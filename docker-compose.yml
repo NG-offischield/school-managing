@@ -1,0 +1,65 @@
+# Local / LAN development topology (spec §2, UML 04 "Déploiement V1 en LAN").
+#
+#   clients (admin desktop, Flutter, browser)
+#            │  HTTP + WebSocket only
+#            ▼
+#        ┌───────┐      ┌──────────┐
+#        │  web  │ ───▶ │    db    │  PostgreSQL (not published to the network)
+#        │Django │ ───▶ │  redis   │  cache / rate limits / channel layer (not published)
+#        └───────┘      └──────────┘
+#
+# Only `web` publishes a port. Clients must never talk to PostgreSQL or Redis
+# directly (spec §9), so those two services are reachable only on the internal
+# Docker network.
+
+name: school-platform
+
+services:
+  db:
+    image: postgres:17-alpine
+    env_file: .env
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # To inspect the database from the host during development only, uncomment:
+    # ports: ["127.0.0.1:5432:5432"]
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: ./backend
+      args:
+        # Development image also contains pytest, ruff, coverage...
+        INSTALL_DEV: "true"
+    env_file: .env
+    # Source is bind-mounted so code edits reload without rebuilding the image.
+    volumes:
+      - ./backend:/app
+    ports:
+      # 0.0.0.0 so phones and the admin PC on the same LAN can reach the API.
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+
+volumes:
+  pg_data:
+  redis_data:

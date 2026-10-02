@@ -1,0 +1,3 @@
+-r base.txt
+# Production-only dependencies will be added here when deployment is planned
+# (production deployment is explicitly out of scope for Phase 1).

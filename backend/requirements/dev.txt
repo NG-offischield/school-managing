@@ -1,0 +1,10 @@
+-r base.txt
+
+# Tests run against a real PostgreSQL (never SQLite - spec §13).
+pytest~=8.4
+pytest-django~=4.11
+factory-boy~=3.3
+coverage~=7.10
+
+# Linter + formatter.
+ruff~=0.13

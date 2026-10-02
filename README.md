@@ -1,0 +1,48 @@
+# School Platform
+
+Plateforme de gestion scolaire — V1 : un établissement, architecture prête pour le multi-établissement, fonctionnement en réseau local (LAN) sans hébergement payant.
+
+**Source de vérité :** [docs/specification/School_Master_Specification_V4.docx](docs/specification/School_Master_Specification_V4.docx).
+Les écarts validés par rapport à la spec sont tracés dans [docs/adr/](docs/adr/).
+
+## Architecture
+
+| Composant | Technologie | Dossier |
+|---|---|---|
+| Backend (API REST + WebSocket) | Django 5.2 LTS, DRF, Channels | `backend/` |
+| Base de données | PostgreSQL 17 | conteneur `db` |
+| Temps réel / cache / limitation de débit | Redis 7 | conteneur `redis` |
+| Client administrateur | Python + PySide6 (bureau) | `admin_desktop/` *(phase ultérieure)* |
+| Enseignant / Parent / Gardien / Personnel | Flutter | `mobile/` *(phase ultérieure)* |
+| Site public | Django Templates | `backend/` *(phase ultérieure)* |
+
+Le backend est la seule autorité pour les permissions, les calculs, la finance et les règles métier. Les clients ne parlent jamais directement à PostgreSQL ou Redis.
+
+## Démarrage rapide
+
+Prérequis : Docker Desktop démarré.
+
+```bash
+cp .env.example .env        # puis remplacer les valeurs "change-me"
+docker compose up --build   # API sur http://localhost:8000
+```
+
+Créer l'établissement et son premier super-administrateur (il n'existe pas d'inscription admin publique) :
+
+```bash
+docker compose exec web python manage.py bootstrap_school --code LYC-DLA --name "Lycée de Douala" --city Douala --address "Akwa" --admin-username admin --admin-email admin@example.cm --admin-first-name Jean --admin-last-name Dupont
+```
+
+Lancer les tests (sur PostgreSQL réel) :
+
+```bash
+docker compose run --rm web pytest
+```
+
+Voir [docs/runbook.md](docs/runbook.md) pour l'exploitation courante.
+
+## État d'avancement
+
+- [x] Phase 0 — audit de l'environnement
+- [x] Phase 1 — squelette Django, Docker, utilisateur personnalisé, noyau multi-tenant, authentification, tests
+- [ ] Phases suivantes — profils, scolarité, présences/QR, planning, finance, paie, communication, site public, clients PySide6 et Flutter

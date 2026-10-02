@@ -1,0 +1,33 @@
+# --- Secrets -----------------------------------------------------------------
+# The real .env holds SECRET_KEY and database passwords: it must NEVER be
+# committed (spec §9). Only .env.example, which contains placeholders, is versioned.
+.env
+.env.*
+!.env.example
+
+# --- Python ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Django runtime files ----------------------------------------------------
+# Uploaded files are private user data (IDs, attachments): never versioned.
+backend/media/
+backend/staticfiles/
+
+# --- Flutter / Dart ----------------------------------------------------------
+mobile/**/.dart_tool/
+mobile/**/build/
+
+# --- IDE / OS ----------------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+.DS_Store
+.test-media/

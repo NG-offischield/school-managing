@@ -1,0 +1,6 @@
+# Files are executed in Linux containers: keep LF line endings on every OS
+# (Windows core.autocrlf would otherwise turn them into CRLF on checkout).
+* text=auto eol=lf
+*.docx binary
+*.png binary
+*.jpg binary

@@ -1,0 +1,21 @@
+# Runtime dependencies shared by every environment.
+# `~=` allows patch/minor security updates within a compatible series.
+
+# Django 5.2 is the LTS line (security support until April 2028).
+Django~=5.2.17
+djangorestframework~=3.16
+# Real-time layer (WebSockets) - spec §2.
+channels~=4.3
+channels-redis~=4.3
+# ASGI server; also upgrades `runserver` to serve ASGI in development.
+daphne~=4.2
+# PostgreSQL driver (psycopg 3).
+psycopg[binary]~=3.2
+# Reads configuration and secrets from environment variables / .env.
+django-environ~=0.12
+# Argon2 password hashing (spec §9: no plaintext, no MD5).
+argon2-cffi~=25.1
+# Required by ImageField (school logo, profile photos).
+Pillow~=12.0
+# Redis client used by Django's cache backend (rate limiting).
+redis~=6.0

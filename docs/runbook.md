@@ -1,0 +1,54 @@
+# Runbook — exploitation locale / LAN
+
+## Démarrer / arrêter
+
+```bash
+docker compose up -d --build     # démarre db, redis, web (migrations appliquées au démarrage)
+docker compose logs -f web       # suivre les logs de l'API
+docker compose down              # arrêter (les données restent dans les volumes)
+```
+
+`docker compose down -v` **supprime les volumes, donc toute la base**. À n'utiliser que sur un poste de développement.
+
+## Vérifier que l'API répond
+
+```bash
+curl http://localhost:8000/api/v1/health/
+```
+
+Depuis un téléphone sur le même Wi-Fi : remplacer `localhost` par l'IP du serveur et ajouter cette IP à `DJANGO_ALLOWED_HOSTS` dans `.env`.
+
+## Premier démarrage d'un établissement
+
+```bash
+docker compose exec web python manage.py bootstrap_school --help
+```
+
+Le mot de passe est demandé de façon interactive (jamais en argument, pour ne pas finir dans l'historique du shell).
+
+## Tests et qualité
+
+```bash
+docker compose run --rm web pytest                 # tests
+docker compose run --rm web pytest --create-db     # après une modification de migration
+docker compose run --rm web ruff check .           # lint
+docker compose run --rm web ruff format .          # formatage
+```
+
+## Migrations
+
+```bash
+docker compose exec web python manage.py makemigrations
+docker compose exec web python manage.py migrate
+```
+
+## Sauvegarde de la base
+
+```bash
+docker compose exec db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > backup.sql
+```
+
+## Points d'attention Windows
+
+- Utiliser `py` et non `python` (ce dernier ouvre le Microsoft Store).
+- PowerShell 5.1 écrit les fichiers UTF-8 **avec BOM** : éditer `.env` avec un éditeur de code, pas avec `Set-Content`.

@@ -1,0 +1,31 @@
+[project]
+name = "school-platform-backend"
+version = "0.1.0"
+description = "School management platform — Django backend (spec V4)"
+requires-python = ">=3.13"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["test_*.py"]
+testpaths = ["tests"]
+# --reuse-db speeds up local runs; CI should run with --create-db.
+addopts = "--strict-markers -ra --reuse-db"
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+extend-exclude = ["*/migrations/*"]
+
+[tool.ruff.lint]
+# E/F: errors, I: import order, B: likely bugs, UP: modern syntax, DJ: Django rules, S: security.
+select = ["E", "F", "I", "B", "UP", "DJ", "S"]
+ignore = [
+    "DJ001",  # nullable CharField: kept where the spec says the column is nullable
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S105", "S106"]  # asserts and fake passwords are fine in tests
+
+[tool.coverage.run]
+source = ["apps", "common"]
+omit = ["*/migrations/*"]
