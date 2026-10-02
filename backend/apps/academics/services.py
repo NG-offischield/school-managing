@@ -107,13 +107,9 @@ def create_period(academic_year, *, name, period_type, order_index, start_date, 
 # -----------------------------------------------------------------------------
 
 
-def create_subject(school, *, code, name, subject_type=SubjectType.THEORETICAL, category=None, **extra):
-    """Create a subject, applying the school's "category required" rule."""
-    if category is None and school.configuration.subject_category_required:
-        raise ValidationError(
-            "This school requires every subject to belong to a pedagogical category.",
-            code="subject_category_required",
-        )
+def create_subject(school, *, code, name, category, subject_type=SubjectType.THEORETICAL, **extra):
+    """Create a subject. The category is mandatory (NOT NULL in PostgreSQL)
+    and must belong to the same school (composite FK)."""
     return Subject.objects.create(
         school=school, code=code, name=name, subject_type=subject_type, category=category, **extra
     )

@@ -82,11 +82,6 @@ class SchoolConfiguration(BaseModel):
     default_attachment_limit_mb = models.PositiveIntegerField(default=10)
     # Length of one paid teaching session ("vacation"), used by payroll.
     teacher_vacation_duration_minutes = models.PositiveIntegerField(default=120)
-    # When True, every subject must belong to a pedagogical category
-    # (enforced by academics.services.create_subject). Addition to spec
-    # §4.1, see ADR 0008: "a subject belongs to a category when the
-    # school's rule requires it".
-    subject_category_required = models.BooleanField(default=True)
 
     class Meta:
         constraints = [

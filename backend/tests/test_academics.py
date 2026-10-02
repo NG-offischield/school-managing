@@ -18,7 +18,6 @@ from apps.academics.models import (
     SubjectCompatibilityRule,
     SubjectType,
 )
-from apps.core.models import SchoolConfiguration
 from apps.core.services import FirstAdmin, SchoolProvisioningService
 
 from .conftest import DB
@@ -286,17 +285,21 @@ def test_category_code_unique_per_school(school):
         CategoryFactory(school=school, code="SCI")
 
 
-def test_subject_category_required_by_default(school):
-    with pytest.raises(ValidationError) as exc:
-        services.create_subject(school, code="MATH", name="Mathématiques")
-    assert exc.value.code == "subject_category_required"
+def test_subject_category_is_mandatory_in_postgresql(school):
+    """NOT NULL in the database: no runtime setting can bypass it."""
+    with db_rejects(), transaction.atomic():
+        Subject.objects.create(school=school, code="MATH", name="Mathématiques", category=None)
+    subject = SubjectFactory(school=school)
+    with db_rejects(), transaction.atomic():
+        Subject.objects.filter(pk=subject.pk).update(category=None)
 
 
-def test_subject_category_optional_when_school_rule_says_so(school):
-    SchoolConfiguration.objects.filter(school=school).update(subject_category_required=False)
-    school.refresh_from_db()
-    subject = services.create_subject(school, code="EPS", name="Sport", subject_type=SubjectType.PRACTICAL)
-    assert subject.category is None and subject.subject_type == SubjectType.PRACTICAL
+def test_subject_has_exactly_one_category(school):
+    sci = CategoryFactory(school=school, code="SCIENTIFIC")
+    subject = services.create_subject(
+        school, code="EPS", name="Sport", category=sci, subject_type=SubjectType.PRACTICAL
+    )
+    assert subject.category == sci and sci.subjects.get() == subject
 
 
 def test_theoretical_and_practical_subjects(school):

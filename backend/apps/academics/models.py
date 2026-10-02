@@ -273,17 +273,15 @@ class SubjectType(models.TextChoices):
 class Subject(TenantModel):
     """A taught subject (catalogue of the school).
 
-    `category` is nullable: a subject belongs to a pedagogical category when
-    the school's rule requires it (SchoolConfiguration.subject_category_required,
-    checked by services.create_subject). Deviation from spec §4.4, where the
-    column is NOT NULL — see ADR 0008.
+    Every subject belongs to exactly ONE pedagogical category (spec §4.4:
+    NOT NULL, enforced by PostgreSQL). Teaching a subject from another
+    category is not modelled by a second category but by the compatibility
+    rules and audited overrides (apps/people/compatibility.py).
     """
 
     code = models.CharField(max_length=30)
     name = models.CharField(max_length=120)
-    category = models.ForeignKey(
-        PedagogicalCategory, on_delete=models.PROTECT, blank=True, null=True, related_name="subjects"
-    )
+    category = models.ForeignKey(PedagogicalCategory, on_delete=models.PROTECT, related_name="subjects")
     subject_type = models.CharField(
         max_length=20, choices=SubjectType.choices, default=SubjectType.THEORETICAL, db_index=True
     )

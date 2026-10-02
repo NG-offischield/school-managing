@@ -93,7 +93,7 @@ def test_current_school_endpoint(two_schools):
     a = two_schools["a"]
     data = client_for(a["admin"]).get("/api/v1/school/").json()["data"]
     assert data["code"] == a["school"].code
-    assert data["configuration"]["subject_category_required"] is True
+    assert data["configuration"]["default_late_threshold_minutes"] == 15
     assert data["branding"]["primary_color"] == "#173B73"
 
 
