@@ -34,6 +34,11 @@ class ErrorCode(StrEnum):
     UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE"
     RATE_LIMITED = "RATE_LIMITED"
     SERVER_ERROR = "SERVER_ERROR"
+    # A business rule of a service was broken; details.rule = stable rule code
+    # (e.g. "period_not_open", "score_out_of_range").
+    BUSINESS_RULE_VIOLATION = "BUSINESS_RULE_VIOLATION"
+    # Refused by the database (uniqueness, integrity trigger) or stale data.
+    CONFLICT = "CONFLICT"
     # Authentication
     NOT_AUTHENTICATED = "NOT_AUTHENTICATED"
     AUTHENTICATION_FAILED = "AUTHENTICATION_FAILED"
@@ -55,6 +60,8 @@ ERROR_MESSAGES = {
     ErrorCode.UNSUPPORTED_MEDIA_TYPE: _("Unsupported content type."),
     ErrorCode.RATE_LIMITED: _("Too many requests. Please try again later."),
     ErrorCode.SERVER_ERROR: _("An unexpected error occurred."),
+    ErrorCode.BUSINESS_RULE_VIOLATION: _("This operation breaks a business rule."),
+    ErrorCode.CONFLICT: _("This operation conflicts with existing data."),
     ErrorCode.NOT_AUTHENTICATED: _("Authentication is required."),
     ErrorCode.AUTHENTICATION_FAILED: _("Authentication failed."),
     ErrorCode.INVALID_CREDENTIALS: _("Invalid credentials."),

@@ -100,6 +100,7 @@ def test_event_survives_deletion_of_its_user_and_school():
     with connection.cursor() as cursor:
         cursor.execute("DELETE FROM core_schoolbranding WHERE school_id = %s", [school.id])
         cursor.execute("DELETE FROM core_schoolconfiguration WHERE school_id = %s", [school.id])
+        cursor.execute("DELETE FROM academics_gradingscale WHERE school_id = %s", [school.id])
         cursor.execute("DELETE FROM core_school WHERE id = %s", [school.id])
         cursor.execute("DELETE FROM accounts_user WHERE id = %s", [user.id])
 
@@ -120,3 +121,12 @@ def test_event_referencing_an_uncommitted_row_is_kept_with_unresolved_ref():
     event = SecurityEvent.objects.get()
     assert event.user_id is None
     assert event.metadata == {"attempt": "x", "unresolved_refs": {"user_id": str(ghost.id)}}
+
+
+def test_suite_runs_on_the_test_settings_and_database():
+    """Guard: the suite must never touch the development database or Redis."""
+    from django.conf import settings
+
+    assert settings.SETTINGS_MODULE == "config.settings.test"
+    assert connection.settings_dict["HOST"] == "db_test"
+    assert settings.CACHES["default"]["BACKEND"].endswith("LocMemCache")

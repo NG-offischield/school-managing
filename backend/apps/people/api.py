@@ -5,23 +5,24 @@ exists in this phase:
 
     resource            ADMIN/SUPER_ADMIN   TEACHER          PARENT                 others
     ------------------  -----------------   --------------   --------------------   ------
-    students            all                 none yet (*)     own VERIFIED children  none
+    students            all                 my classes (*)   own VERIFIED children  none
     parents/children    —                   —                own VERIFIED children  —
     teachers            all                 self             none                   none
     teacher quals       all                 self             none                   none
     staff               all                 none             none                   self (STAFF)
 
-(*) "R scoped" for teachers means "students of the classes I teach": that
-scope needs Course / TeacherClassAssignment, which arrive with the next
-academic phase. Until then a teacher sees no student — fail closed.
+(*) "R scoped" for teachers = students enrolled in a class where the teacher
+has an ACTIVE Course (gradebook phase, ADR 0009).
 
 Out-of-scope objects are filtered out of the queryset, so they answer 404
 exactly like ids that do not exist.
 """
 
+from django.db.models import Q
 from django.urls import path
 from rest_framework import generics, serializers
 
+from common.permissions import membership_has_role
 from common.tenancy import scope_to_current_school
 from common.views import SchoolScopedMixin
 
@@ -153,18 +154,32 @@ class StaffSerializer(serializers.ModelSerializer):
 
 
 class StudentVisibilityMixin(SchoolScopedMixin):
-    """Admins see every student of the school; a parent sees only children
-    linked to them by an ACTIVE and VERIFIED ParentStudent; others none."""
+    """Admins see every student of the school; a parent only the children
+    linked to them by an ACTIVE and VERIFIED ParentStudent; a teacher only the
+    students enrolled in classes where they have an active course; others
+    none. Each scope is a subquery on ids, so the scopes combine with OR
+    without multiplying rows."""
 
     def visible_students(self, queryset):
         if self.is_admin():
             return queryset
         membership = self.membership()
-        return queryset.filter(
-            parent_links__parent__membership=membership,
-            parent_links__active=True,
-            parent_links__identity_verified=True,
-        ).distinct()
+        scope = Q(
+            pk__in=Student.objects.filter(
+                parent_links__parent__membership=membership,
+                parent_links__active=True,
+                parent_links__identity_verified=True,
+            ).values("pk")
+        )
+        if membership_has_role(membership, {"TEACHER"}):
+            # Reverse relation "courses" is declared by gradebook.Course.
+            scope |= Q(
+                pk__in=Student.objects.filter(
+                    enrollments__school_class__courses__teacher__employee__membership=membership,
+                    enrollments__school_class__courses__active=True,
+                ).values("pk")
+            )
+        return queryset.filter(scope)
 
 
 # -----------------------------------------------------------------------------

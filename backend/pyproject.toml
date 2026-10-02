@@ -9,7 +9,10 @@ DJANGO_SETTINGS_MODULE = "config.settings.test"
 python_files = ["test_*.py"]
 testpaths = ["tests"]
 # --reuse-db speeds up local runs; CI should run with --create-db.
-addopts = "--strict-markers -ra --reuse-db"
+# --ds on the command line wins over the DJANGO_SETTINGS_MODULE of .env (which
+# points to development settings): tests must never use the dev database,
+# dev Redis or production password costs.
+addopts = "--ds=config.settings.test --strict-markers -ra --reuse-db"
 
 [tool.ruff]
 line-length = 120

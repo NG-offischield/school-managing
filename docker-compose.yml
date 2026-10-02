@@ -28,6 +28,25 @@ services:
     # To inspect the database from the host during development only, uncomment:
     # ports: ["127.0.0.1:5432:5432"]
 
+  # Throw-away PostgreSQL for the test suite only (config.settings.test).
+  # Same engine and version as `db` (constraints, triggers, btree_gist behave
+  # identically), but data lives in RAM (tmpfs) and durability is switched
+  # off: the suite truncates every table after each transactional test, which
+  # costs seconds per test with fsync on. NEVER use these flags for real data:
+  # the development/production database is the `db` service above.
+  db_test:
+    image: postgres:17-alpine
+    env_file: .env
+    command: >
+      postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   redis:
     image: redis:7-alpine
     volumes:
@@ -55,6 +74,8 @@ services:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      db_test:
         condition: service_healthy
     command: >
       sh -c "python manage.py migrate --noinput &&

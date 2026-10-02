@@ -231,6 +231,55 @@ class Level(TenantModel):
 
 
 # =============================================================================
+# Grading scales
+# =============================================================================
+
+
+class GradingScale(TenantModel):
+    """A scoring scale configured by the school: /20, /100, /60 ...
+
+    Nothing in the code assumes /20. Every score is converted through a scale:
+    a grade is first a fraction (score / assessment max_score), then expressed
+    in the scale of its course, and report cards in the school's DEFAULT scale
+    (`is_default`, one per school — partial unique index).
+
+    Defaults created at provisioning: SUR20 (default), SUR100, SUR60.
+    """
+
+    code = models.CharField(max_length=30)
+    label = models.CharField(max_length=80)
+    max_score = models.DecimalField(max_digits=8, decimal_places=2)
+    pass_score = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True)
+    # Rounding of averages expressed in this scale.
+    decimal_places = models.PositiveSmallIntegerField(default=2)
+    active = models.BooleanField(default=True)
+    # The school's reference scale (report cards, general averages). Addition
+    # to spec §4.4, see ADR 0009.
+    is_default = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["max_score"]
+        constraints = [
+            models.UniqueConstraint(fields=["school", "code"], name="grading_scale_school_code_unique"),
+            models.CheckConstraint(condition=Q(max_score__gt=0), name="grading_scale_max_positive"),
+            models.CheckConstraint(
+                condition=Q(pass_score__isnull=True) | (Q(pass_score__gte=0) & Q(pass_score__lte=F("max_score"))),
+                name="grading_scale_pass_within_max",
+            ),
+            models.CheckConstraint(condition=Q(decimal_places__lte=4), name="grading_scale_decimals_max_4"),
+            models.UniqueConstraint(
+                fields=["school"], condition=Q(is_default=True), name="grading_scale_one_default_per_school"
+            ),
+            models.CheckConstraint(
+                condition=Q(is_default=False) | Q(active=True), name="grading_scale_default_is_active"
+            ),
+        ]
+
+    def __str__(self):
+        return self.label
+
+
+# =============================================================================
 # Pedagogical categories and subjects
 # =============================================================================
 
@@ -287,8 +336,10 @@ class Subject(TenantModel):
     )
     active = models.BooleanField(default=True)
     public_visible = models.BooleanField(default=False)
-    # Spec field `default_grading_scale` (FK GradingScale) arrives with the
-    # grades phase, together with GradingScale itself (ADR 0008).
+    # Scale used for this subject's averages when its Course sets none.
+    default_grading_scale = models.ForeignKey(
+        "GradingScale", on_delete=models.SET_NULL, blank=True, null=True, related_name="+"
+    )
 
     class Meta:
         ordering = ["name"]

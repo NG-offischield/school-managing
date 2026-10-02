@@ -45,7 +45,12 @@ class SchoolFactory(factory.Factory):
 
     @classmethod
     def _create(cls, model_class, **kwargs):
-        return create_school(**kwargs)
+        from apps.academics.services import seed_default_grading_scales
+
+        school = create_school(**kwargs)
+        # Like SchoolProvisioningService: every school has /20 (default), /100, /60.
+        seed_default_grading_scales(school)
+        return school
 
 
 class UserFactory(factory.django.DjangoModelFactory):

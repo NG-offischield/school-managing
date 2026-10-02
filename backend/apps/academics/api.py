@@ -11,7 +11,7 @@ from rest_framework import generics, serializers
 
 from common.views import SchoolScopedMixin
 
-from .models import AcademicPeriod, AcademicYear, Level, PedagogicalCategory, SchoolClass, Subject
+from .models import AcademicPeriod, AcademicYear, GradingScale, Level, PedagogicalCategory, SchoolClass, Subject
 
 
 class AcademicYearSerializer(serializers.ModelSerializer):
@@ -62,6 +62,17 @@ class SchoolClassSerializer(serializers.ModelSerializer):
     class Meta:
         model = SchoolClass
         fields = ["id", "name", "level", "level_code", "academic_year", "capacity", "active"]
+
+
+class GradingScaleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GradingScale
+        fields = ["id", "code", "label", "max_score", "pass_score", "decimal_places", "is_default", "active"]
+
+
+class GradingScaleList(SchoolScopedMixin, generics.ListAPIView):
+    queryset = GradingScale.objects.all()
+    serializer_class = GradingScaleSerializer
 
 
 class AcademicYearList(SchoolScopedMixin, generics.ListAPIView):
@@ -119,4 +130,5 @@ urlpatterns = [
     path("pedagogical-categories/", PedagogicalCategoryList.as_view(), name="pedagogical-categories"),
     path("subjects/", SubjectList.as_view(), name="subjects"),
     path("classes/", SchoolClassList.as_view(), name="classes"),
+    path("grading-scales/", GradingScaleList.as_view(), name="grading-scales"),
 ]

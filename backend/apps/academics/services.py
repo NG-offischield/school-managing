@@ -17,6 +17,7 @@ from .models import (
     AcademicPeriod,
     AcademicYear,
     AcademicYearStatus,
+    GradingScale,
     PedagogicalCategory,
     Subject,
     SubjectType,
@@ -31,6 +32,32 @@ DEFAULT_CATEGORIES = [
     ("ESF", "Économie sociale et familiale"),
     ("TECHNICAL", "Technique"),
 ]
+
+
+# Initial grading scales (code, label, max, pass, is_default). Configurable.
+DEFAULT_SCALES = [
+    ("SUR20", "/20", 20, 10, True),
+    ("SUR100", "/100", 100, 50, False),
+    ("SUR60", "/60", 60, 30, False),
+]
+
+
+def seed_default_grading_scales(school):
+    """Create the default scales if missing. Idempotent."""
+    for code, label, max_score, pass_score, is_default in DEFAULT_SCALES:
+        GradingScale.objects.get_or_create(
+            school=school,
+            code=code,
+            defaults={"label": label, "max_score": max_score, "pass_score": pass_score, "is_default": is_default},
+        )
+
+
+def default_grading_scale(school):
+    """The school's reference scale (report cards). Raises if not configured."""
+    scale = GradingScale.objects.filter(school=school, is_default=True).first()
+    if scale is None:
+        raise ValidationError("The school has no default grading scale.", code="no_default_scale")
+    return scale
 
 
 def seed_default_categories(school):

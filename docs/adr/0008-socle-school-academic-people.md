@@ -35,7 +35,7 @@ Sens des dépendances : `common` ← `core` ← `accounts` ← `academics` ← `
 |---|---|---|---|
 | 1 | `SchoolClass` (et `Room`) hors de la liste de la phase | `SchoolClass` **ajouté**, sans `main_room` | `StudentEnrollment.school_class` est obligatoire dans la spec. `Room` / `main_room` relèvent du planning |
 | 2 | `Subject.category` NOT NULL | ~~nullable + setting~~ → **résolu le 2026-10-02** : FK **non nullable** (migration `academics.0003`), setting `subject_category_required` supprimé (`core.0003`) | décision du porteur du projet : intégrité en base, pas via un réglage runtime. Une matière = une catégorie ; l'enseignement transversal passe par les règles de compatibilité / dérogations |
-| 3 | `Subject.default_grading_scale` (FK GradingScale) | **reporté** | `GradingScale` appartient à la phase des notes |
+| 3 | `Subject.default_grading_scale` (FK GradingScale) | **résolu** dans la phase cœur académique (ADR 0009) | — |
 | 4 | `ParentStudent` = relation **vérifiée** (`verified_at` NOT NULL) | `verified_at` nullable + `identity_verified`, `verification_method`, `verification_reference`, `verified_by` | demande explicite de distinguer déclaré et vérifié. Les droits financiers exigent un lien vérifié (CHECK). `ParentStudentLinkRequest` et `IdentityVerification` restent à venir |
 | 5 | `TeacherProfile.membership` + `employee_number` UNIQUE + `hire_date` | `TeacherProfile.employee` → `EmployeeProfile`. Le numéro enseignant est `employee.employee_number` ; `hire_date` est porté par `EmployeeProfile` | ADR 0003 : une seule source de vérité, sur le même modèle que `StaffProfile` |
 | 6 | `employee_number`, `guardian_number`, `staff_number` UNIQUE globaux | UNIQUE **par école** | cohérence multi-tenant (ADR 0003) |

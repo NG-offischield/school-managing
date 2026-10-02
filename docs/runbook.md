@@ -60,3 +60,17 @@ La migration `academics.0001` exécute `CREATE EXTENSION btree_gist`. Cette exte
 ```bash
 docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS btree_gist"'
 ```
+
+## Base de test (`db_test`)
+
+La suite pytest n'utilise **jamais** la base de développement. `pyproject.toml` force `--ds=config.settings.test`, qui pointe vers le service `db_test` :
+- même PostgreSQL 17 que `db` ;
+- données en RAM (`tmpfs`) et `fsync` désactivé : elles disparaissent à l'arrêt du conteneur ;
+- un test-garde (`test_suite_runs_on_the_test_settings_and_database`) échoue si la suite tourne sur d'autres settings ou une autre base.
+
+Les mots de passe y sont hachés en Argon2 avec un coût minimal (tests uniquement).
+
+```bash
+docker compose run --rm web pytest              # ~2 min
+docker compose run --rm web pytest --create-db  # après une nouvelle migration
+```

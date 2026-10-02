@@ -50,17 +50,22 @@ class EnforceSameValue(Operation):
     reversible = True
     reduces_to_sql = True
 
-    def __init__(self, model_name, field_name, shared_field="school"):
+    def __init__(self, model_name, field_name, shared_field="school", on_update=None):
+        """`on_update="CASCADE"` copies changes of the shared column of the
+        target into the referencing rows (used to keep Grade.max_score equal
+        to its Assessment.max_score)."""
+        if on_update not in (None, "CASCADE"):
+            raise ValueError("on_update must be None or 'CASCADE'")
         self.model_name = model_name
         self.field_name = field_name
         self.shared_field = shared_field
+        self.on_update = on_update
 
     def deconstruct(self):
-        return (
-            self.__class__.__qualname__,
-            [self.model_name, self.field_name],
-            {"shared_field": self.shared_field},
-        )
+        kwargs = {"shared_field": self.shared_field}
+        if self.on_update:
+            kwargs["on_update"] = self.on_update
+        return (self.__class__.__qualname__, [self.model_name, self.field_name], kwargs)
 
     def state_forwards(self, app_label, state):
         # Database-only guarantee: Django's model state is unchanged.
@@ -108,7 +113,10 @@ class EnforceSameValue(Operation):
             f"ALTER TABLE {q(n['table'])} ADD CONSTRAINT {q(n['fk_name'])} "
             f"FOREIGN KEY ({q(n['column'])}, {q(n['shared'])}) "
             f'REFERENCES {q(n["target_table"])} ("id", {q(n["target_shared"])}) '
-            f"DEFERRABLE INITIALLY DEFERRED"
+            # Referential actions (CASCADE) run immediately even on a
+            # deferrable constraint; only the existence check is deferred.
+            + ("ON UPDATE CASCADE " if self.on_update == "CASCADE" else "")
+            + "DEFERRABLE INITIALLY DEFERRED"
         )
 
     def database_backwards(self, app_label, schema_editor, from_state, to_state):

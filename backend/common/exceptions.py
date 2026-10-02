@@ -10,6 +10,8 @@ import logging
 import math
 
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError
 from django.http import Http404
 from rest_framework import exceptions as drf
 from rest_framework.response import Response
@@ -18,6 +20,10 @@ from rest_framework.views import exception_handler, set_rollback
 from .errors import ApiError, ErrorCode, error_body
 
 logger = logging.getLogger(__name__)
+
+# Service rule codes that mean "your data is stale" rather than "invalid":
+# answered 409 CONFLICT (optimistic concurrency, spec §6).
+CONFLICT_RULES = {"stale_grade"}
 
 # Order matters: subclasses before their parents.
 _CODES = [
@@ -59,6 +65,23 @@ def envelope_exception_handler(exc, context):
     # WWW-Authenticate / Retry-After headers and marks the request transaction
     # for rollback; only the body is rewritten here.
     response = exception_handler(exc, context)
+
+    if response is None and isinstance(exc, DjangoValidationError):
+        # Business rule refused by a service (apps/*/services.py). The stable
+        # rule code goes in details so clients can react to it.
+        set_rollback()
+        rule = getattr(exc, "code", None)
+        details = {"rule": rule, "messages": exc.messages}
+        if rule in CONFLICT_RULES:
+            return Response(error_body(ErrorCode.CONFLICT, details), status=409)
+        return Response(error_body(ErrorCode.BUSINESS_RULE_VIOLATION, details), status=400)
+
+    if response is None and isinstance(exc, IntegrityError):
+        # Refused by PostgreSQL (unique constraint, integrity trigger...).
+        # The database message is logged, not returned (it names tables).
+        logger.warning("Integrity error: %s", exc)
+        set_rollback()
+        return Response(error_body(ErrorCode.CONFLICT), status=409)
 
     if response is None:
         # Unexpected error: same JSON shape instead of an HTML 500 page, and no

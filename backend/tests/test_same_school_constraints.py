@@ -25,9 +25,9 @@ def composite_keys():
 
 def test_all_composite_keys_are_present():
     keys = composite_keys()
-    # 9 in academics.0002 + 25 in people.0002.
-    assert len(keys) == 34
-    assert {shared for _, _, shared in keys} == {"school_id", "academic_year_id"}
+    # academics: 9 (0002) + 1 (0005) ; people: 25 (0002) ; gradebook: 22 (0002).
+    assert len(keys) == 57
+    assert {shared for _, _, shared in keys} == {"school_id", "academic_year_id", "max_score"}
 
 
 def test_enrollment_guards_school_and_year():
@@ -35,3 +35,5 @@ def test_enrollment_guards_school_and_year():
     assert ("people_studentenrollment", "school_class_id", "academic_year_id") in keys
     assert ("people_studentenrollment", "student_id", "school_id") in keys
     assert ("academics_academicperiod", "parent_period_id", "academic_year_id") in keys
+    assert ("gradebook_grade", "assessment_id", "max_score") in keys
+    assert ("gradebook_assessment", "academic_period_id", "academic_year_id") in keys
