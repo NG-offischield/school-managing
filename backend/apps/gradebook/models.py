@@ -282,3 +282,50 @@ class ReportCardLine(TenantModel):
 
     def __str__(self):
         return f"{self.report_card} — {self.subject}"
+
+
+# =============================================================================
+# Class principal (professeur principal)
+# =============================================================================
+
+
+class ClassPrincipalAssignment(TenantModel):
+    """The principal teacher of a class, with history (spec §4.4).
+
+    Spec §8: the principal teacher may inspect the whole class dashboard
+    (every subject's averages) but cannot modify other teachers' grades —
+    the dashboard is read-only, grade writes stay limited to own courses.
+
+    Rules enforced by PostgreSQL:
+    - at most ONE active principal per class (partial unique index);
+    - active <=> no end date; end_date >= start_date;
+    - class and teacher belong to the same school (composite FKs).
+    """
+
+    school_class = models.ForeignKey("academics.SchoolClass", on_delete=models.PROTECT, related_name="principals")
+    teacher = models.ForeignKey("people.TeacherProfile", on_delete=models.PROTECT, related_name="principal_of")
+    start_date = models.DateField()
+    end_date = models.DateField(blank=True, null=True)
+    assigned_by = models.ForeignKey(
+        "accounts.SchoolMembership", on_delete=models.SET_NULL, blank=True, null=True, related_name="+"
+    )
+    active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        ordering = ["-start_date"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["school_class"], condition=Q(active=True), name="class_principal_one_active"
+            ),
+            models.CheckConstraint(
+                condition=Q(end_date__isnull=True) | Q(end_date__gte=F("start_date")),
+                name="class_principal_dates_ordered",
+            ),
+            models.CheckConstraint(
+                condition=(Q(active=True) & Q(end_date__isnull=True)) | (Q(active=False) & Q(end_date__isnull=False)),
+                name="class_principal_active_consistent",
+            ),
+        ]
+
+    def __str__(self):
+        return f"PP {self.school_class} — {self.teacher}"

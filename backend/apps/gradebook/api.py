@@ -10,6 +10,7 @@
     GET  /report-cards/, /{id}/          admin: all — parent: VALIDATED cards of verified children
     POST /report-cards/generate/         admin (addition, ADR 0009)
     POST /report-cards/{id}/validate/    admin, period must be closed
+    GET  /classes/{id}/dashboard/        admin or the class's principal teacher (read-only)
 
 Objects referenced in a request body (course, period, student...) are looked
 up inside the current school only: an id of another school is a 404.
@@ -396,6 +397,19 @@ class ReportCardGenerate(SchoolScopedMixin, APIView):
         return Response(ReportCardSerializer(cards, many=True).data, status=status.HTTP_201_CREATED)
 
 
+class ClassDashboard(SchoolScopedMixin, APIView):
+    """GET /classes/{id}/dashboard/?academic_period=<uuid> (spec §6.4).
+    Read-only; admins and the class's principal teacher only."""
+
+    def get(self, request, pk):
+        period_id = self.uuid_param("academic_period")
+        if period_id is None:
+            raise serializers.ValidationError({"academic_period": ["This query parameter is required."]})
+        school_class = scoped(SchoolClass, pk, request)
+        period = scoped(AcademicPeriod, period_id, request)
+        return Response(services.class_dashboard(school_class, period, actor=self.membership()))
+
+
 class ReportCardValidate(SchoolScopedMixin, APIView):
     def post(self, request, pk):
         card = services.validate_report_card(scoped(ReportCard, pk, request), actor=self.membership())
@@ -413,4 +427,5 @@ urlpatterns = [
     path("report-cards/generate/", ReportCardGenerate.as_view(), name="report-cards-generate"),
     path("report-cards/<uuid:pk>/", ReportCardDetail.as_view(), name="report-card"),
     path("report-cards/<uuid:pk>/validate/", ReportCardValidate.as_view(), name="report-card-validate"),
+    path("classes/<uuid:pk>/dashboard/", ClassDashboard.as_view(), name="class-dashboard"),
 ]

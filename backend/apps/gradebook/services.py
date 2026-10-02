@@ -37,6 +37,7 @@ from common.permissions import ADMIN_ROLES, membership_has_role, require_role
 from .models import (
     Assessment,
     AssessmentStatus,
+    ClassPrincipalAssignment,
     Course,
     Grade,
     GradeChangeLog,
@@ -394,11 +395,20 @@ def competition_ranks(values):
 # =============================================================================
 
 
-@transaction.atomic
-def generate_report_cards(school_class, period, *, actor):
-    """(Re)compute DRAFT report cards of every student of the class for the
-    period. Validated cards are frozen and never recomputed."""
-    require_role(actor, ADMIN_ROLES, school=school_class.school)
+@dataclass
+class ClassResults:
+    """Live results of a class for a period, in the school's default scale.
+    Single source for report cards AND the class dashboard, so both always
+    show the same numbers."""
+
+    scale: object
+    subject_lines: list
+    # student pk -> (student, [(SubjectLine, average)], general average or None)
+    students: dict
+    ranks: dict  # student pk -> rank (students with an average only)
+
+
+def compute_class_results(school_class, period):
     if period.academic_year_id != school_class.academic_year_id:
         raise ValidationError("The period belongs to another academic year.", code="period_other_year")
     scale = default_grading_scale(school_class.school)
@@ -408,8 +418,8 @@ def generate_report_cards(school_class, period, *, actor):
         for e in StudentEnrollment.objects.filter(school_class=school_class)
         .exclude(status=EnrollmentStatus.WITHDRAWN)
         .select_related("student")
+        .order_by("student__last_name", "student__first_name")
     ]
-
     computed = {}
     for student in students:
         lines = []
@@ -419,9 +429,17 @@ def generate_report_cards(school_class, period, *, actor):
                 lines.append((line, average))
         avg = general_average((a, line.coefficient) for line, a in lines)
         computed[student.pk] = (student, lines, express(avg / scale.max_score, scale) if avg is not None else None)
+    ranks = competition_ranks({pk: avg for pk, (_, _, avg) in computed.items() if avg is not None})
+    return ClassResults(scale=scale, subject_lines=subject_lines, students=computed, ranks=ranks)
 
-    ranked = {pk: avg for pk, (_, _, avg) in computed.items() if avg is not None}
-    ranks = competition_ranks(ranked)
+
+@transaction.atomic
+def generate_report_cards(school_class, period, *, actor):
+    """(Re)compute DRAFT report cards of every student of the class for the
+    period. Validated cards are frozen and never recomputed."""
+    require_role(actor, ADMIN_ROLES, school=school_class.school)
+    results = compute_class_results(school_class, period)
+    scale, computed, ranks = results.scale, results.students, results.ranks
     now = timezone.now()
     cards = []
     for pk, (student, lines, avg) in computed.items():
@@ -434,7 +452,7 @@ def generate_report_cards(school_class, period, *, actor):
         card.general_average = avg
         card.scale_max_score = scale.max_score
         card.rank = ranks.get(pk)
-        card.class_size = len(ranked) if pk in ranks else None
+        card.class_size = len(ranks) if pk in ranks else None
         card.generated_at = now
         card.save()
         card.lines.all().delete()
@@ -502,3 +520,96 @@ def student_evolution(student, academic_year):
             }
         )
     return evolution
+
+
+# =============================================================================
+# Class principal & class dashboard
+# =============================================================================
+
+
+@transaction.atomic
+def assign_class_principal(school_class, teacher, *, actor, start_date=None):
+    """Make `teacher` the principal teacher of the class. The previous one is
+    ended (history kept); at most one active principal (PostgreSQL)."""
+    require_role(actor, ADMIN_ROLES, school=school_class.school)
+    if teacher.school_id != school_class.school_id:
+        raise PermissionDenied("This teacher belongs to another school.")
+    start = start_date or timezone.localdate()
+    for previous in ClassPrincipalAssignment.objects.select_for_update().filter(school_class=school_class, active=True):
+        previous.active = False
+        previous.end_date = max(start, previous.start_date)
+        previous.save(update_fields=["active", "end_date", "updated_at"])
+    return ClassPrincipalAssignment.objects.create(
+        school=school_class.school, school_class=school_class, teacher=teacher, start_date=start, assigned_by=actor
+    )
+
+
+def current_principal(school_class):
+    assignment = ClassPrincipalAssignment.objects.filter(school_class=school_class, active=True).select_related(
+        "teacher__employee__membership__user"
+    )
+    return assignment.first()
+
+
+def can_view_class_dashboard(membership, school_class):
+    """Admins of the school, or the class's ACTIVE principal teacher."""
+    if is_school_admin(membership, school_class.school):
+        return True
+    principal = current_principal(school_class)
+    return (
+        principal is not None
+        and principal.teacher.employee.membership_id == membership.pk
+        and membership_has_role(membership, {"TEACHER"})
+    )
+
+
+def class_dashboard(school_class, period, *, actor):
+    """Read-only overview of a class for a period (spec §6.4 dashboard):
+    per-subject class averages, per-student general averages and ranks, and
+    the students below SchoolConfiguration.low_average_threshold (expressed in
+    the school's default scale)."""
+    if not can_view_class_dashboard(actor, school_class):
+        raise PermissionDenied("Only an administrator or the class's principal teacher can see this dashboard.")
+    results = compute_class_results(school_class, period)
+    threshold = school_class.school.configuration.low_average_threshold
+    principal = current_principal(school_class)
+
+    subjects = []
+    for line in results.subject_lines:
+        averages = [avg for _, lines, _ in results.students.values() for sl, avg in lines if sl is line]
+        subjects.append(
+            {
+                "subject": line.subject.code,
+                "subject_name": line.subject.name,
+                "coefficient": line.coefficient,
+                "teachers": line.teacher_names,
+                "class_average": express(sum(averages) / len(averages) / results.scale.max_score, results.scale)
+                if averages
+                else None,
+                "graded_students": len(averages),
+            }
+        )
+    students = [
+        {
+            "id": str(pk),
+            "name": student.full_name,
+            "general_average": avg,
+            "rank": results.ranks.get(pk),
+            "below_threshold": avg is not None and avg < threshold,
+        }
+        for pk, (student, _, avg) in results.students.items()
+    ]
+    general = [s["general_average"] for s in students if s["general_average"] is not None]
+    return {
+        "school_class": {"id": str(school_class.pk), "name": school_class.name},
+        "academic_period": {"id": str(period.pk), "name": period.name, "status": period.status},
+        "principal": principal.teacher.employee.membership.user.full_name if principal else None,
+        "scale_max_score": results.scale.max_score,
+        "low_average_threshold": threshold,
+        "student_count": len(students),
+        "class_general_average": express(sum(general) / len(general) / results.scale.max_score, results.scale)
+        if general
+        else None,
+        "subjects": subjects,
+        "students": students,
+    }

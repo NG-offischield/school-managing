@@ -2,7 +2,7 @@
 
 from django.contrib import admin
 
-from .models import Assessment, Course, Grade, GradeChangeLog, ReportCard, ReportCardLine
+from .models import Assessment, ClassPrincipalAssignment, Course, Grade, GradeChangeLog, ReportCard, ReportCardLine
 
 
 @admin.register(Course)
@@ -44,3 +44,9 @@ class ReportCardAdmin(admin.ModelAdmin):
     list_display = ("student", "academic_period", "status", "general_average", "rank")
     list_filter = ("school", "status")
     inlines = [ReportCardLineInline]
+
+
+@admin.register(ClassPrincipalAssignment)
+class ClassPrincipalAssignmentAdmin(admin.ModelAdmin):
+    list_display = ("school_class", "teacher", "start_date", "end_date", "active")
+    list_filter = ("school", "active")

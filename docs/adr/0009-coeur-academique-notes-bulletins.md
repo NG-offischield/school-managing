@@ -48,4 +48,6 @@
 | `ReportCard` | ajout de `validated_at`, `scale_max_score` (instantané de l'échelle) et `class_size` (pour « rang x / y ») | bulletin figé lisible même si les échelles changent |
 | `coefficient_override` (sémantique non précisée) | remplace le poids de l'évaluation pour cette note | interprétation retenue |
 | API 6.6 | ajout de `POST /report-cards/generate/` et `GET /report-cards/`, `GET /report-cards/{id}/` ; le PDF (`GET /report-cards/{id}/pdf/`) relève de la phase Reports | génération nécessaire pour valider |
-| `ClassPrincipalAssignment`, `TeacherClassAssignment`, tableau de bord de classe | **reportés** | hors liste de la phase ; le périmètre enseignant repose sur `Course` |
+| `ClassPrincipalAssignment` + `GET /classes/{id}/dashboard/` | **livrés** (bloc suivant, même phase) | un seul professeur principal actif par classe (index unique partiel), historique conservé ; tableau de bord en lecture seule pour l'admin et le professeur principal, calculé par la même fonction que les bulletins (`compute_class_results`) |
+| `TeacherClassAssignment` | **reporté** | ferait doublon avec `Course` pour le périmètre enseignant ; à introduire si un besoin d'affectation sans matière apparaît |
+| `SchoolConfiguration.low_average_threshold` | interprété dans l'échelle **par défaut** de l'école | le tableau de bord signale les élèves sous ce seuil |

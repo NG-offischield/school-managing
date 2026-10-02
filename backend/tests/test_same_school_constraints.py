@@ -25,8 +25,8 @@ def composite_keys():
 
 def test_all_composite_keys_are_present():
     keys = composite_keys()
-    # academics: 9 (0002) + 1 (0005) ; people: 25 (0002) ; gradebook: 22 (0002).
-    assert len(keys) == 57
+    # academics: 9 (0002) + 1 (0005) ; people: 25 (0002) ; gradebook: 22 (0002) + 3 (0005).
+    assert len(keys) == 60
     assert {shared for _, _, shared in keys} == {"school_id", "academic_year_id", "max_score"}
 
 
