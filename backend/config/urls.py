@@ -17,4 +17,8 @@ urlpatterns = [
     path("django-admin/", admin.site.urls),
     path("api/v1/health/", HealthView.as_view(), name="health"),
     path("api/v1/auth/", include("apps.accounts.urls")),
+    # School + Academic + People: read-only in this phase (ADR 0008).
+    path("api/v1/", include("apps.core.api")),
+    path("api/v1/", include("apps.academics.api")),
+    path("api/v1/", include("apps.people.api")),
 ]

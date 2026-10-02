@@ -49,10 +49,14 @@ INSTALLED_APPS = [
     # Third party
     "rest_framework",
     "channels",
+    # PostgreSQL-specific features: exclusion constraints, range types (ADR 0008).
+    "django.contrib.postgres",
     # Domain apps (spec UML 06 - package diagram). Phase 1 only ships the
     # tenant core and identity; the other domains arrive in later phases.
     "apps.core",
     "apps.accounts",
+    "apps.academics",
+    "apps.people",
 ]
 
 MIDDLEWARE = [

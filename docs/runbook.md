@@ -52,3 +52,11 @@ docker compose exec db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > back
 
 - Utiliser `py` et non `python` (ce dernier ouvre le Microsoft Store).
 - PowerShell 5.1 écrit les fichiers UTF-8 **avec BOM** : éditer `.env` avec un éditeur de code, pas avec `Set-Content`.
+
+## Extension PostgreSQL `btree_gist`
+
+La migration `academics.0001` exécute `CREATE EXTENSION btree_gist`. Cette extension est nécessaire aux contraintes interdisant le chevauchement des années et des périodes (ADR 0008). Le superutilisateur Docker en a le droit. Si la base de production utilise un rôle sans ce privilège, créez l'extension une fois en tant qu'administrateur, avant `migrate` :
+
+```bash
+docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS btree_gist"'
+```

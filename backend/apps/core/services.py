@@ -87,6 +87,10 @@ class SchoolProvisioningService:
         user.set_password(admin.password)
 
         school = create_school(code=code, name=name, city=city, address=address, **school_fields)
+        # Initial academic catalogue (LITERARY, SCIENTIFIC...), editable later.
+        from apps.academics.services import seed_default_categories
+
+        seed_default_categories(school)
         user.save()
         membership = SchoolMembership.objects.create(
             school=school,
