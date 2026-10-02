@@ -2,7 +2,9 @@
 
 import uuid
 
-from rest_framework import authentication, exceptions
+from rest_framework import authentication
+
+from common.errors import ApiAuthenticationError
 
 from .models import UserSession
 from .tokens import read_access_token
@@ -17,7 +19,7 @@ class SessionTokenAuthentication(authentication.BaseAuthentication):
             # No credentials: let permission classes decide (401 if required).
             return None
         if len(header) != 2:
-            raise exceptions.AuthenticationFailed("Invalid authorization header.")
+            raise ApiAuthenticationError()
 
         session_id = read_access_token(header[1].decode())
         try:
@@ -25,12 +27,12 @@ class SessionTokenAuthentication(authentication.BaseAuthentication):
         except ValueError:
             session_uuid = None
         if session_uuid is None:
-            raise exceptions.AuthenticationFailed("Invalid or expired access token.")
+            raise ApiAuthenticationError()
 
         session = UserSession.objects.select_related("user").filter(pk=session_uuid).first()
         # The DB check is what makes logout/revocation effective immediately.
         if session is None or not session.is_usable():
-            raise exceptions.AuthenticationFailed("Session expired or revoked.")
+            raise ApiAuthenticationError()
 
         # request.user = the person, request.auth = the session (used by logout).
         return session.user, session

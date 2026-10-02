@@ -1,0 +1,77 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-02 08:11+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+#: common/errors.py:49
+msgid "Some fields are invalid."
+msgstr "Certains champs sont invalides."
+
+#: common/errors.py:50
+msgid "The request body is malformed."
+msgstr "Le corps de la requête est mal formé."
+
+#: common/errors.py:51
+msgid "Resource not found."
+msgstr "Ressource introuvable."
+
+#: common/errors.py:52
+msgid "This method is not allowed on this resource."
+msgstr "Cette méthode n'est pas autorisée sur cette ressource."
+
+#: common/errors.py:53
+msgid "The requested response format is not available."
+msgstr "Le format de réponse demandé n'est pas disponible."
+
+#: common/errors.py:54
+msgid "Unsupported content type."
+msgstr "Type de contenu non pris en charge."
+
+#: common/errors.py:55
+msgid "Too many requests. Please try again later."
+msgstr "Trop de requêtes. Veuillez réessayer plus tard."
+
+#: common/errors.py:56
+msgid "An unexpected error occurred."
+msgstr "Une erreur inattendue s'est produite."
+
+#: common/errors.py:57
+msgid "Authentication is required."
+msgstr "Une authentification est requise."
+
+#: common/errors.py:58
+msgid "Authentication failed."
+msgstr "Échec de l'authentification."
+
+#: common/errors.py:59
+msgid "Invalid credentials."
+msgstr "Identifiants incorrects."
+
+#: common/errors.py:60
+msgid "Invalid or expired access token."
+msgstr "Jeton d'accès invalide ou expiré."
+
+#: common/errors.py:61
+msgid "Invalid or expired refresh token."
+msgstr "Jeton de renouvellement invalide ou expiré."
+
+#: common/errors.py:62
+msgid "You do not have permission to perform this action."
+msgstr "Vous n'avez pas la permission d'effectuer cette action."
+
+#: common/errors.py:63
+msgid "No active school membership for this request."
+msgstr "Aucune adhésion active à un établissement pour cette requête."

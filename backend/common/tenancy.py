@@ -6,7 +6,7 @@ server trusts blindly: it may only *choose* among schools where the user has an
 ACTIVE membership.
 """
 
-from rest_framework.exceptions import PermissionDenied
+from .errors import ApiPermissionError, ErrorCode
 
 # Optional header letting a multi-school user pick a school (future use).
 SCHOOL_HEADER = "HTTP_X_SCHOOL_CODE"
@@ -46,7 +46,7 @@ def get_active_membership(request):
     if membership is None:
         # Same message whether the school does not exist or the user is not a
         # member: do not reveal which schools exist.
-        raise PermissionDenied("No active school membership for this request.")
+        raise ApiPermissionError(ErrorCode.NO_ACTIVE_MEMBERSHIP)
 
     request._active_membership = membership
     return membership

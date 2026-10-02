@@ -11,6 +11,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# gettext: needed by `makemessages` / `compilemessages` (i18n, ADR 0007).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gettext \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install dependencies first: this layer is cached as long as requirements
 # do not change, so code edits do not trigger a full reinstall.
 ARG INSTALL_DEV=false

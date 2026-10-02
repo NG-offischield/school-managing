@@ -1,0 +1,78 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-02 08:11+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+#: common/errors.py:49
+msgid "Some fields are invalid."
+msgstr ""
+
+#: common/errors.py:50
+msgid "The request body is malformed."
+msgstr ""
+
+#: common/errors.py:51
+msgid "Resource not found."
+msgstr ""
+
+#: common/errors.py:52
+msgid "This method is not allowed on this resource."
+msgstr ""
+
+#: common/errors.py:53
+msgid "The requested response format is not available."
+msgstr ""
+
+#: common/errors.py:54
+msgid "Unsupported content type."
+msgstr ""
+
+#: common/errors.py:55
+msgid "Too many requests. Please try again later."
+msgstr ""
+
+#: common/errors.py:56
+msgid "An unexpected error occurred."
+msgstr ""
+
+#: common/errors.py:57
+msgid "Authentication is required."
+msgstr ""
+
+#: common/errors.py:58
+msgid "Authentication failed."
+msgstr ""
+
+#: common/errors.py:59
+msgid "Invalid credentials."
+msgstr ""
+
+#: common/errors.py:60
+msgid "Invalid or expired access token."
+msgstr ""
+
+#: common/errors.py:61
+msgid "Invalid or expired refresh token."
+msgstr ""
+
+#: common/errors.py:62
+msgid "You do not have permission to perform this action."
+msgstr ""
+
+#: common/errors.py:63
+msgid "No active school membership for this request."
+msgstr ""

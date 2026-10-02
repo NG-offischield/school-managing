@@ -271,6 +271,27 @@ class UserSession(BaseModel):
         return f"Session {self.id} ({self.user})"
 
 
+class RotatedRefreshToken(BaseModel):
+    """Hash of a refresh token that has been replaced by rotation.
+
+    A session is a *token family*: each refresh replaces its token by a new
+    one. The session id is therefore the family identifier, no extra column
+    is needed on UserSession. Keeping the superseded hashes lets the server
+    recognise a token that was already used: only someone holding a copy
+    (an attacker, or the victim after the attacker refreshed first) can
+    present it again. That family is then revoked (ADR 0002).
+
+    Addition to the spec (§4.2 has no such table) — see ADR 0002.
+    """
+
+    # CASCADE: the history has no meaning without its session.
+    session = models.ForeignKey(UserSession, on_delete=models.CASCADE, related_name="rotated_tokens")
+    token_hash = models.CharField(max_length=128, unique=True)
+
+    def __str__(self):
+        return f"Rotated token of {self.session_id}"
+
+
 # =============================================================================
 # Security events (separate from business audit - spec §3)
 # =============================================================================
@@ -283,6 +304,9 @@ class SecurityEventType(models.TextChoices):
     # Event names, not secrets (silences the linter's hardcoded-password rule).
     TOKEN_REFRESHED = "TOKEN_REFRESHED"  # noqa: S105
     REFRESH_REJECTED = "REFRESH_REJECTED"
+    # An already-rotated refresh token was presented: the session is
+    # considered compromised and revoked (ADR 0002).
+    REFRESH_TOKEN_REUSE_DETECTED = "REFRESH_TOKEN_REUSE_DETECTED"  # noqa: S105
     SESSION_REVOKED = "SESSION_REVOKED"
     PASSWORD_CHANGED = "PASSWORD_CHANGED"  # noqa: S105
     ALL_SESSIONS_REVOKED = "ALL_SESSIONS_REVOKED"
@@ -305,25 +329,17 @@ class SecurityEvent(BaseModel):
     `metadata` must never contain passwords, tokens or identity documents
     (spec §9): only identifiers and non-sensitive context.
 
-    `db_constraint=False` on the foreign keys (deviation documented in
-    ADR 0005): the event is committed by another connection, possibly while
-    the referenced row is still uncommitted (or later rolled back) in the
-    business transaction. A database-level FK would then reject the very event
-    we must keep. Django still treats them as relations (joins, SET_NULL on
-    deletion are handled by the ORM).
+    Referential integrity (ADR 0005): `user` and `school` are real PostgreSQL
+    foreign keys declared `ON DELETE SET NULL` at database level (migration
+    0003): an event outlives the user/school it mentions, and a reference,
+    when present, always points to an existing row. When an event must be
+    written while the referenced row is not yet committed by the business
+    transaction, `record_security_event` keeps the event and moves the id into
+    `metadata["unresolved_refs"]` instead of losing it.
     """
 
-    school = models.ForeignKey(
-        "core.School", on_delete=models.SET_NULL, blank=True, null=True, related_name="+", db_constraint=False
-    )
-    user = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        blank=True,
-        null=True,
-        related_name="security_events",
-        db_constraint=False,
-    )
+    school = models.ForeignKey("core.School", on_delete=models.SET_NULL, blank=True, null=True, related_name="+")
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name="security_events")
     event_type = models.CharField(max_length=50, choices=SecurityEventType.choices, db_index=True)
     severity = models.CharField(
         max_length=20, choices=SecuritySeverity.choices, default=SecuritySeverity.INFO, db_index=True

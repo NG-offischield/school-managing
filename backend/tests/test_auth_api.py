@@ -63,11 +63,10 @@ def test_failed_login_is_generic_and_logged(api, user, identifier):
     response = api.post(LOGIN, {"identifier": ident, "password": "wrong-password", "device": DEVICE}, format="json")
 
     assert response.status_code == 401
+    # ADR 0007 format, French by default.
     assert response.json() == {
         "success": False,
-        "data": None,
-        "message": "Invalid credentials.",
-        "errors": None,
+        "error": {"code": "INVALID_CREDENTIALS", "message": "Identifiants incorrects."},
     }
     event = SecurityEvent.objects.get(event_type=SecurityEventType.LOGIN_FAILED)
     assert "wrong-password" not in str(event.metadata)  # password never logged
@@ -86,7 +85,8 @@ def test_login_validation_errors_are_structured(api):
     body = response.json()
     assert response.status_code == 400
     assert body["success"] is False
-    assert "password" in body["errors"] and "device" in body["errors"]
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert "password" in body["error"]["details"] and "device" in body["error"]["details"]
 
 
 def test_login_is_rate_limited(api, user):
@@ -142,12 +142,9 @@ def test_refresh_rotates_the_refresh_token(api, login, user):
     assert first.status_code == 200
     new_refresh = first.json()["data"]["refresh_token"]
     assert new_refresh != tokens["refresh_token"]
+    assert first.json()["data"]["session_id"] == tokens["session_id"]  # same family
 
-    # The old refresh token is now useless (stolen-token mitigation)...
-    replay = api.post(REFRESH, {"refresh_token": tokens["refresh_token"]}, format="json")
-    assert replay.status_code == 401
-    assert SecurityEvent.objects.filter(event_type=SecurityEventType.REFRESH_REJECTED).exists()
-    # ...while the new one works.
+    # The new one keeps working while no old token is replayed.
     assert api.post(REFRESH, {"refresh_token": new_refresh}, format="json").status_code == 200
 
 
@@ -202,7 +199,7 @@ def test_password_change_enforces_strength(auth_api, user):
         format="json",
     )
     assert response.status_code == 400
-    assert "new_password" in response.json()["errors"]
+    assert "new_password" in response.json()["error"]["details"]
 
 
 def test_there_is_no_public_signup_endpoint(api):
@@ -221,12 +218,47 @@ def _rejection_reasons():
     )
 
 
-def test_reused_old_refresh_token_is_rejected_and_logged(api, login, user):
+def test_reused_refresh_token_compromises_and_revokes_its_family_only(api, login, user):
+    """Theft scenario: attacker and victim both hold token T1. One of them
+    refreshes first (gets T2); when T1 is replayed, the server knows a copy
+    exists: refuse, log CRITICAL, revoke the whole session (T2 dies too).
+    The user's other sessions are not affected."""
+    stolen = login(user)
+    other_device = login(user, device={**DEVICE, "identifier": "install-0002"})
+    t2 = api.post(REFRESH, {"refresh_token": stolen["refresh_token"]}, format="json").json()["data"]
+
+    replay = api.post(REFRESH, {"refresh_token": stolen["refresh_token"]}, format="json")
+    assert replay.status_code == 401
+    assert replay.json()["error"]["code"] == "INVALID_REFRESH_TOKEN"  # nothing more revealed
+
+    # 1) the family is revoked: the newest refresh token and the access token are dead
+    assert UserSession.objects.get(pk=stolen["session_id"]).revoked_at is not None
+    assert api.post(REFRESH, {"refresh_token": t2["refresh_token"]}, format="json").status_code == 401
+    assert api.get(ME, HTTP_AUTHORIZATION=f"Bearer {t2['access_token']}").status_code == 401
+    # 2) the security event is CRITICAL and names the session
+    event = SecurityEvent.objects.get(event_type=SecurityEventType.REFRESH_TOKEN_REUSE_DETECTED)
+    assert (event.severity, event.user_id) == ("CRITICAL", user.id)
+    assert event.metadata == {"session_id": stolen["session_id"], "session_was_active": True}
+    # 3) the other session of the same user keeps working
+    assert UserSession.objects.get(pk=other_device["session_id"]).revoked_at is None
+    assert api.post(REFRESH, {"refresh_token": other_device["refresh_token"]}, format="json").status_code == 200
+
+
+def test_reuse_on_an_already_revoked_family_is_still_detected(api, login, user):
     tokens = login(user)
     api.post(REFRESH, {"refresh_token": tokens["refresh_token"]}, format="json")
-    replay = api.post(REFRESH, {"refresh_token": tokens["refresh_token"]}, format="json")
-    assert replay.status_code == 401
+    api.post(REFRESH, {"refresh_token": tokens["refresh_token"]}, format="json")  # revokes
+    api.post(REFRESH, {"refresh_token": tokens["refresh_token"]}, format="json")  # again
+
+    events = SecurityEvent.objects.filter(event_type=SecurityEventType.REFRESH_TOKEN_REUSE_DETECTED)
+    assert sorted(e.metadata["session_was_active"] for e in events) == [False, True]
+
+
+def test_unknown_refresh_token_is_rejected_without_revoking_anything(api, login, user):
+    tokens = login(user)
+    assert api.post(REFRESH, {"refresh_token": "never-issued"}, format="json").status_code == 401
     assert _rejection_reasons() == ["UNKNOWN_TOKEN"]
+    assert UserSession.objects.get(pk=tokens["session_id"]).revoked_at is None
 
 
 def test_expired_session_refuses_refresh_and_access(api, login, user):
@@ -285,16 +317,45 @@ def test_device_is_tracked_and_reused(login, user):
     assert phone.last_seen_at > first_seen
 
 
-def test_global_logout_revokes_every_session(api, login, user, committed):
+REVOKE_ALL = "/api/v1/auth/sessions/revoke-all/"
+
+
+def test_revoke_all_endpoint_revokes_every_session_including_current(api, login, user):
     sessions = [login(user, device={**DEVICE, "identifier": f"install-{i}"}) for i in range(3)]
-    with committed():
-        assert services.revoke_all_sessions(user) == 3
+    other_user_tokens = login(UserFactory())
+
+    api.credentials(HTTP_AUTHORIZATION=f"Bearer {sessions[0]['access_token']}")
+    response = api.post(REVOKE_ALL)
+    assert response.status_code == 200
+    assert response.json()["data"] == {"revoked_count": 3}
 
     for tokens in sessions:
         api.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access_token']}")
         assert api.get(ME).status_code == 401
+        assert api.post(REFRESH, {"refresh_token": tokens["refresh_token"]}, format="json").status_code == 401
+    # Another user's session is untouched.
+    api.credentials(HTTP_AUTHORIZATION=f"Bearer {other_user_tokens['access_token']}")
+    assert api.get(ME).status_code == 200
+
     event = SecurityEvent.objects.get(event_type=SecurityEventType.ALL_SESSIONS_REVOKED)
-    assert event.metadata == {"revoked_count": 3}
+    assert (event.user_id, event.severity) == (user.id, "INFO")
+    assert event.metadata == {"revoked_count": 3, "initiated_by": "SELF"}
+
+
+def test_revoke_all_requires_authentication(api):
+    response = api.post(REVOKE_ALL)
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "NOT_AUTHENTICATED"
+
+
+def test_administrative_revocation_is_recorded_with_its_actor(login, user):
+    """Prepared for the future admin endpoint: the service records who acted."""
+    login(user)
+    admin = UserFactory()
+    assert services.revoke_all_sessions(user, actor=admin) == 1
+    event = SecurityEvent.objects.get(event_type=SecurityEventType.ALL_SESSIONS_REVOKED)
+    assert event.severity == "WARNING"
+    assert event.metadata == {"revoked_count": 1, "initiated_by": "ADMIN", "actor_id": str(admin.id)}
 
 
 def test_global_logout_can_keep_current_session(login, user):
@@ -309,16 +370,13 @@ def test_global_logout_can_keep_current_session(login, user):
 # --- Success logging ---------------------------------------------------------------
 
 
-def test_successes_are_logged_after_commit(api, user, committed):
-    with committed():
-        tokens = api.post(
-            LOGIN, {"identifier": user.username, "password": DEFAULT_PASSWORD, "device": DEVICE}, format="json"
-        ).json()["data"]
-    with committed():
-        tokens = api.post(REFRESH, {"refresh_token": tokens["refresh_token"]}, format="json").json()["data"]
+def test_successes_are_logged_after_commit(api, user):
+    tokens = api.post(
+        LOGIN, {"identifier": user.username, "password": DEFAULT_PASSWORD, "device": DEVICE}, format="json"
+    ).json()["data"]
+    tokens = api.post(REFRESH, {"refresh_token": tokens["refresh_token"]}, format="json").json()["data"]
     api.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access_token']}")
-    with committed():
-        api.post("/api/v1/auth/logout/")
+    api.post("/api/v1/auth/logout/")
 
     events = list(SecurityEvent.objects.order_by("created_at").values_list("event_type", "user_id"))
     assert events == [
@@ -354,13 +412,16 @@ def test_refresh_errors(api):
     assert api.post(REFRESH, {}, format="json").status_code == 400
     garbage = api.post(REFRESH, {"refresh_token": "garbage"}, format="json")
     assert garbage.status_code == 401
-    assert garbage.json()["message"] == "Invalid or expired refresh token."
+    assert garbage.json()["error"] == {
+        "code": "INVALID_REFRESH_TOKEN",
+        "message": "Jeton de renouvellement invalide ou expiré.",
+    }
 
 
 def test_wrong_http_method_uses_error_envelope(api):
     response = api.get(LOGIN)
     assert response.status_code == 405
-    assert response.json()["success"] is False
+    assert response.json()["error"]["code"] == "METHOD_NOT_ALLOWED"
 
 
 def test_unknown_device_platform_is_a_validation_error(api, user):
@@ -370,4 +431,4 @@ def test_unknown_device_platform_is_a_validation_error(api, user):
         format="json",
     )
     assert response.status_code == 400
-    assert "device" in response.json()["errors"]
+    assert "device" in response.json()["error"]["details"]

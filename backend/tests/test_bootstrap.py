@@ -49,9 +49,8 @@ def counts():
     return (School.objects.count(), User.objects.count(), SchoolMembership.objects.count())
 
 
-def test_bootstrap_creates_school_configuration_and_super_admin(env_password, committed):
-    with committed():
-        output = run()
+def test_bootstrap_creates_school_configuration_and_super_admin(env_password):
+    output = run()
 
     school = School.objects.get(code="LYC-DLA")
     assert SchoolConfiguration.objects.filter(school=school).exists()
@@ -137,3 +136,41 @@ def test_no_http_route_can_bootstrap_or_sign_up(api):
     assert not [r for r in api_routes if any(w in r for w in ("bootstrap", "signup", "register", "install"))]
     for path in ("/api/v1/bootstrap/", "/api/v1/auth/register/", "/api/v1/admin/signup/"):
         assert api.post(path, {}, format="json").status_code == 404
+
+
+# --- SchoolProvisioningService (future control plane) ---------------------------
+
+
+def test_provisioning_service_can_create_a_second_tenant():
+    """The service itself is multi-tenant ready (only bootstrap enforces
+    "first school only"). Same person as SUPER_ADMIN of two schools: the
+    first school stays the primary one."""
+    from apps.core.services import FirstAdmin, SchoolProvisioningService
+
+    service = SchoolProvisioningService()
+    first = service.provision(
+        code="A",
+        name="École A",
+        city="Douala",
+        address="x",
+        admin=FirstAdmin("chief", "chief@example.cm", "Ada", "Admin", PASSWORD),
+    )
+    other_admin = FirstAdmin("chief-b", "chief-b@example.cm", "Bob", "Admin", PASSWORD)
+    second = service.provision(code="B", name="École B", city="Yaoundé", address="y", admin=other_admin)
+
+    assert first.school != second.school
+    assert SchoolConfiguration.objects.count() == SchoolBranding.objects.count() == 2
+    assert second.admin_membership.role_codes() == {RoleCode.SUPER_ADMIN}
+    assert second.admin_membership.is_primary_school
+
+
+def test_provisioning_with_weak_password_creates_nothing():
+    from django.core.exceptions import ValidationError
+
+    from apps.core.services import FirstAdmin, SchoolProvisioningService
+
+    with pytest.raises(ValidationError):
+        SchoolProvisioningService().provision(
+            code="A", name="A", city="Douala", address="x", admin=FirstAdmin("a", "a@example.cm", "A", "B", "123")
+        )
+    assert counts() == (0, 0, 0)

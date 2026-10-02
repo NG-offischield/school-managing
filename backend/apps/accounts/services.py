@@ -8,11 +8,14 @@ from dataclasses import dataclass
 
 from django.conf import settings
 from django.contrib.auth import authenticate
-from django.db import transaction
+from django.db import DatabaseError, transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from common.db_routers import SECURITY_LOG_ALIAS
+
 from .models import (
+    RotatedRefreshToken,
     SecurityEvent,
     SecurityEventType,
     SecuritySeverity,
@@ -85,15 +88,27 @@ def record_security_event(
     ctx = ctx or ClientContext()
 
     def write():
-        SecurityEvent.objects.create(
-            user=user,
-            school=school,
+        fields = dict(
             event_type=event_type,
             severity=severity,
             ip_address=ctx.ip_address,
             user_agent=ctx.user_agent,
-            metadata=metadata,
         )
+        try:
+            # atomic(using=...) so that a failed insert leaves the autocommit
+            # connection clean for the fallback below.
+            with transaction.atomic(using=SECURITY_LOG_ALIAS):
+                SecurityEvent.objects.create(user=user, school=school, metadata=metadata, **fields)
+        except DatabaseError:
+            # The FK check (or its lock, bounded by lock_timeout) failed: the
+            # referenced row is not visible to the security_log connection yet
+            # (still uncommitted in the business transaction, or rolled back).
+            # Losing a security event is worse than losing a link: keep the
+            # event, keep the ids as plain data (ADR 0005).
+            unresolved = {
+                key: str(obj.pk) for key, obj in (("user_id", user), ("school_id", school)) if obj is not None
+            }
+            SecurityEvent.objects.create(metadata={**metadata, "unresolved_refs": unresolved}, **fields)
 
     if after_commit:
         # Hooked on the business (default) connection; runs at once if no
@@ -189,16 +204,30 @@ def refresh(raw_refresh_token: str, ctx: ClientContext) -> IssuedTokens:
     Rotation means a stolen refresh token stops working as soon as the
     legitimate client refreshes once. `select_for_update` prevents two
     concurrent refreshes with the same token from both succeeding.
+
+    Reuse detection (ADR 0002): the replaced hash is kept in
+    RotatedRefreshToken. If such an old token is presented again, someone
+    holds a copy of it: the request is refused, the event is logged as
+    CRITICAL and the whole session (= token family) is revoked, so neither the
+    attacker nor the victim's copy can continue. Other sessions of the user
+    are NOT touched (no global policy is triggered here).
+
+    Transaction contract: the revocation must be committed even though the
+    function then raises. It is committed by the atomic block below, so the
+    caller must not run inside an outer transaction that will be rolled back
+    (RefreshView is excluded from ATOMIC_REQUESTS for that reason).
     """
+    presented_hash = hash_token(raw_refresh_token)
     with transaction.atomic():
         session = (
             UserSession.objects.select_for_update(of=("self",))
             .select_related("user")
-            .filter(refresh_token_hash=hash_token(raw_refresh_token))
+            .filter(refresh_token_hash=presented_hash)
             .first()
         )
-        valid = session is not None and session.is_usable()
-        if valid:
+        if session is not None and session.is_usable():
+            # Normal rotation: archive the presented token, issue a new one.
+            RotatedRefreshToken.objects.create(session=session, token_hash=presented_hash)
             raw_refresh = new_refresh_token()
             session.refresh_token_hash = hash_token(raw_refresh)
             session.last_used_at = timezone.now()
@@ -211,12 +240,35 @@ def refresh(raw_refresh_token: str, ctx: ClientContext) -> IssuedTokens:
                 after_commit=True,
                 session_id=str(session.id),
             )
+            return _issued(session, raw_refresh)
 
-    if not valid:
-        # Durable even though an exception is raised right after (ADR 0005).
-        # Reasons are distinguished in the log only, never in the API answer.
+        reused = None
         if session is None:
-            reason = "UNKNOWN_TOKEN"  # includes an already-rotated (reused) token
+            reused = RotatedRefreshToken.objects.filter(token_hash=presented_hash).first()
+            if reused is not None:
+                session = (
+                    UserSession.objects.select_for_update(of=("self",)).select_related("user").get(pk=reused.session_id)
+                )
+                was_active = session.revoked_at is None
+                if was_active:
+                    session.revoked_at = timezone.now()
+                    session.save(update_fields=["revoked_at", "updated_at"])
+
+    # Rejection paths. Events are written immediately on the security_log
+    # connection (ADR 0005); reasons are distinguished in the log only, never
+    # in the API answer.
+    if reused is not None:
+        record_security_event(
+            SecurityEventType.REFRESH_TOKEN_REUSE_DETECTED,
+            user=session.user,
+            ctx=ctx,
+            severity=SecuritySeverity.CRITICAL,
+            session_id=str(session.id),
+            session_was_active=was_active,
+        )
+    else:
+        if session is None:
+            reason = "UNKNOWN_TOKEN"
         elif session.revoked_at is not None:
             reason = "SESSION_REVOKED"
         elif not session.user.is_active:
@@ -230,8 +282,7 @@ def refresh(raw_refresh_token: str, ctx: ClientContext) -> IssuedTokens:
             severity=SecuritySeverity.WARNING,
             reason=reason,
         )
-        raise InvalidRefreshToken()
-    return _issued(session, raw_refresh)
+    raise InvalidRefreshToken()
 
 
 def revoke_session(session: UserSession, *, ctx=None, reason=SecurityEventType.SESSION_REVOKED) -> None:
@@ -242,19 +293,35 @@ def revoke_session(session: UserSession, *, ctx=None, reason=SecurityEventType.S
 
 
 @transaction.atomic
-def revoke_all_sessions(user, *, except_session=None, ctx=None) -> int:
+def revoke_all_sessions(user, *, except_session=None, ctx=None, actor=None) -> int:
     """Global logout: revoke every active session of `user` (optionally
-    keeping the one making the request). Returns the number revoked.
+    keeping one). Returns the number revoked.
 
     Access tokens die with their sessions, since each request re-checks the
     session (ADR 0002).
+
+    `actor` prepares the future *administrative* revocation (an admin cutting
+    off a compromised account). This service does not authorise anything: the
+    calling view must check the permission (role ADMIN/SUPER_ADMIN in the
+    target user's school, see ADR 0002). The actor is recorded so the log
+    distinguishes a self-service logout from an administrative one.
     """
     sessions = user.sessions.filter(revoked_at__isnull=True)
     if except_session is not None:
         sessions = sessions.exclude(pk=except_session.pk)
     count = sessions.update(revoked_at=timezone.now())
+
+    administrative = actor is not None and actor.pk != user.pk
+    metadata = {"revoked_count": count, "initiated_by": "ADMIN" if administrative else "SELF"}
+    if administrative:
+        metadata["actor_id"] = str(actor.pk)
     record_security_event(
-        SecurityEventType.ALL_SESSIONS_REVOKED, user=user, ctx=ctx, after_commit=True, revoked_count=count
+        SecurityEventType.ALL_SESSIONS_REVOKED,
+        user=user,
+        ctx=ctx,
+        severity=SecuritySeverity.WARNING if administrative else SecuritySeverity.INFO,
+        after_commit=True,
+        **metadata,
     )
     return count
 

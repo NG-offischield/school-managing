@@ -45,4 +45,6 @@ Voir [docs/runbook.md](docs/runbook.md) pour l'exploitation courante.
 
 - [x] Phase 0 — audit de l'environnement
 - [x] Phase 1 — squelette Django, Docker, utilisateur personnalisé, noyau multi-tenant, authentification, tests
+- [x] Gate 0 — validation de la fondation (isolation tenant, auth, journal de sécurité, bootstrap)
+- [x] Mini-gate — FK SET NULL sur SecurityEvent, détection de réutilisation des refresh tokens, `sessions/revoke-all/`, `SchoolProvisioningService`, format d'erreur `{success, error{code, message}}` + i18n fr/en
 - [ ] Phases suivantes — profils, scolarité, présences/QR, planning, finance, paie, communication, site public, clients PySide6 et Flutter

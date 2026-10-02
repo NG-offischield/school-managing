@@ -19,7 +19,7 @@ class IsSchoolMember(BasePermission):
     def has_permission(self, request, view):
         if not (request.user and request.user.is_authenticated):
             return False
-        # Raises PermissionDenied itself when no membership matches.
+        # Raises ApiPermissionError(NO_ACTIVE_MEMBERSHIP) when no membership matches.
         get_active_membership(request)
         return True
 

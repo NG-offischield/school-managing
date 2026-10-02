@@ -1,19 +1,30 @@
-# ADR 0006 — Bootstrap de l'installation et ajout futur d'établissements
+# ADR 0006 — Bootstrap de l'installation et provisionnement des établissements
 
-- **Statut :** proposé — 2026-10-02 (à valider)
+- **Statut :** accepté — 2026-10-02 (décision du porteur du projet)
 
 ## Décision
 
-`manage.py bootstrap_school` initialise uniquement une installation **vide** :
+### `SchoolProvisioningService` (apps/core/services.py)
 
-- Il s'exécute seulement depuis un shell sur le serveur (environnement contrôlé). Il n'existe **aucune route HTTP équivalente**, et un test le vérifie en parcourant toutes les URL.
-- Il crée l'établissement, sa `SchoolConfiguration` et sa `SchoolBranding` de façon atomique, puis le premier compte : adhésion `ACTIVE`, école principale, rôle `SUPER_ADMIN`.
-- Mot de passe : saisie masquée et confirmée, ou variable `BOOTSTRAP_ADMIN_PASSWORD` pour l'automatisation. Il n'est **jamais** accepté en argument, validé par `AUTH_PASSWORD_VALIDATORS`, haché en Argon2, jamais affiché ni journalisé. Sans terminal et sans la variable, la commande échoue au lieu de rester bloquée.
-- Journalisation : `BOOTSTRAP_COMPLETED` après commit ; `BOOTSTRAP_REJECTED` immédiatement, qui survit donc au rollback.
-- **Second lancement** : si un établissement existe déjà, la commande refuse, ne modifie rien, sort en erreur et journalise `ALREADY_BOOTSTRAPPED`. Même comportement si le nom d'utilisateur ou l'e-mail admin existe déjà.
+C'est le **seul chemin de code** qui crée un établissement complet et prêt à l'emploi, en une transaction atomique :
+- `School` ;
+- `SchoolConfiguration` ;
+- `SchoolBranding` ;
+- le premier compte : `User`, adhésion `ACTIVE`, rôle `SUPER_ADMIN`. Le flag « école principale » n'est posé que si l'utilisateur n'en a pas déjà une.
 
-## Point à arbitrer
+Le mot de passe est validé (`AUTH_PASSWORD_VALIDATORS`) **avant** toute écriture, puis haché en Argon2.
 
-La spec veut un fonctionnement **mono-établissement en V1** mais **prêt pour le multi-établissement**. Le bootstrap refuse volontairement de créer un deuxième établissement. Cela ne remet pas en cause le modèle : un deuxième `School` reste une simple insertion de données, comme le démontrent les tests de `test_tenancy_permissions.py`. En revanche, la création d'un établissement supplémentaire relève du futur *control plane* (`SchoolInstallation`, hors V1 selon la spec §4). Elle devra faire l'objet d'une opération dédiée, conçue explicitement plutôt que dérivée du bootstrap.
+Le service ne vérifie **aucune autorisation**. C'est à l'appelant de le faire : accès shell aujourd'hui, permissions du *control plane* demain (`SchoolInstallation`, spec §4, hors V1). Le service est lui-même prêt pour le multi-établissement : il sait créer un deuxième établissement, ce que les tests vérifient.
 
-**Variable d'environnement** : `BOOTSTRAP_ADMIN_PASSWORD` peut être visible via `docker inspect` ou `/proc`. Il faut la retirer de l'environnement après usage. La saisie interactive reste la méthode recommandée.
+**Il n'existe aucune API HTTP qui l'expose.** Créer un établissement est une opération de plateforme, pas une action d'établissement.
+
+### `manage.py bootstrap_school`
+
+La commande initialise uniquement une installation **vide**. C'est la **seule** règle « premier établissement uniquement », et elle est propre au bootstrap.
+- Elle s'exécute depuis un shell sur le serveur. Aucune route HTTP équivalente n'existe ; un test parcourt toutes les URL pour le vérifier.
+- Elle délègue la création à `SchoolProvisioningService`.
+- Mot de passe : saisie masquée et confirmée, ou variable `BOOTSTRAP_ADMIN_PASSWORD` pour l'automatisation. Il n'est jamais accepté en argument, jamais affiché, jamais journalisé. Sans terminal et sans la variable, la commande échoue au lieu de rester bloquée.
+- Journalisation : `BOOTSTRAP_COMPLETED` après commit ; `BOOTSTRAP_REJECTED` immédiatement, avec `ALREADY_BOOTSTRAPPED` ou `ADMIN_ALREADY_EXISTS`. Ce dernier survit au rollback.
+- **Second lancement** : la commande refuse, ne modifie rien et sort en erreur.
+
+**Variable d'environnement** : `BOOTSTRAP_ADMIN_PASSWORD` peut être visible via `docker inspect` ou `/proc`. Il faut la retirer après usage ; la saisie interactive reste la méthode recommandée.

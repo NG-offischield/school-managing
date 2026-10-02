@@ -34,21 +34,11 @@ from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.db.models import Q
-from django.utils import timezone
 
-from apps.accounts.models import (
-    MembershipRole,
-    MembershipStatus,
-    Role,
-    RoleCode,
-    SchoolMembership,
-    SecurityEventType,
-    SecuritySeverity,
-    User,
-)
+from apps.accounts.models import SecurityEventType, SecuritySeverity, User
 from apps.accounts.services import ClientContext, record_security_event
 from apps.core.models import School
-from apps.core.services import create_school
+from apps.core.services import FirstAdmin, SchoolProvisioningService
 
 PASSWORD_ENV_VAR = "BOOTSTRAP_ADMIN_PASSWORD"  # noqa: S105 - variable name, not a secret
 CLI_CONTEXT = ClientContext(ip_address=None, user_agent="manage.py bootstrap_school")
@@ -116,31 +106,28 @@ class Command(BaseCommand):
                 requested_username=opts["admin_username"],
             )
 
-        admin = User(
+        admin_spec = dict(
             username=opts["admin_username"],
             email=opts["admin_email"],
             first_name=opts["admin_first_name"],
             last_name=opts["admin_last_name"],
-            # Lets the bootstrap admin also open the developer Django admin.
-            is_staff=True,
-            is_superuser=True,
         )
-        # Read before writing anything: a bad password leaves no partial data.
-        admin.set_password(self._read_password(admin))
+        # Read (and validate) before writing anything: a bad password leaves
+        # no partial data. The unsaved User only feeds the similarity validator.
+        password = self._read_password(User(**admin_spec))
 
-        # create_school also creates SchoolConfiguration and SchoolBranding.
-        school = create_school(code=opts["code"], name=opts["name"], city=opts["city"], address=opts["address"])
-        admin.save()
-        membership = SchoolMembership.objects.create(
-            school=school,
-            user=admin,
-            status=MembershipStatus.ACTIVE,
-            joined_at=timezone.now(),
-            is_primary_school=True,
-        )
-        # System roles exist from migration accounts.0002.
-        MembershipRole.objects.create(membership=membership, role=Role.objects.get(code=RoleCode.SUPER_ADMIN))
+        try:
+            provisioned = SchoolProvisioningService().provision(
+                code=opts["code"],
+                name=opts["name"],
+                city=opts["city"],
+                address=opts["address"],
+                admin=FirstAdmin(password=password, **admin_spec),
+            )
+        except ValidationError as exc:
+            raise CommandError(" ".join(exc.messages)) from exc
 
+        school, admin = provisioned.school, provisioned.admin_membership.user
         record_security_event(
             SecurityEventType.BOOTSTRAP_COMPLETED,
             user=admin,

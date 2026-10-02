@@ -1,20 +1,17 @@
-"""Uniform API response envelope (spec §6) — renderer, pagination, error helper.
+"""Uniform API response envelope — renderer and pagination.
 
-Every response has the same shape, so the Flutter and PySide6 clients can use
-a single parser:
-
-    success: {"success": true,  "data": <payload>, "message": null, "meta": null}
-    error:   {"success": false, "data": null, "message": "...", "errors": {...}}
-    list:    {"success": true,  "data": [...], "message": null,
+    success: {"success": true, "data": <payload>, "message": null, "meta": null}    (spec §6)
+    list:    {"success": true, "data": [...], "message": null,
               "meta": {"count": .., "next": .., "previous": ..}}
+    error:   {"success": false, "error": {"code": "...", "message": "..."}}     (ADR 0007)
+
+Errors are built by common.errors / common.exceptions.
 
 IMPORT RULE (see ADR 0004): this module is referenced by the
 DEFAULT_RENDERER_CLASSES / DEFAULT_PAGINATION_CLASS settings. It must therefore
 never import `rest_framework.views` (or anything importing it): `APIView`
 reads DEFAULT_RENDERER_CLASSES while its class body executes, which would
 import this module again while it is still half-initialised.
-The exception handler, which does need `rest_framework.views`, lives in
-`common.exceptions` for exactly that reason.
 """
 
 from rest_framework.pagination import PageNumberPagination
@@ -23,7 +20,7 @@ from rest_framework.response import Response
 
 
 def _is_enveloped(data):
-    return isinstance(data, dict) and "success" in data and "data" in data
+    return isinstance(data, dict) and "success" in data and ("data" in data or "error" in data)
 
 
 class EnvelopeJSONRenderer(JSONRenderer):
@@ -57,12 +54,3 @@ class EnvelopePagination(PageNumberPagination):
                 },
             }
         )
-
-
-def error_envelope(message, errors=None):
-    return {"success": False, "data": None, "message": message, "errors": errors}
-
-
-def error_response(message, status_code, errors=None):
-    """Error envelope returned by a view itself (instead of raising)."""
-    return Response(error_envelope(message, errors), status=status_code)

@@ -1,14 +1,18 @@
 import pytest
-from django.db import connections
 from rest_framework.test import APIClient
 
+from apps.accounts.models import Role
+from apps.accounts.system_roles import sync_system_roles
 from common.db_routers import SECURITY_LOG_ALIAS
 
 from .factories import DEFAULT_PASSWORD, MembershipFactory, SchoolFactory, UserFactory
 
-# Every DB test may touch the security log, which goes through its own
-# connection (ADR 0005). Modules use: `pytestmark = DB`.
-DB = pytest.mark.django_db(databases=["default", SECURITY_LOG_ALIAS])
+# Every DB test is TRANSACTIONAL (ADR 0005): business data is really
+# committed, exactly as in production, so the security_log connection can see
+# it and its foreign keys are checked for real. A rollback-only test would hide
+# precisely the cross-connection behaviour we need to verify. The database is
+# flushed (TRUNCATE) after each test. Modules use: `pytestmark = DB`.
+DB = pytest.mark.django_db(transaction=True, databases=["default", SECURITY_LOG_ALIAS])
 
 DEVICE = {
     "identifier": "install-0001",
@@ -29,34 +33,14 @@ def _clear_cache():
     cache.clear()
 
 
-def _purge_security_log():
-    with connections[SECURITY_LOG_ALIAS].cursor() as cursor:
-        cursor.execute("DELETE FROM accounts_securityevent")
-
-
 @pytest.fixture(autouse=True)
-def _isolate_security_log(request, django_db_blocker):
-    """The security_log connection is a test *mirror*: Django does not wrap it
-    in the per-test rollback, so its rows are really committed (that is the
-    very property under test). Purge them around each DB test so tests stay
-    independent."""
-    marker = request.node.get_closest_marker("django_db")
-    if marker is None:
-        yield
-        return
-    with django_db_blocker.unblock():
-        _purge_security_log()
-    yield
-    with django_db_blocker.unblock():
-        _purge_security_log()
-
-
-@pytest.fixture
-def committed(django_capture_on_commit_callbacks):
-    """Run on_commit callbacks (success security events) at the end of the
-    block, as a real commit would. Tests run inside a transaction that is
-    never committed, so they would otherwise never fire."""
-    return lambda: django_capture_on_commit_callbacks(execute=True)
+def _system_roles(request):
+    """The flush after each transactional test also empties the roles seeded
+    by migration 0002: put them back before each DB test, with the very
+    function the migration uses."""
+    if request.node.get_closest_marker("django_db") is not None:
+        request.getfixturevalue("transactional_db")
+        sync_system_roles(Role)
 
 
 @pytest.fixture

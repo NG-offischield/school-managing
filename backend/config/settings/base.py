@@ -58,6 +58,10 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    # Picks the language of user-facing messages from Accept-Language
+    # (fr by default, en available) — ADR 0007. Must sit after
+    # SessionMiddleware and before CommonMiddleware.
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -153,7 +157,12 @@ REFRESH_TOKEN_LIFETIME = timedelta(days=env.int("REFRESH_TOKEN_LIFETIME_DAYS", d
 # --- Internationalisation -----------------------------------------------------
 # V1 school is in Cameroon (spec: School.timezone default Africa/Douala).
 
-LANGUAGE_CODE = "fr"
+LANGUAGE_CODE = "fr"  # V1 default language (ADR 0007)
+LANGUAGES = [("fr", "Français"), ("en", "English")]
+# Our own translations (API error messages...). Source strings are English;
+# French lives in backend/locale/fr. Compiled .mo files are committed so the
+# bind-mounted source tree works without running compilemessages first.
+LOCALE_PATHS = [BASE_DIR / "locale"]
 TIME_ZONE = "Africa/Douala"
 USE_I18N = True
 # Datetimes are stored as timestamptz (UTC) and converted for display only.
