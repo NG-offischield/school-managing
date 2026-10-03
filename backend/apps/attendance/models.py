@@ -190,6 +190,12 @@ class GuardianScan(TenantModel):
     device = models.ForeignKey(
         "accounts.UserDevice", on_delete=models.SET_NULL, blank=True, null=True, related_name="+"
     )
+    # Integration point with planning (ADR 0012): a future per-session scan
+    # (classroom check) will reference the dated session. Gate scans leave it
+    # NULL — the daily attendance flow is unchanged.
+    teaching_session = models.ForeignKey(
+        "scheduling.TeachingSession", on_delete=models.PROTECT, blank=True, null=True, related_name="scans"
+    )
     scanned_at = models.DateTimeField(default=timezone.now, db_index=True)
     result = models.CharField(max_length=30, choices=ScanResult.choices, db_index=True)
     # Never the raw presented token: only a short hash prefix (investigations).

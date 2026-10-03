@@ -25,10 +25,21 @@ def composite_keys():
 
 def test_all_composite_keys_are_present():
     keys = composite_keys()
-    # academics: 9 (0002) + 1 (0005) ; people: 25 (0002) ; gradebook: 22 (0002) + 3 (0005) ;
-    # attendance: 17 (0002).
-    assert len(keys) == 77
-    assert {shared for _, _, shared in keys} == {"school_id", "academic_year_id", "max_score", "student_id"}
+    # academics: 9 (0002) + 1 (0005) + 1 (0007) ; people: 25 (0002) ; gradebook: 22 (0002) + 3 (0005) ;
+    # attendance: 17 (0002) + 1 (0004) ; scheduling: 34 (0002).
+    assert len(keys) == 113
+    assert {shared for _, _, shared in keys} == {
+        "school_id",
+        "academic_year_id",
+        "max_score",
+        "student_id",
+        # planning copies kept equal to their course (ADR 0012)
+        "course_id",
+        "teacher_id",
+        "planned_teacher_id",
+        "school_class_id",
+        "subject_id",
+    }
 
 
 def test_enrollment_guards_school_and_year():
@@ -39,3 +50,5 @@ def test_enrollment_guards_school_and_year():
     assert ("gradebook_grade", "assessment_id", "max_score") in keys
     assert ("gradebook_assessment", "academic_period_id", "academic_year_id") in keys
     assert ("attendance_guardianscan", "qr_code_id", "student_id") in keys
+    assert ("scheduling_teachingsession", "course_id", "planned_teacher_id") in keys
+    assert ("scheduling_scheduleslot", "course_id", "teacher_id") in keys

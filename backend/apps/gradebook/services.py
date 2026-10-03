@@ -29,9 +29,11 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from apps.academics.models import AcademicPeriod, PeriodStatus, Subject
+from apps.academics.models import AcademicPeriod, AcademicYearStatus, PeriodStatus, Subject
 from apps.academics.services import default_grading_scale
+from apps.audit.services import record_audit
 from apps.people.models import EnrollmentStatus, QualificationStatus, StudentEnrollment
+from apps.scheduling.models import SlotStatus
 from common.permissions import ADMIN_ROLES, membership_has_role, require_role
 
 from .models import (
@@ -618,3 +620,24 @@ def class_dashboard(school_class, period, *, actor):
         "subjects": subjects,
         "students": students,
     }
+
+
+@transaction.atomic
+def set_course_active(course, active, *, actor):
+    """Deactivate / reactivate a course (admin desktop "Cours"). Refused (409)
+    while the course is still scheduled: end or archive its slots first."""
+    require_role(actor, ADMIN_ROLES, school=course.school)
+    course = Course.objects.select_for_update().get(pk=course.pk)
+    # "Still scheduled" = published slots in a planned / active year.
+    if (
+        not active
+        and course.schedule_slots.filter(
+            status=SlotStatus.PUBLISHED,
+            academic_year__status__in=[AcademicYearStatus.PLANNED, AcademicYearStatus.ACTIVE],
+        ).exists()
+    ):
+        raise ValidationError("This course is still scheduled.", code="course_scheduled")
+    course.active = active
+    course.save(update_fields=["active", "updated_at"])
+    record_audit("COURSE_ACTIVATED" if active else "COURSE_DEACTIVATED", actor=actor, entity=course)
+    return course

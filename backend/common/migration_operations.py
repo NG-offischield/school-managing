@@ -50,21 +50,27 @@ class EnforceSameValue(Operation):
     reversible = True
     reduces_to_sql = True
 
-    def __init__(self, model_name, field_name, shared_field="school", on_update=None):
+    def __init__(self, model_name, field_name, shared_field="school", on_update=None, target_field=None):
         """`on_update="CASCADE"` copies changes of the shared column of the
         target into the referencing rows (used to keep Grade.max_score equal
-        to its Assessment.max_score)."""
+        to its Assessment.max_score).
+
+        `target_field`: name of the shared column on the TARGET when it differs
+        (e.g. TeachingSession.planned_teacher must equal Course.teacher)."""
         if on_update not in (None, "CASCADE"):
             raise ValueError("on_update must be None or 'CASCADE'")
         self.model_name = model_name
         self.field_name = field_name
         self.shared_field = shared_field
         self.on_update = on_update
+        self.target_field = target_field
 
     def deconstruct(self):
         kwargs = {"shared_field": self.shared_field}
         if self.on_update:
             kwargs["on_update"] = self.on_update
+        if self.target_field:
+            kwargs["target_field"] = self.target_field
         return (self.__class__.__qualname__, [self.model_name, self.field_name], kwargs)
 
     def state_forwards(self, app_label, state):
@@ -76,7 +82,7 @@ class EnforceSameValue(Operation):
         field = model._meta.get_field(self.field_name)
         target = field.related_model
         shared = model._meta.get_field(self.shared_field).column
-        target_shared = target._meta.get_field(self.shared_field).column
+        target_shared = target._meta.get_field(self.target_field or self.shared_field).column
         max_len = schema_editor.connection.ops.max_name_length()
         table, target_table = model._meta.db_table, target._meta.db_table
         return {

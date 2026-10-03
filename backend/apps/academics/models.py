@@ -398,6 +398,51 @@ class SubjectCompatibilityRule(TenantModel):
 
 
 # =============================================================================
+# Rooms
+# =============================================================================
+
+
+class RoomType(models.TextChoices):
+    CLASSROOM = "CLASSROOM", "Salle de classe"
+    LABORATORY = "LABORATORY", "Laboratoire"
+    WORKSHOP = "WORKSHOP", "Atelier"
+    COMPUTER = "COMPUTER", "Salle informatique"
+    SPORTS = "SPORTS", "Installation sportive"
+    OTHER = "OTHER", "Autre"
+
+
+class Room(TenantModel):
+    """A room, deliberately simple in V1 (spec §4.4: "no hard-coded physical
+    geometry"): code, name, type, capacity, benches, active.
+
+    Theoretical subjects are taught in the class's main room
+    (SchoolClass.main_room); practical subjects may use a dedicated room
+    (laboratory, workshop...). Occupation and capacity conflicts are checked
+    by the scheduling services and by PostgreSQL exclusion constraints.
+    """
+
+    code = models.CharField(max_length=30)
+    name = models.CharField(max_length=100)
+    room_type = models.CharField(max_length=30, choices=RoomType.choices, default=RoomType.CLASSROOM)
+    capacity = models.PositiveIntegerField(blank=True, null=True)
+    bench_count = models.PositiveIntegerField(blank=True, null=True)
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["code"]
+        constraints = [
+            models.UniqueConstraint(fields=["school", "code"], name="room_school_code_unique"),
+            models.CheckConstraint(condition=Q(room_type__in=RoomType.values), name="room_type_valid"),
+            models.CheckConstraint(
+                condition=Q(capacity__isnull=True) | Q(capacity__gt=0), name="room_capacity_positive"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.code} — {self.name}"
+
+
+# =============================================================================
 # Classes
 # =============================================================================
 
@@ -410,14 +455,15 @@ class SchoolClass(TenantModel):
     StudentEnrollment of the year (apps/people).
 
     Not in the phase list but required: StudentEnrollment.school_class is
-    mandatory in the spec. `main_room` (FK Room) arrives with the scheduling
-    phase (ADR 0008).
+    mandatory in the spec. `main_room` arrived with the scheduling phase
+    (ADR 0012): the default room of the class's theoretical courses.
     """
 
     name = models.CharField(max_length=80, db_index=True)
     level = models.ForeignKey(Level, on_delete=models.PROTECT, related_name="classes")
     academic_year = models.ForeignKey(AcademicYear, on_delete=models.PROTECT, related_name="classes")
     capacity = models.PositiveIntegerField(blank=True, null=True)
+    main_room = models.ForeignKey(Room, on_delete=models.SET_NULL, blank=True, null=True, related_name="main_of")
     active = models.BooleanField(default=True)
     public_visible = models.BooleanField(default=False)
 

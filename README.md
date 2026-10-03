@@ -51,4 +51,5 @@ Voir [docs/runbook.md](docs/runbook.md) pour l'exploitation courante.
 - [x] Cœur académique — échelles /20 /100 /60, cours, évaluations, notes (historique immuable, période ouverte), moyennes pondérées, bulletins, évolution, clôture des périodes (ADR 0009)
 - [x] Catalogue pédagogique administrable (catégories, matières) + journal d'audit (ADR 0010)
 - [x] Présences + QR annuel : scans, présence journalière, retards, clôture, corrections, alertes graduées, convocations (ADR 0011)
-- [ ] Phases suivantes — planning (feuilles d'appel par séance), finance, paie, communication, site public, clients PySide6 et Flutter
+- [x] Planning : salles, emploi du temps récurrent, séances datées, conflits garantis par PostgreSQL, disponibilités, remplacements, permutations, historique / boîte d'envoi des notifications (ADR 0012)
+- [ ] Phases suivantes — présence par séance, finance, paie, communication / notifications, site public, clients PySide6 et Flutter
