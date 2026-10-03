@@ -39,7 +39,7 @@ from apps.accounts.models import UserDevice
 from apps.finance import services as finance_services
 from apps.people.api import StudentVisibilityMixin
 from apps.people.models import ParentProfile, Student
-from common.permissions import HasSchoolRole
+from common.permissions import ADMIN_ROLES, HasSchoolRole, membership_has_role
 from common.tenancy import scope_to_current_school
 from common.views import SchoolScopedMixin
 
@@ -162,6 +162,12 @@ class ConvocationSerializer(serializers.ModelSerializer):
         ]
 
 
+# Who may see the financial status of a scanned student. Spec §7 shows it in
+# the GUARDIAN scan answer; administrators see all finance anyway. Other
+# scanners (STAFF) get null: a financial fact is not needed to let a pupil in.
+SOLVENCY_VIEWER_ROLES = frozenset({"GUARDIAN", *ADMIN_ROLES})
+
+
 class ScanInput(serializers.Serializer):
     token = serializers.CharField(max_length=256)
     device_id = serializers.UUIDField(required=False, allow_null=True)
@@ -191,11 +197,13 @@ class ScanCreate(SchoolScopedMixin, APIView):
             "scanned_at": scan.scanned_at,
             "student": None,
             "attendance": None,
-            # Spec §7: UP_TO_DATE / OVERDUE only — never amounts (ADR 0013).
+            # Spec §7: UP_TO_DATE / OVERDUE only — never amounts (ADR 0013),
+            # and only for the roles of SOLVENCY_VIEWER_ROLES (ADR 0014).
             "solvency": None,
         }
         if outcome.attendance is not None:
-            payload["solvency"] = finance_services.solvency(scan.student)
+            if membership_has_role(self.membership(), SOLVENCY_VIEWER_ROLES):
+                payload["solvency"] = finance_services.solvency(scan.student)
             enrollment = (
                 scan.student.enrollments.filter(academic_year=scan.academic_year).select_related("school_class").first()
             )

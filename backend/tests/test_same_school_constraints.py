@@ -26,8 +26,8 @@ def composite_keys():
 def test_all_composite_keys_are_present():
     keys = composite_keys()
     # academics: 9 (0002) + 1 (0005) + 1 (0007) ; people: 25 (0002) ; gradebook: 22 (0002) + 3 (0005) ;
-    # attendance: 17 (0002) + 1 (0004) ; scheduling: 34 (0002) ; finance: 32 (0002).
-    assert len(keys) == 145
+    # attendance: 17 (0002) + 1 (0004) ; scheduling: 34 (0002) ; finance: 32 (0002) ; payroll: 37 (0002).
+    assert len(keys) == 182
     assert {shared for _, _, shared in keys} == {
         "school_id",
         "academic_year_id",
@@ -42,6 +42,9 @@ def test_all_composite_keys_are_present():
         # finance (ADR 0013): wallet of a payment = wallet of its payer; refund rows of their payment
         "payer_id",
         "payment_id",
+        # payroll (ADR 0014): check-in / line / settlement tied to their session and payroll
+        "teaching_session_id",
+        "teacher_payroll_id",
     }
 
 
@@ -62,3 +65,11 @@ def test_finance_guards_payer_wallet_and_refund_payment():
     assert ("finance_payment", "wallet_id", "payer_id") in keys
     assert ("finance_paymentallocation", "refund_id", "payment_id") in keys
     assert ("finance_paymentallocation", "invoice_id", "student_id") in keys
+
+
+def test_payroll_lines_are_tied_to_their_teacher_and_session():
+    keys = composite_keys()
+    assert ("payroll_teachersessioncheckin", "teaching_session_id", "teacher_id") in keys
+    assert ("payroll_payrollline", "teaching_session_id", "teacher_id") in keys
+    assert ("payroll_payrollline", "check_in_id", "teaching_session_id") in keys
+    assert ("payroll_payrollsettlement", "line_id", "teacher_payroll_id") in keys

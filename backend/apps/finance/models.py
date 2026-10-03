@@ -235,6 +235,7 @@ class LedgerType(models.TextChoices):
     FUNDING = "FUNDING", "Approvisionnement (simulation)"
     PAYMENT = "PAYMENT", "Paiement"
     REFUND = "REFUND", "Remboursement"
+    PAYROLL = "PAYROLL", "Paie (ADR 0014)"
 
 
 class LedgerDirection(models.TextChoices):

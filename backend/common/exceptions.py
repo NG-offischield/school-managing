@@ -42,6 +42,25 @@ CONFLICT_RULES = {
     "payment_not_refundable",
     "refund_exceeds_payment",
     "amount_exceeds_balance",
+    "insufficient_balance",
+    "wallet_blocked",
+    # payroll (ADR 0014)
+    "session_cancelled",
+    "session_already_validated",
+    "session_already_rejected",
+    "session_already_paid",
+    "session_in_approved_payroll",
+    "checkin_already_verified",
+    "rate_overlap",
+    "rate_locked_by_payroll",
+    "period_overlap",
+    "period_closed",
+    "period_not_settled",
+    "payroll_already_paid",
+    "payroll_already_approved",
+    "payroll_cancelled",
+    "payroll_not_approved",
+    "payroll_stale",
 }
 
 # Order matters: subclasses before their parents.

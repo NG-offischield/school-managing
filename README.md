@@ -53,4 +53,5 @@ Voir [docs/runbook.md](docs/runbook.md) pour l'exploitation courante.
 - [x] Présences + QR annuel : scans, présence journalière, retards, clôture, corrections, alertes graduées, convocations (ADR 0011)
 - [x] Planning : salles, emploi du temps récurrent, séances datées, conflits garantis par PostgreSQL, disponibilités, remplacements, permutations, historique / boîte d'envoi des notifications (ADR 0012)
 - [x] Finance : motifs et échéanciers, factures, paiements simulés déterministes (succès, refus, fonds insuffisants, délai, erreur fournisseur), idempotence, wallets et trésorerie en grand livre append-only, remboursements par transaction inverse, solvabilité au scan QR, tableau de bord (ADR 0013)
-- [ ] Phases suivantes — présence par séance, paie, communication / notifications, reçus PDF, site public, clients PySide6 et Flutter
+- [x] Paie : validation administrative des séances (check-in), taux datés, périodes, calcul déterministe programmé / acquis, paie préparée → validée → payée via Finance, double paiement impossible, corrections tracées, solvabilité QR limitée aux rôles autorisés (ADR 0014)
+- [ ] Phases suivantes — présence par séance (fiches d'appel), communication / notifications, reçus et bulletins de paie PDF, site public, clients PySide6 et Flutter
