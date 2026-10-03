@@ -19,3 +19,6 @@ argon2-cffi~=25.1
 Pillow~=12.0
 # Redis client used by Django's cache backend (rate limiting).
 redis~=6.0
+# PDF generation of official documents (ADR 0016): pure Python, no system
+# library, works offline on the school LAN.
+reportlab~=4.4

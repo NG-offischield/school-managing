@@ -27,8 +27,8 @@ def test_all_composite_keys_are_present():
     keys = composite_keys()
     # academics: 9 (0002) + 1 (0005) + 1 (0007) ; people: 25 (0002) ; gradebook: 22 (0002) + 3 (0005) ;
     # attendance: 17 (0002) + 1 (0004) ; scheduling: 34 (0002) ; finance: 32 (0002) ; payroll: 37 (0002) ;
-    # communication: 29 (0002) + 1 hand-written (message sender is a participant).
-    assert len(keys) == 212
+    # communication: 29 (0002) + 1 hand-written (message sender is a participant) ; documents: 9 (0002).
+    assert len(keys) == 221
     assert {shared for _, _, shared in keys} == {
         "school_id",
         "academic_year_id",

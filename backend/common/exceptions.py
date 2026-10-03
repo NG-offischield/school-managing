@@ -71,6 +71,10 @@ CONFLICT_RULES = {
     "message_already_deleted",
     "post_already_deleted",
     "client_id_conflict",
+    # documents (ADR 0016)
+    "document_source_not_final",
+    "document_official",
+    "document_superseded",
 }
 
 # Order matters: subclasses before their parents.
