@@ -28,6 +28,7 @@ from .factories import (
     SchoolClassFactory,
     SchoolFactory,
     SubjectFactory,
+    admin_of,
 )
 
 pytestmark = DB
@@ -297,17 +298,20 @@ def test_subject_category_is_mandatory_in_postgresql(school):
 def test_subject_has_exactly_one_category(school):
     sci = CategoryFactory(school=school, code="SCIENTIFIC")
     subject = services.create_subject(
-        school, code="EPS", name="Sport", category=sci, subject_type=SubjectType.PRACTICAL
+        school, actor=admin_of(school), code="EPS", name="Sport", category=sci, subject_type=SubjectType.PRACTICAL
     )
     assert subject.category == sci and sci.subjects.get() == subject
 
 
 def test_theoretical_and_practical_subjects(school):
+    admin = admin_of(school)
     sci = CategoryFactory(school=school, code="SCIENTIFIC")
     for code in ("MATH", "HIST", "GEO", "SVTEEHB"):
-        services.create_subject(school, code=code, name=code, category=sci)
+        services.create_subject(school, actor=admin, code=code, name=code, category=sci)
     for code in ("EPS", "LABO", "ATELIER"):
-        services.create_subject(school, code=code, name=code, category=sci, subject_type=SubjectType.PRACTICAL)
+        services.create_subject(
+            school, actor=admin, code=code, name=code, category=sci, subject_type=SubjectType.PRACTICAL
+        )
     assert Subject.objects.for_school(school).filter(subject_type=SubjectType.THEORETICAL).count() == 4
     with db_rejects(), transaction.atomic():
         SubjectFactory(school=school, subject_type="ONLINE")

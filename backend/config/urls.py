@@ -20,6 +20,7 @@ urlpatterns = [
     # School + Academic + People: read-only in this phase (ADR 0008).
     path("api/v1/", include("apps.core.api")),
     path("api/v1/", include("apps.academics.api")),
+    path("api/v1/", include("apps.academics.catalog_api")),
     path("api/v1/", include("apps.people.api")),
     path("api/v1/", include("apps.gradebook.api")),
 ]

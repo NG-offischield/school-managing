@@ -29,7 +29,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from apps.academics.models import AcademicPeriod, PeriodStatus
+from apps.academics.models import AcademicPeriod, PeriodStatus, Subject
 from apps.academics.services import default_grading_scale
 from apps.people.models import EnrollmentStatus, QualificationStatus, StudentEnrollment
 from common.permissions import ADMIN_ROLES, membership_has_role, require_role
@@ -104,6 +104,11 @@ def create_course(
     completed before a course is assigned.
     """
     require_role(actor, ADMIN_ROLES, school=school_class.school)
+    # Re-read from the database: the caller's instance may be stale (e.g.
+    # deactivated meanwhile by another administrator).
+    subject = Subject.objects.select_related("category").get(pk=subject.pk)
+    if not (subject.active and subject.category.active):
+        raise ValidationError("This subject (or its category) is inactive.", code="subject_inactive")
     qualification = teacher.qualifications.filter(subject=subject).first()
     if qualification is None or qualification.status in (QualificationStatus.PENDING, QualificationStatus.REJECTED):
         raise ValidationError(

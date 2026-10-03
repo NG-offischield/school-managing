@@ -11,7 +11,7 @@ from rest_framework import generics, serializers
 
 from common.views import SchoolScopedMixin
 
-from .models import AcademicPeriod, AcademicYear, GradingScale, Level, PedagogicalCategory, SchoolClass, Subject
+from .models import AcademicPeriod, AcademicYear, GradingScale, Level, SchoolClass
 
 
 class AcademicYearSerializer(serializers.ModelSerializer):
@@ -40,20 +40,6 @@ class LevelSerializer(serializers.ModelSerializer):
     class Meta:
         model = Level
         fields = ["id", "code", "name", "cycle", "order_index", "first_character", "active"]
-
-
-class PedagogicalCategorySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = PedagogicalCategory
-        fields = ["id", "code", "name", "description", "active"]
-
-
-class SubjectSerializer(serializers.ModelSerializer):
-    category_code = serializers.CharField(source="category.code", default=None, read_only=True)
-
-    class Meta:
-        model = Subject
-        fields = ["id", "code", "name", "category", "category_code", "subject_type", "active"]
 
 
 class SchoolClassSerializer(serializers.ModelSerializer):
@@ -101,16 +87,6 @@ class LevelList(SchoolScopedMixin, generics.ListAPIView):
     serializer_class = LevelSerializer
 
 
-class PedagogicalCategoryList(SchoolScopedMixin, generics.ListAPIView):
-    queryset = PedagogicalCategory.objects.all()
-    serializer_class = PedagogicalCategorySerializer
-
-
-class SubjectList(SchoolScopedMixin, generics.ListAPIView):
-    queryset = Subject.objects.select_related("category")
-    serializer_class = SubjectSerializer
-
-
 class SchoolClassList(SchoolScopedMixin, generics.ListAPIView):
     """Optional filter: ?academic_year=<uuid>."""
 
@@ -127,8 +103,6 @@ urlpatterns = [
     path("academic-years/<uuid:pk>/", AcademicYearDetail.as_view(), name="academic-year"),
     path("academic-periods/", AcademicPeriodList.as_view(), name="academic-periods"),
     path("levels/", LevelList.as_view(), name="levels"),
-    path("pedagogical-categories/", PedagogicalCategoryList.as_view(), name="pedagogical-categories"),
-    path("subjects/", SubjectList.as_view(), name="subjects"),
     path("classes/", SchoolClassList.as_view(), name="classes"),
     path("grading-scales/", GradingScaleList.as_view(), name="grading-scales"),
 ]

@@ -21,9 +21,10 @@ from .errors import ApiError, ErrorCode, error_body
 
 logger = logging.getLogger(__name__)
 
-# Service rule codes that mean "your data is stale" rather than "invalid":
+# Service rule codes that mean "conflicts with the current state" (stale data,
+# duplicate code, row still in use) rather than "invalid input":
 # answered 409 CONFLICT (optimistic concurrency, spec §6).
-CONFLICT_RULES = {"stale_grade"}
+CONFLICT_RULES = {"stale_grade", "duplicate_code", "category_in_use", "subject_in_use"}
 
 # Order matters: subclasses before their parents.
 _CODES = [
