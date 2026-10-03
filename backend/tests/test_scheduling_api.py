@@ -97,8 +97,16 @@ def test_admin_session_actions_via_api(w):
     assert moved["is_moved"] is True
     cancelled = data(admin.post(f"/api/v1/admin/sessions/{session.id}/cancel/", {"reason": "Grève"}, format="json"))
     assert cancelled["status"] == "CANCELLED"
-    feed = data(admin.get("/api/v1/admin/planning/changes/?notification_status=PENDING"))
-    assert {c["change_type"] for c in feed} >= {"SESSION_MOVED", "SESSION_CANCELLED"}
+    # Both changes are in the history feed as notifiable changes: PENDING until the
+    # communication dispatcher (ADR 0015) consumes them, then SENT — never NOT_REQUIRED.
+    feed = data(admin.get("/api/v1/admin/planning/changes/"))
+    notifiable = {
+        c["change_type"]: c["notification_status"]
+        for c in feed
+        if c["change_type"] in ("SESSION_MOVED", "SESSION_CANCELLED")
+    }
+    assert set(notifiable) == {"SESSION_MOVED", "SESSION_CANCELLED"}
+    assert set(notifiable.values()) <= {"PENDING", "SENT"}
 
 
 def test_courses_admin_endpoints(w):

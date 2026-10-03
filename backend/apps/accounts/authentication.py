@@ -10,6 +10,21 @@ from .models import UserSession
 from .tokens import read_access_token
 
 
+def session_from_access_token(raw_token):
+    """The usable UserSession of an access token, or None. Shared by REST
+    (below) and the WebSocket consumer, so both accept exactly the same
+    tokens and see revocation / logout immediately."""
+    session_id = read_access_token(raw_token or "")
+    try:
+        session_uuid = uuid.UUID(session_id) if session_id else None
+    except ValueError:
+        return None
+    if session_uuid is None:
+        return None
+    session = UserSession.objects.select_related("user").filter(pk=session_uuid).first()
+    return session if session is not None and session.is_usable() else None
+
+
 class SessionTokenAuthentication(authentication.BaseAuthentication):
     keyword = "Bearer"
 
@@ -21,17 +36,9 @@ class SessionTokenAuthentication(authentication.BaseAuthentication):
         if len(header) != 2:
             raise ApiAuthenticationError()
 
-        session_id = read_access_token(header[1].decode())
-        try:
-            session_uuid = uuid.UUID(session_id) if session_id else None
-        except ValueError:
-            session_uuid = None
-        if session_uuid is None:
-            raise ApiAuthenticationError()
-
-        session = UserSession.objects.select_related("user").filter(pk=session_uuid).first()
         # The DB check is what makes logout/revocation effective immediately.
-        if session is None or not session.is_usable():
+        session = session_from_access_token(header[1].decode())
+        if session is None:
             raise ApiAuthenticationError()
 
         # request.user = the person, request.auth = the session (used by logout).

@@ -26,8 +26,9 @@ def composite_keys():
 def test_all_composite_keys_are_present():
     keys = composite_keys()
     # academics: 9 (0002) + 1 (0005) + 1 (0007) ; people: 25 (0002) ; gradebook: 22 (0002) + 3 (0005) ;
-    # attendance: 17 (0002) + 1 (0004) ; scheduling: 34 (0002) ; finance: 32 (0002) ; payroll: 37 (0002).
-    assert len(keys) == 182
+    # attendance: 17 (0002) + 1 (0004) ; scheduling: 34 (0002) ; finance: 32 (0002) ; payroll: 37 (0002) ;
+    # communication: 29 (0002) + 1 hand-written (message sender is a participant).
+    assert len(keys) == 212
     assert {shared for _, _, shared in keys} == {
         "school_id",
         "academic_year_id",
@@ -45,6 +46,8 @@ def test_all_composite_keys_are_present():
         # payroll (ADR 0014): check-in / line / settlement tied to their session and payroll
         "teaching_session_id",
         "teacher_payroll_id",
+        # communication (ADR 0015): message(conversation, sender) -> participant(conversation, membership)
+        "sender_id",
     }
 
 
@@ -73,3 +76,9 @@ def test_payroll_lines_are_tied_to_their_teacher_and_session():
     assert ("payroll_payrollline", "teaching_session_id", "teacher_id") in keys
     assert ("payroll_payrollline", "check_in_id", "teaching_session_id") in keys
     assert ("payroll_payrollsettlement", "line_id", "teacher_payroll_id") in keys
+
+
+def test_message_sender_must_be_a_participant():
+    keys = composite_keys()
+    assert ("communication_message", "conversation_id", "sender_id") in keys
+    assert ("communication_notification", "recipient_id", "school_id") in keys

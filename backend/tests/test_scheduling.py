@@ -10,6 +10,7 @@ from django.db import IntegrityError, transaction
 from apps.academics.models import AcademicYear
 from apps.attendance.models import GuardianScan, ScanResult
 from apps.audit.models import AuditLog
+from apps.communication.models import Notification
 from apps.people import services as people
 from apps.scheduling import services as planning
 from apps.scheduling.models import (
@@ -282,12 +283,17 @@ def test_cancel_records_a_notifiable_change(w):
     session = TeachingSession.objects.get()
     planning.cancel_session(session, actor=w.admin, reason="Enseignant malade")
     change = ScheduleChange.objects.get(session=session, change_type=ChangeType.SESSION_CANCELLED)
-    assert (change.notification_status, change.school_class, change.reason) == (
-        NotificationStatus.PENDING,
-        w.klass,
-        "Enseignant malade",
-    )
+    assert (change.school_class, change.reason) == (w.klass, "Enseignant malade")
     assert str(w.tm.pk) in change.teacher_ids
+    # Notifiable change: queued PENDING by planning, then consumed after commit
+    # by the communication dispatcher (ADR 0015), which marks it SENT and
+    # notifies the teacher concerned.
+    assert change.notification_status in (NotificationStatus.PENDING, NotificationStatus.SENT)
+    if change.notification_status == NotificationStatus.SENT:
+        assert change.notified_at is not None
+        assert Notification.objects.filter(
+            recipient=w.tm.employee.membership, event_key=f"schedule_change:{change.pk}"
+        ).exists()
     with pytest.raises(ValidationError) as exc:
         planning.cancel_session(session, actor=w.admin, reason="x")
     assert code_of(exc) == "session_not_scheduled"

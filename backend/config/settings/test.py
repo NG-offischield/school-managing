@@ -34,3 +34,10 @@ CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
 
 # Isolate uploaded files produced by tests.
 MEDIA_ROOT = BASE_DIR / ".test-media"  # noqa: F405
+STORAGES = {  # noqa: F405
+    **STORAGES,  # noqa: F405
+    "private": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "OPTIONS": {"location": str(BASE_DIR / ".test-media" / "private")},  # noqa: F405
+    },
+}

@@ -18,6 +18,7 @@ htmlcov/
 # --- Django runtime files ----------------------------------------------------
 # Uploaded files are private user data (IDs, attachments): never versioned.
 backend/media/
+backend/private-media/
 backend/staticfiles/
 
 # --- Flutter / Dart ----------------------------------------------------------

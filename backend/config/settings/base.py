@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     "apps.scheduling",
     "apps.finance",
     "apps.payroll",
+    "apps.communication",
 ]
 
 MIDDLEWARE = [
@@ -190,6 +191,25 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # public URL route (see config/urls.py).
 MEDIA_ROOT = BASE_DIR / "media"
 MEDIA_URL = "media/"
+
+# Private files (attachments of messages and complaints, ADR 0015): a
+# separate storage with no public route at all. Files are only streamed by
+# views that check permissions first. Moving to an object store later means
+# changing this backend, not the business code.
+PRIVATE_MEDIA_ROOT = env("PRIVATE_MEDIA_ROOT", default=str(BASE_DIR / "private-media"))
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    "private": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "OPTIONS": {"location": PRIVATE_MEDIA_ROOT},
+    },
+}
+# Hard ceiling for any upload; the school's own limit
+# (SchoolConfiguration.default_attachment_limit_mb) applies below it.
+ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 2_621_440
 
 
 # --- Cache (rate limiting) ----------------------------------------------------

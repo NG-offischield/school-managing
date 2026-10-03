@@ -61,6 +61,16 @@ CONFLICT_RULES = {
     "payroll_cancelled",
     "payroll_not_approved",
     "payroll_stale",
+    # communication (ADR 0015)
+    "complaint_final",
+    "complaint_not_draft",
+    "complaint_not_open",
+    "invalid_transition",
+    "conversation_closed",
+    "thread_locked",
+    "message_already_deleted",
+    "post_already_deleted",
+    "client_id_conflict",
 }
 
 # Order matters: subclasses before their parents.

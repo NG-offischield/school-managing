@@ -25,12 +25,23 @@ def get_active_membership(request):
     if hasattr(request, "_active_membership"):
         return request._active_membership
 
+    membership = resolve_membership(request.user, request.META.get(SCHOOL_HEADER))
+    if membership is None:
+        # Same message whether the school does not exist or the user is not a
+        # member: do not reveal which schools exist.
+        raise ApiPermissionError(ErrorCode.NO_ACTIVE_MEMBERSHIP)
+
+    request._active_membership = membership
+    return membership
+
+
+def resolve_membership(user, code=None):
+    """The rules above, without a request: also used by the WebSocket
+    consumer so REST and WebSocket resolve the tenant identically."""
     # Imported lazily: common/ must not depend on apps at import time.
     from apps.accounts.models import SchoolMembership
 
-    candidates = SchoolMembership.objects.active().filter(user=request.user).select_related("school")
-
-    code = request.META.get(SCHOOL_HEADER)
+    candidates = SchoolMembership.objects.active().filter(user=user).select_related("school")
     if code:
         membership = candidates.filter(school__code=code).first()
     else:
@@ -42,13 +53,6 @@ def get_active_membership(request):
             membership = memberships[0]
         else:
             membership = None
-
-    if membership is None:
-        # Same message whether the school does not exist or the user is not a
-        # member: do not reveal which schools exist.
-        raise ApiPermissionError(ErrorCode.NO_ACTIVE_MEMBERSHIP)
-
-    request._active_membership = membership
     return membership
 
 
