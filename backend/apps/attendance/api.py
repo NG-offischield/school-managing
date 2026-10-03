@@ -36,6 +36,7 @@ from rest_framework.views import APIView
 
 from apps.academics.models import AcademicYear, SchoolClass
 from apps.accounts.models import UserDevice
+from apps.finance import services as finance_services
 from apps.people.api import StudentVisibilityMixin
 from apps.people.models import ParentProfile, Student
 from common.permissions import HasSchoolRole
@@ -190,10 +191,11 @@ class ScanCreate(SchoolScopedMixin, APIView):
             "scanned_at": scan.scanned_at,
             "student": None,
             "attendance": None,
-            # Finance phase: solvency status will be added here (spec §7).
+            # Spec §7: UP_TO_DATE / OVERDUE only — never amounts (ADR 0013).
             "solvency": None,
         }
         if outcome.attendance is not None:
+            payload["solvency"] = finance_services.solvency(scan.student)
             enrollment = (
                 scan.student.enrollments.filter(academic_year=scan.academic_year).select_related("school_class").first()
             )

@@ -26,8 +26,8 @@ def composite_keys():
 def test_all_composite_keys_are_present():
     keys = composite_keys()
     # academics: 9 (0002) + 1 (0005) + 1 (0007) ; people: 25 (0002) ; gradebook: 22 (0002) + 3 (0005) ;
-    # attendance: 17 (0002) + 1 (0004) ; scheduling: 34 (0002).
-    assert len(keys) == 113
+    # attendance: 17 (0002) + 1 (0004) ; scheduling: 34 (0002) ; finance: 32 (0002).
+    assert len(keys) == 145
     assert {shared for _, _, shared in keys} == {
         "school_id",
         "academic_year_id",
@@ -39,6 +39,9 @@ def test_all_composite_keys_are_present():
         "planned_teacher_id",
         "school_class_id",
         "subject_id",
+        # finance (ADR 0013): wallet of a payment = wallet of its payer; refund rows of their payment
+        "payer_id",
+        "payment_id",
     }
 
 
@@ -52,3 +55,10 @@ def test_enrollment_guards_school_and_year():
     assert ("attendance_guardianscan", "qr_code_id", "student_id") in keys
     assert ("scheduling_teachingsession", "course_id", "planned_teacher_id") in keys
     assert ("scheduling_scheduleslot", "course_id", "teacher_id") in keys
+
+
+def test_finance_guards_payer_wallet_and_refund_payment():
+    keys = composite_keys()
+    assert ("finance_payment", "wallet_id", "payer_id") in keys
+    assert ("finance_paymentallocation", "refund_id", "payment_id") in keys
+    assert ("finance_paymentallocation", "invoice_id", "student_id") in keys

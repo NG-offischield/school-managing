@@ -34,6 +34,14 @@ CONFLICT_RULES = {
     "room_in_use",
     "room_capacity_exceeded",
     "course_scheduled",
+    # finance (ADR 0013)
+    "idempotency_conflict",
+    "invoice_has_payments",
+    "invoice_cancelled",
+    "invoice_not_payable",
+    "payment_not_refundable",
+    "refund_exceeds_payment",
+    "amount_exceeds_balance",
 }
 
 # Order matters: subclasses before their parents.

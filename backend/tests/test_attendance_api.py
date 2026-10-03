@@ -45,7 +45,7 @@ def test_scan_endpoint_returns_minimum_and_never_the_token(w):
     assert body["result"] in ("ACCEPTED", "ALREADY_PRESENT")
     assert body["student"]["name"] == w.students[0].full_name and body["student"]["class"] == "3e A"
     assert body["attendance"]["status"] in ("PRESENT", "LATE")
-    assert token not in str(body) and body["solvency"] is None
+    assert token not in str(body) and body["solvency"] == "UP_TO_DATE"
 
 
 def test_scan_unknown_token_is_a_logged_refusal_not_an_error(w):

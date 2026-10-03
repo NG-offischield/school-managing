@@ -52,4 +52,5 @@ Voir [docs/runbook.md](docs/runbook.md) pour l'exploitation courante.
 - [x] Catalogue pédagogique administrable (catégories, matières) + journal d'audit (ADR 0010)
 - [x] Présences + QR annuel : scans, présence journalière, retards, clôture, corrections, alertes graduées, convocations (ADR 0011)
 - [x] Planning : salles, emploi du temps récurrent, séances datées, conflits garantis par PostgreSQL, disponibilités, remplacements, permutations, historique / boîte d'envoi des notifications (ADR 0012)
-- [ ] Phases suivantes — présence par séance, finance, paie, communication / notifications, site public, clients PySide6 et Flutter
+- [x] Finance : motifs et échéanciers, factures, paiements simulés déterministes (succès, refus, fonds insuffisants, délai, erreur fournisseur), idempotence, wallets et trésorerie en grand livre append-only, remboursements par transaction inverse, solvabilité au scan QR, tableau de bord (ADR 0013)
+- [ ] Phases suivantes — présence par séance, paie, communication / notifications, reçus PDF, site public, clients PySide6 et Flutter
