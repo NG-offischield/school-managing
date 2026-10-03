@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "apps.people",
     "apps.gradebook",
     "apps.audit",
+    "apps.attendance",
 ]
 
 MIDDLEWARE = [
@@ -235,6 +236,8 @@ REST_FRAMEWORK = {
         "user": "600/min",
         "auth-login": "10/min",
         "auth-refresh": "30/min",
+        # Gate scanning: a busy gate scans many pupils per minute (ADR 0011).
+        "qr-scan": "240/min",
     },
 }
 

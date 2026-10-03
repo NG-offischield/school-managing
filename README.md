@@ -49,4 +49,6 @@ Voir [docs/runbook.md](docs/runbook.md) pour l'exploitation courante.
 - [x] Mini-gate — FK SET NULL sur SecurityEvent, détection de réutilisation des refresh tokens, `sessions/revoke-all/`, `SchoolProvisioningService`, format d'erreur `{success, error{code, message}}` + i18n fr/en
 - [x] Socle métier School + Academic + People (années, périodes, niveaux, catégories, matières, compatibilité, classes, élèves, inscriptions, parents, enseignants, personnel, gardiens) — API en lecture seule, ADR 0008
 - [x] Cœur académique — échelles /20 /100 /60, cours, évaluations, notes (historique immuable, période ouverte), moyennes pondérées, bulletins, évolution, clôture des périodes (ADR 0009)
-- [ ] Phases suivantes — présences/QR, planning, finance, paie, communication, site public, clients PySide6 et Flutter
+- [x] Catalogue pédagogique administrable (catégories, matières) + journal d'audit (ADR 0010)
+- [x] Présences + QR annuel : scans, présence journalière, retards, clôture, corrections, alertes graduées, convocations (ADR 0011)
+- [ ] Phases suivantes — planning (feuilles d'appel par séance), finance, paie, communication, site public, clients PySide6 et Flutter
