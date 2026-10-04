@@ -2,18 +2,10 @@
 clear errors. The password field is cleared as soon as the request leaves."""
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (
-    QCheckBox,
-    QFrame,
-    QLabel,
-    QLineEdit,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QCheckBox, QFrame, QLabel, QLineEdit, QVBoxLayout, QWidget
 
 from .feedback import describe
-from .widgets import Banner
+from .widgets import Banner, button
 
 
 class LoginWindow(QWidget):
@@ -23,43 +15,55 @@ class LoginWindow(QWidget):
         super().__init__(parent)
         self.auth, self.runner, self.config = auth, runner, config
         self.setWindowTitle("Administration scolaire — Connexion")
-        self.setObjectName("page")
-        self.resize(460, 520)
+        self.setObjectName("loginBackground")
+        self.setMinimumSize(520, 600)
 
         card = QFrame(objectName="card")
         form = QVBoxLayout(card)
-        form.setContentsMargins(28, 28, 28, 28)
-        form.setSpacing(10)
-        title = QLabel("Administration scolaire", objectName="pageTitle")
-        subtitle = QLabel("Connectez-vous avec votre compte administrateur.", objectName="muted")
-        self.identifier = QLineEdit(placeholderText="Identifiant ou e-mail")
-        self.password = QLineEdit(placeholderText="Mot de passe", echoMode=QLineEdit.Password)
+        form.setContentsMargins(32, 30, 32, 28)
+        form.setSpacing(6)
+        form.addWidget(QLabel("Administration scolaire", objectName="appTitle"))
+        subtitle = QLabel("Connectez-vous avec votre compte administrateur.", objectName="subtitle")
+        subtitle.setWordWrap(True)
+        form.addWidget(subtitle)
+        form.addSpacing(14)
+
+        self.identifier = QLineEdit(placeholderText="ex. admin ou admin@ecole.cm")
+        self.password = QLineEdit(placeholderText="Votre mot de passe", echoMode=QLineEdit.Password)
+        for caption, field, name in (
+            ("Identifiant ou e-mail", self.identifier, "Identifiant"),
+            ("Mot de passe", self.password, "Mot de passe"),
+        ):
+            label = QLabel(caption, objectName="fieldLabel")
+            label.setBuddy(field)
+            field.setAccessibleName(name)
+            form.addWidget(label)
+            form.addWidget(field)
+            form.addSpacing(8)
         self.remember = QCheckBox("Rester connecté sur ce poste")
         self.remember.setToolTip(
             "Conserve uniquement un jeton de session dans le coffre sécurisé du système, jamais le mot de passe."
         )
-        self.submit = QPushButton("Se connecter", objectName="primary")
+        form.addWidget(self.remember)
+        form.addSpacing(10)
+        self.submit = button("Se connecter", "primary")
         self.submit.setDefault(True)
+        self.submit.setMinimumHeight(40)
+        form.addWidget(self.submit)
         self.banner = Banner(self)
-        server = QLabel(f"Serveur : {config.api_url}", objectName="muted")
+        form.addSpacing(6)
+        form.addWidget(self.banner)
+        form.addSpacing(6)
+        server = QLabel(f"Serveur : {config.api_url}", objectName="help")
         server.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        for widget in (
-            title,
-            subtitle,
-            self.identifier,
-            self.password,
-            self.remember,
-            self.submit,
-            self.banner,
-            server,
-        ):
-            form.addWidget(widget)
+        form.addWidget(server)
         if config.insecure_transport:
             warning = Banner(self)
             warning.show_message(
                 "warning",
-                "Connexion non chiffrée (HTTP) vers un autre poste : à réserver au "
-                "réseau de développement. Utilisez HTTPS en production.",
+                "connexion non chiffrée vers un autre poste. À réserver au réseau de développement ; "
+                "utilisez HTTPS en production.",
+                title="HTTP",
             )
             form.addWidget(warning)
 
@@ -67,7 +71,10 @@ class LoginWindow(QWidget):
         outer.addStretch()
         outer.addWidget(card, alignment=Qt.AlignHCenter)
         outer.addStretch()
-        card.setFixedWidth(400)
+        card.setFixedWidth(440)
+        self.setTabOrder(self.identifier, self.password)
+        self.setTabOrder(self.password, self.remember)
+        self.setTabOrder(self.remember, self.submit)
 
         self.submit.clicked.connect(self.attempt)
         self.password.returnPressed.connect(self.attempt)
@@ -76,11 +83,13 @@ class LoginWindow(QWidget):
         self.password.textChanged.connect(self._update_state)
         self._loading = False
         self._update_state()
+        self.identifier.setFocus()
 
     def _update_state(self):
         ready = bool(self.identifier.text().strip() and self.password.text()) and not self._loading
         self.submit.setEnabled(ready)
-        self.submit.setText("Connexion…" if self._loading else "Se connecter")
+        self.submit.setText("Connexion en cours…" if self._loading else "Se connecter")
+        self.submit.setToolTip("" if ready or self._loading else "Saisissez l'identifiant et le mot de passe.")
         for widget in (self.identifier, self.password, self.remember):
             widget.setEnabled(not self._loading)
 
@@ -103,9 +112,11 @@ class LoginWindow(QWidget):
     def _failed(self, exc):
         self._loading = False
         self._update_state()
-        feedback = describe(exc)
-        text = exc.message if getattr(exc, "status", None) == 401 else f"{feedback.title} — {feedback.text}"
-        self.banner.show_message("error", text)
+        if getattr(exc, "status", None) == 401:
+            self.banner.show_message("error", exc.message, title="Connexion refusée")
+        else:
+            feedback = describe(exc, "Connexion impossible")
+            self.banner.show_message("error", feedback.text, title=feedback.title, detail=feedback.detail)
         self.password.setFocus()
 
     def reset(self, message=None):

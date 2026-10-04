@@ -48,3 +48,11 @@ def auth(api, vault):
 def logged_in(auth):
     auth.login("admin", PASSWORD)
     return auth
+
+
+@pytest.fixture(scope="session")
+def qapp():
+    """The QApplication with the real theme (Fusion + light palette + style sheet)."""
+    from school_admin.ui.theme import ensure_app
+
+    return ensure_app()

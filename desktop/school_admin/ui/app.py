@@ -16,7 +16,7 @@ from .main_window import MainWindow
 from .pages.catalog_pages import CategoriesPage, SubjectsPage
 from .pages.dashboard_page import DashboardPage
 from .tasks import TaskRunner
-from .theme import STYLE
+from .theme import apply_theme
 
 
 class AppController:
@@ -74,7 +74,7 @@ class AppController:
 def main(argv=None):
     app = QApplication(argv if argv is not None else sys.argv)
     app.setApplicationName("Administration scolaire")
-    app.setStyleSheet(STYLE)
+    apply_theme(app)
     config = load_config()
     api = ApiClient(config.api_url, timeout=config.timeout, language=config.language)
     auth = AuthService(api, device_info(), persistent_store=KeyringTokenStore(config.api_url))

@@ -69,6 +69,26 @@ school_admin/
                        exécution des appels hors du fil d'affichage, messages d'erreur uniformes
 ```
 
+## Interface (thème unique)
+
+`school_admin/ui/theme.py` est la seule source des couleurs et de la typographie (jetons `TOKENS` et `TYPE`). Le thème :
+
+- impose le style Fusion et une palette claire, quel que soit le mode sombre de Windows ;
+- vérifie les contrastes WCAG 2.1 par des tests (`tests/test_theme_dialogs.py`) : 4,5:1 pour les textes, 3:1 pour les bordures et le focus.
+
+Rôles de boutons : `primary` (Ajouter, Enregistrer), `secondary` (Annuler, Actualiser, Modifier), `danger` (Désactiver).
+
+Composants partagés dans `ui/widgets.py` : `button()`, `FormDialog`, `ConfirmDialog`, `Banner`.
+
+Captures des vrais écrans contre un backend (revue visuelle) :
+
+```powershell
+$env:QT_QPA_FONTDIR = "C:/Windows/Fonts"
+.venv\Scripts\python tools\capture_screens.py C:\temp\captures 1366x768 1920x1080
+```
+
+L'outil utilise les mêmes variables `SCHOOL_ADMIN_E2E_*` que le test de bout en bout. Il crée une catégorie et une matière.
+
 ## Sécurité
 
 - **Mot de passe :** il n'est jamais stocké ; le champ est vidé dès l'envoi de la requête.

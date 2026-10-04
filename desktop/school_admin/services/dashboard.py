@@ -16,6 +16,7 @@ breaking the whole page. Authentication errors still propagate (-> login).
 from datetime import date, timedelta
 
 from ..api.errors import ApiError, NetworkError, Unauthorized
+from ..messages import explain
 from ..models import DashboardData, Metric
 
 ATTENDANCE_LABELS = {"PRESENT": "présents", "LATE": "retards", "ABSENT": "absents", "EXCUSED": "excusés"}
@@ -32,7 +33,7 @@ class DashboardService:
         except (Unauthorized, NetworkError):
             raise
         except ApiError as exc:
-            return Metric(label, None, hint, error=exc.message)
+            return Metric(label, None, hint, error=explain(exc))
 
     def load(self):
         school = self.api.get("school/")
