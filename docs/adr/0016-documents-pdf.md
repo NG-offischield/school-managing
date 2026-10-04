@@ -4,8 +4,9 @@
 - **Périmètre :** nouvelle app `documents` (`Document`, `DocumentDownload`). Elle couvre :
   - le rendu PDF ReportLab ;
   - les bulletins scolaires, reçus de paiement, bulletins de paie, relevés de présence d'un élève et registres de classe ;
-  - les endpoints de la spec §6.12 (`/reports/...pdf/`, `/report-cards/{id}/pdf/`, `/payroll/{id}/payslip.pdf/`).
-- **Hors périmètre :** carte élève (avec QR), PDF de l'emploi du temps, PySide6, Flutter, FCM, déploiement.
+  - la carte d'élève et l'emploi du temps (§7 et §8, ajoutés le 2026-10-04) ;
+  - les endpoints de la spec §6.12 (`/reports/...pdf/`, `/report-cards/{id}/pdf/`, `/payroll/{id}/payslip.pdf/`, `/reports/student-card/{id}.pdf/`, `/reports/schedule.pdf/`, `POST /students/{id}/card/`).
+- **Hors périmètre :** PySide6, Flutter, FCM, déploiement.
 
 ## 1. Bibliothèque : ReportLab
 
@@ -80,4 +81,48 @@ Codes de retour :
 
 1. Il n'y a pas de table `Payslip` dédiée ni de colonnes `pdf_path` : le registre central `Document` couvre tous les types, avec versions et instantané. `ReportCard.pdf_path`, sur le stockage public par défaut, n'est **pas** utilisé.
 2. Un endpoint de reçu est ajouté (`/payments/{id}/receipt.pdf/`), ainsi que l'endpoint de vérification d'authenticité.
-3. La carte élève et le PDF de l'emploi du temps (§6.12) ne sont pas encore produits.
+3. ~~La carte élève et le PDF de l'emploi du temps ne sont pas encore produits~~ — fermé, voir §7 et §8.
+4. La carte d'élève est officielle **par QR**. Une modification ordinaire de la fiche (spec §15 : le QR reste stable) ne la réimprime pas ; une réimpression passe par la réémission du QR.
+
+## 7. Carte d'élève (`STUDENT_CARD`)
+
+**Sources** (aucun nouveau système) :
+- `Student` : nom, prénom, sexe, date de naissance, matricule, photo ;
+- l'inscription active de l'année courante : classe, niveau ;
+- l'`AcademicYear` courante ;
+- le **`StudentQRCode` ACTIF existant**.
+
+**Contacts d'urgence** (spec §15) : les parents au lien **actif et vérifié**, contact principal en premier, au plus deux, nom et téléphone seulement. Rien d'autre n'est exposé : ni adresse, ni lieu de naissance, ni pièce d'identité.
+
+**QR :**
+- la carte encode le **jeton opaque existant** tel quel ; il n'y a pas de second système de QR ;
+- le jeton n'est **jamais** copié dans le registre : `content` ne garde que l'identifiant et la version du QR, et le jeton n'est utilisé qu'au rendu ;
+- pas de QR actif, pas d'année courante ou pas d'inscription → 409 `document_source_not_final`.
+
+**Statut et unicité :**
+- carte OFFICIELLE, une par QR (`params_key = qr:<id>`) ;
+- la réémission du QR (carte perdue) produit une nouvelle carte ; l'ancienne reste dans l'historique.
+
+**Rendu :** format ID-1 (85,6 × 54 mm), recto-verso.
+- **Recto :** bandeau aux couleurs de l'école, logo, fond de carte (`SchoolBranding.card_background`) s'il existe, photo, identité, QR.
+- **Verso :** contacts d'urgence, coordonnées de l'école, code de vérification.
+
+**Droits :** administration de l'école, et parents au lien vérifié de l'élève.
+
+## 8. Emploi du temps (`TIMETABLE`)
+
+**Sources :** uniquement `scheduling`.
+- Les créneaux `ScheduleSlot` PUBLISHED en vigueur la semaine demandée donnent la grille horaire × jours. Chaque cellule indique la matière, l'enseignant (ou la classe, pour la vue enseignant) et la salle.
+- Les `TeachingSession` de la semaine donnent les **modifications** : séances annulées, remplacements, déplacements.
+
+**Source du document :** une classe (`school_class`) ou un enseignant. Pour l'enseignant, la nouvelle colonne `Document.teacher` est protégée par une FK composite (même école).
+
+**Unicité et statut :**
+- un document par semaine (`params_key` = lundi) ;
+- OFFICIEL pour une semaine écoulée, PROVISOIRE sinon : versionné si le planning change.
+
+**Droits :**
+- administration : tout ce qui appartient à son école ;
+- parent : l'emploi du temps de la classe où son enfant (lien vérifié) est activement inscrit ;
+- enseignant : **son propre** emploi du temps uniquement ;
+- tout le reste → 404.

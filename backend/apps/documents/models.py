@@ -33,6 +33,8 @@ class DocumentKind(models.TextChoices):
     PAYSLIP = "PAYSLIP", "Bulletin de paie"
     STUDENT_ATTENDANCE = "STUDENT_ATTENDANCE", "Relevé de présence d'un élève"
     CLASS_ATTENDANCE = "CLASS_ATTENDANCE", "Registre de présence d'une classe"
+    STUDENT_CARD = "STUDENT_CARD", "Carte d'élève"
+    TIMETABLE = "TIMETABLE", "Emploi du temps"
 
 
 class DocumentStatus(models.TextChoices):
@@ -48,8 +50,10 @@ KIND_SOURCES = {
     DocumentKind.PAYSLIP: ("teacher_payroll", "staff_payroll"),
     DocumentKind.STUDENT_ATTENDANCE: ("student",),
     DocumentKind.CLASS_ATTENDANCE: ("school_class",),
+    DocumentKind.STUDENT_CARD: ("student",),
+    DocumentKind.TIMETABLE: ("school_class", "teacher"),  # a class's, or a teacher's own
 }
-SOURCE_FIELDS = ("report_card", "payment", "teacher_payroll", "staff_payroll", "student", "school_class")
+SOURCE_FIELDS = ("report_card", "payment", "teacher_payroll", "staff_payroll", "student", "school_class", "teacher")
 
 
 def _kind_check(kind, allowed):
@@ -84,6 +88,9 @@ class Document(TenantModel):
     student = models.ForeignKey("people.Student", on_delete=models.PROTECT, blank=True, null=True, related_name="+")
     school_class = models.ForeignKey(
         "academics.SchoolClass", on_delete=models.PROTECT, blank=True, null=True, related_name="+"
+    )
+    teacher = models.ForeignKey(
+        "people.TeacherProfile", on_delete=models.PROTECT, blank=True, null=True, related_name="+"
     )
     # Extra parameters of the source (date range of an attendance statement...).
     params = models.JSONField(default=dict)

@@ -14,11 +14,15 @@ and the school's own identity (School / SchoolBranding):
 import io
 import logging
 
+from reportlab.graphics import renderPDF
+from reportlab.graphics.barcode.qr import QrCodeWidget
+from reportlab.graphics.shapes import Drawing
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas as pdf_canvas
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from .models import DocumentStatus
@@ -35,16 +39,22 @@ def _color(value, fallback):
         return colors.HexColor(fallback)
 
 
-def _logo(school):
-    """The school's logo (default storage), or None when absent/unreadable."""
-    if not school.logo:
+def _image(field_file):
+    """An image of the storage (school logo, pupil photo, card background),
+    or None when absent / unreadable: a broken image must never prevent an
+    official document."""
+    if not field_file:
         return None
     try:
-        with school.logo.open("rb") as handle:
+        with field_file.open("rb") as handle:
             return ImageReader(io.BytesIO(handle.read()))
-    except Exception:  # a broken logo must not prevent an official document
-        logger.warning("Unreadable logo for school %s", school.pk)
+    except Exception:
+        logger.warning("Unreadable image %s", getattr(field_file, "name", ""))
         return None
+
+
+def _logo(school):
+    return _image(school.logo)
 
 
 def render(content, *, school, status, verification_code, generated_label):
@@ -54,8 +64,10 @@ def render(content, *, school, status, verification_code, generated_label):
     logo = _logo(school)
     official = status == DocumentStatus.OFFICIAL
 
+    pagesize = landscape(A4) if content.get("landscape") else A4
+
     def decorate(canvas, doc):
-        width, height = A4
+        width, height = pagesize
         canvas.saveState()
         # Header band.
         canvas.setFillColor(primary)
@@ -153,7 +165,7 @@ def render(content, *, school, status, verification_code, generated_label):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
-        pagesize=A4,
+        pagesize=pagesize,
         leftMargin=MARGIN,
         rightMargin=MARGIN,
         topMargin=HEADER_HEIGHT,
@@ -168,7 +180,8 @@ def render(content, *, school, status, verification_code, generated_label):
 
 
 def _escape(value):
-    return str(value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    text = str(value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return text.replace(chr(10), "<br/>")  # multi-line cells (timetable)
 
 
 def _grid(rows, color, *, header, widths=None):
@@ -181,3 +194,90 @@ def _grid(rows, color, *, header, widths=None):
         style += [("BACKGROUND", (0, 0), (-1, 0), color), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white)]
     table.setStyle(TableStyle(style))
     return table
+
+
+# =============================================================================
+# Student card (ID-1 format, recto / verso)
+# =============================================================================
+
+CARD = (85.6 * mm, 53.98 * mm)
+
+
+def render_card(content, *, school, verification_code, qr_token, photo=None, background=None):
+    """Recto: school identity, photo, pupil identity, annual QR (the
+    EXISTING opaque token, encoded as is). Verso: emergency contacts, school
+    contacts, verification code. Branding from School / SchoolBranding."""
+    info = content["school"]
+    primary = _color(info["primary_color"], "#173B73")
+    fields = dict(content["fields"])
+    width, height = CARD
+    buffer = io.BytesIO()
+    page = pdf_canvas.Canvas(buffer, pagesize=CARD)
+    page.setTitle(content["title"])
+    page.setAuthor(info["name"])
+    background_image, logo, picture = _image(background), _logo(school), _image(photo)
+
+    # --- recto ---
+    if background_image is not None:
+        page.drawImage(background_image, 0, 0, width=width, height=height, mask="auto")
+    page.setFillColor(primary)
+    page.rect(0, height - 11 * mm, width, 11 * mm, stroke=0, fill=1)
+    x = 3 * mm
+    if logo is not None:
+        page.drawImage(
+            logo, 2 * mm, height - 10 * mm, width=9 * mm, height=9 * mm, preserveAspectRatio=True, mask="auto"
+        )
+        x = 12 * mm
+    page.setFillColor(colors.white)
+    page.setFont("Helvetica-Bold", 7.5)
+    page.drawString(x, height - 5 * mm, info["name"][:48])
+    page.setFont("Helvetica", 5.5)
+    page.drawString(x, height - 8.5 * mm, f"Carte d'élève — {fields['Année scolaire']}")
+    if picture is not None:
+        page.drawImage(picture, 3 * mm, 8 * mm, width=20 * mm, height=25 * mm, preserveAspectRatio=True, mask="auto")
+    else:
+        page.setStrokeColor(colors.lightgrey)
+        page.rect(3 * mm, 8 * mm, 20 * mm, 25 * mm)
+    page.setFillColor(colors.black)
+    y = height - 15 * mm
+    for label in ("Nom", "Prénom", "Sexe", "Né(e) le", "Classe", "Matricule"):
+        page.setFont("Helvetica", 5)
+        page.drawString(25 * mm, y, label)
+        page.setFont("Helvetica-Bold", 6.5)
+        page.drawString(37 * mm, y, str(fields.get(label, ""))[:28])
+        y -= 4.2 * mm
+    widget = QrCodeWidget(qr_token)
+    x0, y0, x1, y1 = widget.getBounds()
+    side = 22 * mm
+    drawing = Drawing(side, side, transform=[side / (x1 - x0), 0, 0, side / (y1 - y0), 0, 0])
+    drawing.add(widget)
+    renderPDF.draw(drawing, page, width - side - 2 * mm, 3 * mm)
+    page.setFont("Helvetica", 4.5)
+    page.drawString(3 * mm, 3 * mm, f"Carte n° {fields['Carte n°']}")
+    page.showPage()
+
+    # --- verso ---
+    page.setFillColor(primary)
+    page.rect(0, height - 7 * mm, width, 7 * mm, stroke=0, fill=1)
+    page.setFillColor(colors.white)
+    page.setFont("Helvetica-Bold", 6.5)
+    page.drawString(3 * mm, height - 4.8 * mm, "En cas d'urgence")
+    page.setFillColor(colors.black)
+    y = height - 12 * mm
+    for name, phone in content.get("emergency") or [["—", ""]]:
+        page.setFont("Helvetica-Bold", 6)
+        page.drawString(3 * mm, y, str(name)[:40])
+        page.setFont("Helvetica", 6)
+        page.drawRightString(width - 3 * mm, y, str(phone))
+        y -= 4.5 * mm
+    page.setFont("Helvetica", 5)
+    contact = " · ".join(v for v in (info["phone"], info["email"]) if v)
+    page.drawString(3 * mm, 14 * mm, f"{info['name']} — {info['address']}, {info['city']}"[:90])
+    if contact:
+        page.drawString(3 * mm, 10.5 * mm, contact[:90])
+    page.drawString(3 * mm, 7 * mm, content.get("statement", "")[:95])
+    page.setFillColor(colors.grey)
+    page.drawString(3 * mm, 3 * mm, f"Code de vérification : {verification_code}")
+    page.showPage()
+    page.save()
+    return buffer.getvalue()

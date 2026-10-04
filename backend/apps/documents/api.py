@@ -13,6 +13,8 @@ Spec shortcuts (generate-or-get, then stream the PDF):
     GET /reports/report-card/{id}.pdf/   GET /report-cards/{id}/pdf/
     GET /payroll/{id}/payslip.pdf/       GET /payments/{id}/receipt.pdf/
     GET /reports/attendance.pdf/?student=&date_from=&date_to=   or   ?school_class=&date=
+    GET /reports/student-card/{id}.pdf/   POST /students/{id}/card/
+    GET /reports/schedule.pdf/?school_class=|teacher=&date=   (week containing `date`)
 
 Answers: another school's id, or a source the caller may not see -> 404;
 a source that cannot be documented yet (draft report card for a parent,
@@ -32,7 +34,7 @@ from apps.academics.models import SchoolClass
 from apps.finance.models import Payment
 from apps.gradebook.models import ReportCard
 from apps.payroll.models import StaffPayroll, TeacherPayroll
-from apps.people.models import Student
+from apps.people.models import Student, TeacherProfile
 from common.tenancy import scope_to_current_school
 from common.views import SchoolScopedMixin
 
@@ -80,6 +82,7 @@ class GenerateInput(serializers.Serializer):
     date = serializers.DateField(required=False)
     date_from = serializers.DateField(required=False)
     date_to = serializers.DateField(required=False)
+    teacher = serializers.UUIDField(required=False)
 
     REQUIRED = {
         DocumentKind.REPORT_CARD: ("report_card",),
@@ -87,9 +90,13 @@ class GenerateInput(serializers.Serializer):
         DocumentKind.PAYSLIP: ("payroll",),
         DocumentKind.STUDENT_ATTENDANCE: ("student", "date_from", "date_to"),
         DocumentKind.CLASS_ATTENDANCE: ("school_class", "date"),
+        DocumentKind.STUDENT_CARD: ("student",),
+        DocumentKind.TIMETABLE: (),  # school_class OR teacher, checked below
     }
 
     def validate(self, attrs):
+        if attrs["kind"] == DocumentKind.TIMETABLE and bool(attrs.get("school_class")) == bool(attrs.get("teacher")):
+            raise serializers.ValidationError({"school_class": ["Give a class or a teacher."]})
         missing = [f for f in self.REQUIRED[attrs["kind"]] if not attrs.get(f)]
         if missing:
             raise serializers.ValidationError({f: ["Required for this kind."] for f in missing})
@@ -109,6 +116,15 @@ def resolve(kind, values, request):
             "date_from": values["date_from"],
             "date_to": values["date_to"],
         }
+    if kind == DocumentKind.STUDENT_CARD:
+        return scoped(Student, values["student"], request), {}
+    if kind == DocumentKind.TIMETABLE:
+        source = (
+            scoped(TeacherProfile, values["teacher"], request)
+            if values.get("teacher")
+            else scoped(SchoolClass, values["school_class"], request)
+        )
+        return source, {"date": values.get("date")}
     return scoped(SchoolClass, values["school_class"], request), {"date": values["date"]}
 
 
@@ -227,6 +243,32 @@ class AttendancePdf(ShortcutMixin, APIView):
             raise serializers.ValidationError({"date": exc.detail}) from None
 
 
+class StudentCardPdf(ShortcutMixin, APIView):
+    def get(self, request, pk):
+        return self.deliver(DocumentKind.STUDENT_CARD, scoped(Student, pk, request))
+
+
+class StudentCardGenerate(SchoolScopedMixin, APIView):
+    """Spec: POST /students/{id}/card/ — generate (or get) the card."""
+
+    def post(self, request, pk):
+        document, created = generate_visible(
+            DocumentKind.STUDENT_CARD, scoped(Student, pk, request), self.membership(), {}
+        )
+        return Response(DocumentSerializer(document).data, status=status.HTTP_201_CREATED if created else 200)
+
+
+class SchedulePdf(ShortcutMixin, APIView):
+    def get(self, request):
+        teacher, school_class = self.uuid_param("teacher"), self.uuid_param("school_class")
+        if bool(teacher) == bool(school_class):
+            raise serializers.ValidationError({"school_class": ["Give a class or a teacher."]})
+        source = scoped(TeacherProfile, teacher, request) if teacher else scoped(SchoolClass, school_class, request)
+        raw = request.query_params.get("date")
+        day = serializers.DateField().to_internal_value(raw) if raw else None
+        return self.deliver(DocumentKind.TIMETABLE, source, {"date": day})
+
+
 urlpatterns = [
     path("documents/", Documents.as_view()),
     path("documents/verify/", DocumentVerify.as_view()),
@@ -238,4 +280,7 @@ urlpatterns = [
     path("payroll/<uuid:pk>/payslip.pdf/", PayslipPdf.as_view()),
     path("payments/<uuid:pk>/receipt.pdf/", ReceiptPdf.as_view()),
     path("reports/attendance.pdf/", AttendancePdf.as_view()),
+    path("reports/student-card/<uuid:pk>.pdf/", StudentCardPdf.as_view()),
+    path("students/<uuid:pk>/card/", StudentCardGenerate.as_view()),
+    path("reports/schedule.pdf/", SchedulePdf.as_view()),
 ]

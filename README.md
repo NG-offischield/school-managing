@@ -55,5 +55,5 @@ Voir [docs/runbook.md](docs/runbook.md) pour l'exploitation courante.
 - [x] Finance : motifs et échéanciers, factures, paiements simulés déterministes (succès, refus, fonds insuffisants, délai, erreur fournisseur), idempotence, wallets et trésorerie en grand livre append-only, remboursements par transaction inverse, solvabilité au scan QR, tableau de bord (ADR 0013)
 - [x] Paie : validation administrative des séances (check-in), taux datés, périodes, calcul déterministe programmé / acquis, paie préparée → validée → payée via Finance, double paiement impossible, corrections tracées, solvabilité QR limitée aux rôles autorisés (ADR 0014)
 - [x] Communication : notifications projetées depuis les domaines (file push prête pour FCM), messagerie privée, forum / annonces, réclamations, pièces jointes privées, WebSocket temps réel (ADR 0015)
-- [x] Documents officiels PDF : bulletins, reçus, bulletins de paie, relevés et registres de présence ; officiel / provisoire, versions, branding de l'école, stockage privé, traces (ADR 0016)
-- [ ] Phases suivantes — présence par séance (fiches d'appel), envoi FCM, carte élève, site public, clients PySide6 et Flutter
+- [x] Documents officiels PDF : bulletins, reçus, bulletins de paie, relevés et registres de présence, carte d'élève (QR annuel existant), emploi du temps ; officiel / provisoire, versions, branding de l'école, stockage privé, traces (ADR 0016)
+- [ ] Phases suivantes — présence par séance (fiches d'appel), envoi FCM, site public, clients PySide6 et Flutter

@@ -8,18 +8,21 @@ version" are decided by comparing fingerprints. Nothing here writes to the
 source domains.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import timedelta
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from django.utils import timezone
 
-from apps.attendance.models import DailyStatus, StudentDailyAttendance
+from apps.academics.models import AcademicYear
+from apps.attendance.models import DailyStatus, QRStatus, StudentDailyAttendance, StudentQRCode
 from apps.finance.models import MONEY_RECEIVED, PaymentAllocation
 from apps.gradebook.models import ReportCardStatus
 from apps.payroll.models import LineKind, PayrollLine, PayrollStatus, TeacherPayroll
-from apps.people.models import EnrollmentStatus, StudentEnrollment
-from apps.scheduling.models import TeachingSession
+from apps.people.models import EnrollmentStatus, ParentStudent, StudentEnrollment, TeacherProfile
+from apps.scheduling.models import ScheduleSlot, SessionStatus, SlotStatus, TeachingSession
 
 from .models import DocumentStatus
 
@@ -32,6 +35,13 @@ class Built:
     status: str
     title: str
     file_name: str
+    # Parameters decided by the source itself (the QR a card is printed for).
+    params: dict | None = None
+    params_key: str | None = None
+    # Rendering: "page" (A4 report) or "card" (ID-1 card), and render-only
+    # inputs never stored in `content` (the QR token is a secret).
+    layout: str = "page"
+    extra: dict = field(default_factory=dict)
 
 
 def not_final(message):
@@ -411,4 +421,184 @@ def class_attendance(school_class, day):
         status,
         f"Registre — {school_class.name} — {_d(day)}",
         f"registre-{school_class.name}-{day}.pdf".replace(" ", "-"),
+    )
+
+
+# =============================================================================
+# Student card (people + attendance QR)
+# =============================================================================
+
+
+def emergency_contacts(student, limit=2):
+    """Verified, active parents of the pupil, primary contact first: name and
+    phone only (no address, no identity document)."""
+    links = (
+        ParentStudent.objects.filter(student=student, active=True, identity_verified=True)
+        .select_related("parent__membership__user")
+        .order_by("-is_primary_contact", "created_at")[:limit]
+    )
+    return [
+        [link.parent.membership.user.full_name, link.parent.emergency_phone or link.parent.membership.user.phone or ""]
+        for link in links
+    ]
+
+
+def student_card(student):
+    """The annual card carries the EXISTING annual QR (attendance
+    StudentQRCode): no second QR system. One official card per QR; a
+    reissued QR (new token) gives a new card, the old one stays in history.
+    Only what a card needs is shown (no address, birthplace, documents)."""
+    year = AcademicYear.objects.filter(school=student.school, is_current=True).first()
+    if year is None:
+        raise not_final("The school has no current academic year.")
+    qr = StudentQRCode.objects.filter(student=student, academic_year=year, status=QRStatus.ACTIVE).first()
+    if qr is None:
+        raise not_final("The pupil has no active QR code for the current year.")
+    enrollment = (
+        StudentEnrollment.objects.filter(student=student, academic_year=year, status=EnrollmentStatus.ACTIVE)
+        .select_related("school_class__level")
+        .first()
+    )
+    if enrollment is None:
+        raise not_final("The pupil is not enrolled this year.")
+    klass = enrollment.school_class
+    branding = getattr(student.school, "branding", None)
+    background = branding.card_background if branding and branding.card_background else None
+    card_number = f"{student.student_number}-V{qr.version}"
+    content = {
+        "kind": "STUDENT_CARD",
+        "title": "Carte d'élève",
+        "subtitle": year.name,
+        "school": school_block(student.school),
+        "fields": [
+            ["Nom", student.last_name],
+            ["Prénom", student.first_name],
+            ["Sexe", student.get_sex_display()],
+            ["Né(e) le", _d(student.date_of_birth)],
+            ["Classe", klass.name],
+            ["Niveau", klass.level.name if klass.level_id else ""],
+            ["Année scolaire", year.name],
+            ["Matricule", student.student_number],
+            ["Carte n°", card_number],
+        ],
+        "emergency": emergency_contacts(student),
+        "photo": student.photo.name if student.photo else "",
+        "card_background": background.name if background else "",
+        # QR identity only: the token itself is never copied into documents.
+        "qr": {"id": str(qr.pk), "version": qr.version, "issued_at": _d(qr.issued_at)},
+        "summary": [],
+        "tables": [],
+        "statement": "Carte personnelle. En cas de perte, prévenir l'établissement.",
+    }
+    return Built(
+        content,
+        DocumentStatus.OFFICIAL,
+        f"Carte d'élève — {student.full_name} — {year.name}",
+        f"carte-{card_number}.pdf",
+        params={"qr": str(qr.pk), "academic_year": str(year.pk)},
+        params_key=f"qr:{qr.pk}",
+        layout="card",
+        extra={"qr_token": qr.token, "photo": student.photo, "background": background},
+    )
+
+
+# =============================================================================
+# Timetable (scheduling)
+# =============================================================================
+
+WEEKDAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+
+
+def _hm(value):
+    return value.strftime("%H:%M")
+
+
+def timetable(source, day):
+    """Week timetable of a class, or of a teacher, built from the PUBLISHED
+    recurring slots in force that week, plus that week's changes (cancelled,
+    moved, substituted sessions). Reads scheduling only."""
+    teacher_view = isinstance(source, TeacherProfile)
+    monday = day - timedelta(days=day.isoweekday() - 1)
+    sunday = monday + timedelta(days=6)
+    slots = ScheduleSlot.objects.filter(status=SlotStatus.PUBLISHED, effective_from__lte=sunday).exclude(
+        effective_to__lt=monday
+    )
+    sessions = TeachingSession.objects.filter(date__gte=monday, date__lte=sunday)
+    if teacher_view:
+        slots = slots.filter(teacher=source)
+        sessions = sessions.filter(Q(teacher=source) | Q(planned_teacher=source))
+        owner = source.employee.membership.user.full_name
+        year = AcademicYear.objects.filter(school=source.school, start_date__lte=day, end_date__gte=day).first()
+    else:
+        slots = slots.filter(school_class=source)
+        sessions = sessions.filter(school_class=source)
+        owner = source.name
+        year = source.academic_year
+    slots = list(slots.select_related("course__subject", "teacher__employee__membership__user", "room", "school_class"))
+    days = sorted({1, 2, 3, 4, 5} | {slot.weekday for slot in slots})
+    hours = sorted({(slot.start_time, slot.end_time) for slot in slots})
+    grid = {(slot.weekday, slot.start_time, slot.end_time): slot for slot in slots}
+
+    def cell(slot):
+        if slot is None:
+            return ""
+        who = slot.school_class.name if teacher_view else slot.teacher.employee.membership.user.full_name
+        room = slot.room.name if slot.room_id else ""
+        return "\n".join(part for part in (slot.course.subject.name, who, room) if part)
+
+    rows = [
+        [f"{_hm(start)}–{_hm(end)}", *[cell(grid.get((weekday, start, end))) for weekday in days]]
+        for start, end in hours
+    ]
+    changes = []
+    for session in sessions.select_related("subject", "teacher__employee__membership__user").order_by(
+        "scheduled_start"
+    ):
+        if session.status == SessionStatus.CANCELLED:
+            what = "Séance annulée"
+        elif session.teacher_id != session.planned_teacher_id:
+            what = f"Remplacement : {session.teacher.employee.membership.user.full_name}"
+        elif session.original_start is not None:
+            what = f"Déplacée (initialement {timezone.localtime(session.original_start):%d/%m %H:%M})"
+        else:
+            continue
+        start = timezone.localtime(session.scheduled_start)
+        end = timezone.localtime(session.scheduled_end)
+        changes.append([_d(session.date), f"{start:%H:%M}–{end:%H:%M}", session.subject.name, what])
+    final = sunday < timezone.localdate()
+    content = {
+        "kind": "TIMETABLE",
+        "title": "Emploi du temps",
+        "subtitle": f"{owner} — semaine du {_d(monday)} au {_d(sunday)}",
+        "school": school_block(source.school),
+        "landscape": True,
+        "fields": [
+            ["Enseignant" if teacher_view else "Classe", owner],
+            ["Année scolaire", year.name if year else ""],
+            ["Semaine", f"{_d(monday)} – {_d(sunday)}"],
+        ],
+        "tables": [
+            {"title": "Créneaux", "columns": ["Horaire", *[WEEKDAYS[d - 1] for d in days]], "rows": rows},
+            {
+                "title": "Modifications de la semaine",
+                "columns": ["Date", "Horaire", "Matière", "Changement"],
+                "rows": changes,
+            },
+        ],
+        "summary": [],
+        "statement": (
+            "Semaine écoulée : emploi du temps tel qu'il a été appliqué."
+            if final
+            else "Emploi du temps susceptible de modification : se référer à l'application pour les changements."
+        ),
+    }
+    status = DocumentStatus.OFFICIAL if final else DocumentStatus.PROVISIONAL
+    slug = (source.employee.employee_number if teacher_view else source.name).replace(" ", "-")
+    return Built(
+        content,
+        status,
+        f"Emploi du temps — {owner} — semaine du {_d(monday)}",
+        f"edt-{slug}-{monday}.pdf",
+        params={"week": monday.isoformat()},
+        params_key=monday.isoformat(),
     )

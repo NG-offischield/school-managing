@@ -36,11 +36,11 @@ from apps.communication import access as relations
 from apps.communication.attachments import private_storage
 from apps.finance.services import can_view_finance
 from apps.payroll.models import TeacherPayroll
-from apps.people.models import ParentStudent
+from apps.people.models import EnrollmentStatus, ParentStudent, StudentEnrollment, TeacherProfile
 from common.permissions import membership_has_role
 
 from . import builders, rendering
-from .models import Document, DocumentDownload, DocumentKind, DocumentStatus
+from .models import SOURCE_FIELDS, Document, DocumentDownload, DocumentKind, DocumentStatus
 
 
 def fingerprint(content):
@@ -58,9 +58,12 @@ def _source_filter(kind, source, params_key=""):
         DocumentKind.PAYMENT_RECEIPT: "payment",
         DocumentKind.STUDENT_ATTENDANCE: "student",
         DocumentKind.CLASS_ATTENDANCE: "school_class",
+        DocumentKind.STUDENT_CARD: "student",
     }
     if kind == DocumentKind.PAYSLIP:
         column = "teacher_payroll" if isinstance(source, TeacherPayroll) else "staff_payroll"
+    elif kind == DocumentKind.TIMETABLE:
+        column = "teacher" if isinstance(source, TeacherProfile) else "school_class"
     else:
         column = columns[kind]
     return {"kind": kind, column: source, "params_key": params_key}
@@ -93,11 +96,24 @@ def can_access(member, kind, source, *, official=True):
             membership_has_role(member, {"TEACHER"})
             and source.courses.filter(active=True, teacher__employee__membership=member).exists()
         )
+    if kind == DocumentKind.STUDENT_CARD:
+        return relations.parent_of(member, source)
+    if kind == DocumentKind.TIMETABLE:
+        if isinstance(source, TeacherProfile):
+            return source.employee.membership_id == member.pk  # a teacher: their own only
+        # A class: parents of a pupil actively enrolled in it.
+        return ParentStudent.objects.filter(
+            parent__membership=member,
+            active=True,
+            identity_verified=True,
+            student__enrollments__school_class=source,
+            student__enrollments__status=EnrollmentStatus.ACTIVE,
+        ).exists() and membership_has_role(member, {"PARENT"})
     return False
 
 
 def _source_of(document):
-    for field in ("report_card", "payment", "teacher_payroll", "staff_payroll", "student", "school_class"):
+    for field in SOURCE_FIELDS:
         value = getattr(document, field)
         if value is not None:
             return value
@@ -136,6 +152,14 @@ def visible_documents(member):
             school_class__courses__active=True,
             school_class__courses__teacher__employee__membership=member,
         )
+        | Q(kind=DocumentKind.STUDENT_CARD, student__in=children.values("student_id"))
+        | Q(kind=DocumentKind.TIMETABLE, teacher__employee__membership=member)
+        | Q(
+            kind=DocumentKind.TIMETABLE,
+            school_class__in=StudentEnrollment.objects.filter(
+                student__in=children.values("student_id"), status=EnrollmentStatus.ACTIVE
+            ).values("school_class_id"),
+        )
     ).distinct()
 
 
@@ -155,6 +179,10 @@ def _build(kind, source, params):
         return builders.student_attendance(source, params["date_from"], params["date_to"])
     if kind == DocumentKind.CLASS_ATTENDANCE:
         return builders.class_attendance(source, params["date"])
+    if kind == DocumentKind.STUDENT_CARD:
+        return builders.student_card(source)
+    if kind == DocumentKind.TIMETABLE:
+        return builders.timetable(source, params.get("date") or timezone.localdate())
     raise ValidationError("Unknown document kind.", code="invalid_kind")
 
 
@@ -178,7 +206,10 @@ def generate(kind, source, *, actor, **params):
     built = _build(kind, source, params)  # re-reads the source; may refuse a non-final one
     if built.status != DocumentStatus.OFFICIAL and not can_access(actor, kind, source, official=False):
         raise ValidationError("This document is not official yet.", code="document_source_not_final")
-    stored_params, params_key = _params(kind, params)
+    if built.params_key is not None:  # decided by the source (card: its QR; timetable: its week)
+        stored_params, params_key = built.params, built.params_key
+    else:
+        stored_params, params_key = _params(kind, params)
     lookup = _source_filter(kind, source, params_key)
     digest = fingerprint(built.content)
     try:
@@ -201,13 +232,16 @@ def _store(kind, source, actor, built, digest, stored_params, lookup):
         current.save(update_fields=["status", "updated_at"])
     now = timezone.now()
     code = secrets.token_hex(8).upper()
-    pdf = rendering.render(
-        built.content,
-        school=source.school,
-        status=built.status,
-        verification_code=code,
-        generated_label=f"généré le {timezone.localtime(now):%d/%m/%Y %H:%M}",
-    )
+    if built.layout == "card":
+        pdf = rendering.render_card(built.content, school=source.school, verification_code=code, **built.extra)
+    else:
+        pdf = rendering.render(
+            built.content,
+            school=source.school,
+            status=built.status,
+            verification_code=code,
+            generated_label=f"généré le {timezone.localtime(now):%d/%m/%Y %H:%M}",
+        )
     path = private_storage().save(
         f"documents/{source.school_id.hex}/{now:%Y/%m}/{uuid.uuid4().hex}.pdf", ContentFile(pdf)
     )
@@ -261,6 +295,8 @@ def regenerate(document, *, actor):
         params = {"date_from": _date(document.params["date_from"]), "date_to": _date(document.params["date_to"])}
     elif document.kind == DocumentKind.CLASS_ATTENDANCE:
         params = {"date": _date(document.params["date"])}
+    elif document.kind == DocumentKind.TIMETABLE:
+        params = {"date": _date(document.params["week"])}
     return generate(document.kind, _source_of(document), actor=actor, **params)
 
 
