@@ -410,3 +410,168 @@ class HistoryEntry:
     action: str
     summary: str
     actor: str
+
+
+# --- teachers (ADR 0019) -----------------------------------------------------------
+
+PROFESSIONAL_STATUSES = {
+    "ACTIVE": "En activité",
+    "PROBATION": "Période d'essai",
+    "SUSPENDED": "Suspendu",
+    "INACTIVE": "Inactif",
+}
+EMPLOYMENT_STATUSES = {
+    "ACTIVE": "Actif",
+    "ON_LEAVE": "En congé",
+    "SUSPENDED": "Suspendu",
+    "TERMINATED": "Fin de contrat",
+}
+QUALIFICATION_STATUSES = {
+    "DECLARED": "Déclarée",
+    "PENDING": "À valider",
+    "VERIFIED": "Vérifiée",
+    "REJECTED": "Retirée / refusée",
+}
+COMPATIBILITY_RESULTS = {
+    "COMPATIBLE": "Compatible",
+    "REQUIRES_REVIEW": "À valider par l'administration",
+    "INCOMPATIBLE": "Incompatible",
+    "OVERRIDDEN": "Autorisé par dérogation",
+}
+
+
+def _ref_label(ref):
+    return f"{ref.get('code', '')} — {ref.get('name', '')}".strip(" —") if ref else ""
+
+
+@dataclass(frozen=True)
+class Teacher:
+    id: str
+    number: str
+    first_name: str
+    last_name: str
+    email: str = ""
+    phone: str = ""
+    category_id: str = ""
+    category_label: str = ""
+    primary_subject_id: str = ""
+    primary_subject_label: str = ""
+    subjects: tuple = ()
+    professional_status: str = ""
+    employment_status: str = ""
+    active: bool = True
+    hire_date: date | None = None
+    address: str = ""
+    qualification_summary: str = ""
+    bio: str = ""
+    account_activated: bool = False
+    active_course_count: int | None = None
+    upcoming_session_count: int | None = None
+
+    @property
+    def code(self):  # the list screens name a row by `code`
+        return self.number
+
+    @property
+    def name(self):
+        return f"{self.last_name} {self.first_name}".strip()
+
+    @property
+    def status_label(self):
+        if self.active:
+            return "Actif"
+        if self.employment_status and self.employment_status != "ACTIVE":
+            return EMPLOYMENT_STATUSES.get(self.employment_status, self.employment_status)
+        return PROFESSIONAL_STATUSES.get(self.professional_status, self.professional_status)
+
+    @classmethod
+    def from_api(cls, row):
+        category, subject = row.get("pedagogical_category") or {}, row.get("primary_subject") or {}
+        return cls(
+            row["id"],
+            row.get("teacher_number", ""),
+            row.get("first_name", ""),
+            row.get("last_name", ""),
+            row.get("email") or "",
+            row.get("phone") or "",
+            category.get("id", "") if isinstance(category, dict) else str(category),
+            _ref_label(category) if isinstance(category, dict) else "",
+            subject.get("id", "") if isinstance(subject, dict) else str(subject),
+            _ref_label(subject) if isinstance(subject, dict) else "",
+            tuple(row.get("subjects") or ()),
+            row.get("professional_status", ""),
+            row.get("employment_status", ""),
+            bool(row.get("active", row.get("professional_status") == "ACTIVE")),
+            _date(row.get("hire_date")),
+            row.get("address") or "",
+            row.get("qualification_summary") or "",
+            row.get("bio") or "",
+            bool(row.get("account_activated")),
+            row.get("active_course_count"),
+            row.get("upcoming_session_count"),
+        )
+
+
+@dataclass(frozen=True)
+class Qualification:
+    id: str
+    subject_id: str
+    subject_code: str
+    subject_name: str
+    status: str
+    source: str
+    computed: str
+    current: str
+    notes: str = ""
+
+    @property
+    def label(self):
+        return f"{self.subject_code} — {self.subject_name}"
+
+    @property
+    def status_label(self):
+        return QUALIFICATION_STATUSES.get(self.status, self.status)
+
+    @classmethod
+    def from_api(cls, row):
+        subject = row.get("subject") or {}
+        return cls(
+            row["id"],
+            subject.get("id", ""),
+            subject.get("code", ""),
+            subject.get("name", ""),
+            row.get("status", ""),
+            row.get("source", ""),
+            row.get("computed_compatibility", ""),
+            row.get("current_compatibility", row.get("computed_compatibility", "")),
+            row.get("notes") or "",
+        )
+
+
+@dataclass(frozen=True)
+class CompatibilityVerdict:
+    """The server's verdict (people/compatibility.py) — displayed, never computed here."""
+
+    result: str
+    reason: str
+    subject_label: str
+    level_label: str = ""
+    rule: dict | None = None
+    override: dict | None = None
+    qualification_status: str | None = None
+
+    @property
+    def result_label(self):
+        return COMPATIBILITY_RESULTS.get(self.result, self.result)
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["result"],
+            row.get("reason", ""),
+            _ref_label(row.get("subject")),
+            _ref_label(row.get("level")),
+            row.get("rule"),
+            row.get("override"),
+            row.get("qualification_status"),
+        )

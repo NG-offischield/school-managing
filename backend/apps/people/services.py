@@ -15,6 +15,7 @@ from datetime import date
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.academics.models import AcademicYearStatus
@@ -27,10 +28,12 @@ from .models import (
     CompatibilityResult,
     EmployeeProfile,
     EmployeeType,
+    EmploymentStatus,
     EnrollmentStatus,
     GuardianProfile,
     ParentProfile,
     ParentStudent,
+    ProfessionalStatus,
     PromotionStatus,
     QualificationSource,
     QualificationStatus,
@@ -556,6 +559,414 @@ def grant_compatibility_override(teacher, subject, *, actor, reason, level=None,
         reason=reason.strip(),
         expires_at=expires_at,
     )
+
+
+# =============================================================================
+# Teachers administration (admin desktop: Gestion académique → Enseignants, ADR 0019)
+# =============================================================================
+# One teacher = User (the person, global) → SchoolMembership (this school,
+# role TEACHER) → EmployeeProfile (HR: employee number = teacher number) →
+# TeacherProfile (category, primary subject) → qualifications. Creation
+# builds the whole chain in ONE transaction: a refusal at any step (number
+# taken, e-mail used by another account, incompatible primary subject…)
+# leaves nothing behind.
+#
+# Accounts: the user is created WITHOUT a usable password (Django's
+# unusable password): no password is ever typed, generated or shown here,
+# and the existing login stays the only authentication. Activating the
+# account (first password) is a separate, later procedure.
+#
+# Compatibility stays the job of people/compatibility.py: these services
+# call evaluate(); the client only displays its verdict.
+
+TEACHER_USER_FIELDS = ("first_name", "last_name", "email", "phone")
+TEACHER_EMPLOYEE_FIELDS = ("employee_number", "hire_date", "address", "employment_status")
+TEACHER_PROFILE_FIELDS = (
+    "pedagogical_category",
+    "primary_subject",
+    "professional_status",
+    "qualification_summary",
+    "bio",
+)
+
+
+def _teacher_snapshot(teacher):
+    employee, user = teacher.employee, teacher.employee.membership.user
+    return {
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email,
+        "phone": user.phone,
+        "employee_number": employee.employee_number,
+        "hire_date": employee.hire_date,
+        "address": employee.address,
+        "employment_status": employee.employment_status,
+        "pedagogical_category": str(teacher.pedagogical_category_id),
+        "primary_subject": str(teacher.primary_subject_id),
+        "professional_status": teacher.professional_status,
+    }
+
+
+def _audit_teacher(action, actor, entity, old=None, new=None):
+    from apps.audit.models import AuditLayer
+    from apps.audit.services import record_audit
+
+    record_audit(action, actor=actor, entity=entity, old=old, new=new, layer=AuditLayer.ADMINISTRATIVE)
+
+
+def _check_category(school, category):
+    if category is None:
+        raise ValidationError("Choose a pedagogical category.", code="category_required")
+    if category.school_id != school.pk:
+        raise ValidationError("The category belongs to another school.", code="category_other_school")
+    if not category.active:
+        raise ValidationError("This pedagogical category is inactive.", code="category_inactive")
+
+
+def _check_subject(school, subject):
+    if subject is None:
+        raise ValidationError("Choose a subject.", code="subject_required")
+    if subject.school_id != school.pk:
+        raise ValidationError("The subject belongs to another school.", code="subject_other_school")
+    if not subject.active:
+        raise ValidationError("This subject is inactive.", code="subject_inactive")
+
+
+def _unique_employee_number(school, number, exclude=None):
+    taken = EmployeeProfile.objects.filter(school=school, employee_number__iexact=number)
+    if exclude is not None:
+        taken = taken.exclude(pk=exclude.pk)
+    if taken.exists():
+        raise ValidationError(
+            f"The number {number} is already used by another employee.", code="duplicate_employee_number"
+        )
+
+
+def _email(value):
+    value = (value or "").strip().lower()
+    if not value or "@" not in value:
+        raise ValidationError("A valid e-mail address is required.", code="email_required")
+    return value
+
+
+def _account_for(school, email, first_name, last_name, phone, actor):
+    """The user + membership of the new teacher.
+
+    - nobody uses the e-mail: a new user (unusable password) + ACTIVE membership;
+    - the e-mail belongs to a member of THIS school without an employee
+      profile (e.g. a parent who becomes a teacher): that membership is reused;
+    - otherwise (account of another school, or already an employee here):
+      refused (409) — another school's account is never attached silently.
+    """
+    from apps.accounts.models import MembershipStatus, SchoolMembership, User
+
+    user = User.objects.filter(email__iexact=email).first() or User.objects.filter(username__iexact=email).first()
+    if user is None:
+        user = User.objects.create_user(
+            username=email, email=email, password=None, first_name=first_name, last_name=last_name, phone=phone
+        )
+    membership = SchoolMembership.objects.filter(school=school, user=user).first()
+    if membership is None:
+        if user.memberships.exists():
+            raise ValidationError("This e-mail address is already used by another account.", code="email_in_use")
+        membership = SchoolMembership.objects.create(
+            school=school,
+            user=user,
+            status=MembershipStatus.ACTIVE,
+            joined_at=timezone.now(),
+            is_primary_school=not user.memberships.filter(is_primary_school=True).exists(),
+        )
+    elif hasattr(membership, "employee_profile"):
+        raise ValidationError("This person is already an employee of the school.", code="already_employee")
+    _grant_teacher_role(membership, actor)
+    return membership
+
+
+def _grant_teacher_role(membership, actor):
+    """The role comes from the role catalog (system role TEACHER): never a
+    free role name."""
+    from apps.accounts.models import MembershipRole, Role, RoleCode
+
+    assignment, created = MembershipRole.objects.get_or_create(
+        membership=membership,
+        role=Role.objects.get(code=RoleCode.TEACHER),
+        defaults={"assigned_by": actor, "active": True},
+    )
+    if not created and not assignment.active:
+        assignment.active = True
+        assignment.assigned_by = actor
+        assignment.save(update_fields=["active", "assigned_by", "updated_at"])
+
+
+@transaction.atomic
+def admin_create_teacher(
+    school,
+    *,
+    actor,
+    first_name,
+    last_name,
+    email,
+    employee_number,
+    pedagogical_category,
+    primary_subject,
+    phone=None,
+    hire_date=None,
+    address=None,
+    qualification_summary=None,
+    bio=None,
+):
+    require_role(actor, ADMIN_ROLES, school=school)
+    first_name, last_name = _text(first_name, "first_name", required=True), _text(last_name, "last_name", required=True)
+    email = _email(email)
+    employee_number = _text(employee_number, "employee_number", required=True)
+    _check_category(school, pedagogical_category)
+    _check_subject(school, primary_subject)
+    _unique_employee_number(school, employee_number)
+    membership = _account_for(school, email, first_name, last_name, _text(phone, "phone") or None, actor)
+    employee = create_employee(
+        membership,
+        employee_number=employee_number,
+        employee_type=EmployeeType.TEACHER,
+        hire_date=hire_date,
+        address=_text(address, "address") or None,
+    )
+    # create_teacher declares the primary subject through the compatibility
+    # engine: an incompatible primary subject rolls everything back.
+    teacher = create_teacher(
+        employee,
+        pedagogical_category=pedagogical_category,
+        primary_subject=primary_subject,
+        qualification_summary=_text(qualification_summary, "qualification_summary") or None,
+        bio=_text(bio, "bio") or None,
+    )
+    _audit_teacher("TEACHER_CREATED", actor, teacher, new=_teacher_snapshot(teacher))
+    return teacher
+
+
+ACTIVE_TEACHING = (ProfessionalStatus.ACTIVE,)
+
+
+def _teaching_load(teacher):
+    """What still needs the teacher: active courses of open years and
+    sessions still to come (the planning relies on an active teacher)."""
+    from apps.gradebook.models import Course
+    from apps.scheduling.models import SessionStatus, TeachingSession
+
+    courses = Course.objects.filter(
+        teacher=teacher, active=True, academic_year__status__in=(AcademicYearStatus.PLANNED, AcademicYearStatus.ACTIVE)
+    ).count()
+    sessions = TeachingSession.objects.filter(
+        teacher=teacher, status=SessionStatus.SCHEDULED, date__gte=timezone.localdate()
+    ).count()
+    return courses, sessions
+
+
+def _check_can_stop_teaching(teacher):
+    courses, sessions = _teaching_load(teacher)
+    if courses or sessions:
+        raise ValidationError(
+            f"The teacher still has {courses} active course(s) and {sessions} session(s) to come.",
+            code="teacher_in_use",
+            params={"courses": courses, "sessions": sessions},
+        )
+
+
+@transaction.atomic
+def admin_update_teacher(teacher, *, actor, **changes):
+    """Identity (user), HR (employee) and teaching profile. Leaving the
+    "active" state (status change) follows the same rule as deactivation."""
+    require_role(actor, ADMIN_ROLES, school=teacher.school)
+    teacher = TeacherProfile.objects.select_for_update().select_related("employee__membership__user").get(pk=teacher.pk)
+    employee, user = teacher.employee, teacher.employee.membership.user
+    school = teacher.school
+    old = _teacher_snapshot(teacher)
+    for name in ("first_name", "last_name"):
+        if name in changes:
+            setattr(user, name, _text(changes[name], name, required=True))
+    if "phone" in changes:
+        user.phone = _text(changes["phone"], "phone") or None
+    if "email" in changes:
+        email = _email(changes["email"])
+        from apps.accounts.models import User
+
+        if User.objects.filter(Q(email__iexact=email) | Q(username__iexact=email)).exclude(pk=user.pk).exists():
+            raise ValidationError("This e-mail address is already used by another account.", code="email_in_use")
+        user.email = email
+    if "employee_number" in changes:
+        number = _text(changes["employee_number"], "employee_number", required=True)
+        _unique_employee_number(school, number, exclude=employee)
+        employee.employee_number = number
+    for name in ("hire_date",):
+        if name in changes:
+            setattr(employee, name, changes[name])
+    if "address" in changes:
+        employee.address = _text(changes["address"], "address") or None
+    if "pedagogical_category" in changes:
+        _check_category(school, changes["pedagogical_category"])
+        teacher.pedagogical_category = changes["pedagogical_category"]
+    if "primary_subject" in changes and changes["primary_subject"] != teacher.primary_subject:
+        subject = changes["primary_subject"]
+        _check_subject(school, subject)
+        existing = teacher.qualifications.filter(subject=subject).first()
+        if existing is None:
+            teacher.primary_subject = subject
+            declare_qualification(teacher, subject, source=QualificationSource.ADMIN)  # engine decides
+        elif existing.status == QualificationStatus.REJECTED:
+            raise ValidationError("This subject's qualification was rejected.", code="qualification_rejected")
+        teacher.primary_subject = subject
+    for name in ("qualification_summary", "bio"):
+        if name in changes:
+            setattr(teacher, name, _text(changes[name], name) or None)
+    stops = False
+    if "professional_status" in changes:
+        if changes["professional_status"] not in ProfessionalStatus.values:
+            raise ValidationError("Unknown status.", code="status_invalid")
+        stops |= changes["professional_status"] not in ACTIVE_TEACHING
+        teacher.professional_status = changes["professional_status"]
+    if "employment_status" in changes:
+        if changes["employment_status"] not in EmploymentStatus.values:
+            raise ValidationError("Unknown status.", code="status_invalid")
+        stops |= changes["employment_status"] != EmploymentStatus.ACTIVE
+        employee.employment_status = changes["employment_status"]
+    if stops:
+        _check_can_stop_teaching(teacher)
+    user.save()
+    employee.save()
+    teacher.save()
+    _audit_teacher("TEACHER_UPDATED", actor, teacher, old=old, new=_teacher_snapshot(teacher))
+    return teacher
+
+
+@transaction.atomic
+def admin_set_teacher_active(teacher, active, *, actor):
+    """Deactivate = stop teaching (professional status INACTIVE). Refused
+    (409 teacher_in_use) while courses or future sessions still need the
+    teacher. Nothing is deleted: courses, sessions, grades, payroll and the
+    account history stay. Reactivation needs an ACTIVE employment."""
+    require_role(actor, ADMIN_ROLES, school=teacher.school)
+    teacher = TeacherProfile.objects.select_for_update().select_related("employee").get(pk=teacher.pk)
+    old = _teacher_snapshot(teacher)
+    if active:
+        if teacher.employee.employment_status != EmploymentStatus.ACTIVE:
+            raise ValidationError("The employment is not active.", code="employment_not_active")
+        teacher.professional_status = ProfessionalStatus.ACTIVE
+    else:
+        _check_can_stop_teaching(teacher)
+        teacher.professional_status = ProfessionalStatus.INACTIVE
+    teacher.save(update_fields=["professional_status", "updated_at"])
+    _audit_teacher(
+        "TEACHER_ACTIVATED" if active else "TEACHER_DEACTIVATED",
+        actor,
+        teacher,
+        old=old,
+        new=_teacher_snapshot(teacher),
+    )
+    return teacher
+
+
+def _qualification_data(qualification):
+    return {
+        "subject": str(qualification.subject_id),
+        "subject_code": qualification.subject.code,
+        "status": qualification.status,
+        "computed_compatibility": qualification.computed_compatibility,
+    }
+
+
+@transaction.atomic
+def admin_add_qualification(teacher, subject, *, actor, level=None, notes=None):
+    """Administrative entry of a subject, judged by the compatibility engine:
+    COMPATIBLE / OVERRIDDEN -> DECLARED, REQUIRES_REVIEW -> PENDING,
+    INCOMPATIBLE -> refused (400 incompatible_subject; an override may then
+    be granted). A previously rejected qualification is re-evaluated."""
+    require_role(actor, ADMIN_ROLES, school=teacher.school)
+    _check_subject(teacher.school, subject)
+    existing = teacher.qualifications.filter(subject=subject).first()
+    if existing is not None and existing.status != QualificationStatus.REJECTED:
+        raise ValidationError("The teacher already has this subject.", code="already_qualified")
+    if existing is not None:  # rejected before: judged again, same row (unique per teacher and subject)
+        evaluation = evaluate(teacher, subject, level)
+        if evaluation.result == CompatibilityResult.INCOMPATIBLE:
+            raise IncompatibleSubject(
+                "This subject is incompatible with the teacher's pedagogical category.", code="incompatible_subject"
+            )
+        old = _qualification_data(existing)
+        existing.status = (
+            QualificationStatus.PENDING
+            if evaluation.result == CompatibilityResult.REQUIRES_REVIEW
+            else QualificationStatus.DECLARED
+        )
+        existing.source = (
+            QualificationSource.OVERRIDE
+            if evaluation.result == CompatibilityResult.OVERRIDDEN
+            else QualificationSource.ADMIN
+        )
+        existing.computed_compatibility = evaluation.result
+        existing.verified, existing.verified_by, existing.verified_at = False, None, None
+        existing.notes = _text(notes, "notes") or None
+        existing.save()
+        _audit_teacher("QUALIFICATION_ADDED", actor, existing, old=old, new=_qualification_data(existing))
+        return existing
+    qualification = declare_qualification(
+        teacher, subject, level=level, source=QualificationSource.ADMIN, notes=_text(notes, "notes") or None
+    )
+    _audit_teacher("QUALIFICATION_ADDED", actor, qualification, new=_qualification_data(qualification))
+    return qualification
+
+
+@transaction.atomic
+def admin_verify_qualification(qualification, *, actor):
+    old = _qualification_data(qualification)
+    qualification = verify_qualification(qualification, actor=actor)
+    _audit_teacher("QUALIFICATION_VERIFIED", actor, qualification, old=old, new=_qualification_data(qualification))
+    return qualification
+
+
+@transaction.atomic
+def admin_reject_qualification(qualification, *, actor, reason):
+    """Refuse or withdraw a subject. Refused for the primary subject and while
+    an active course of an open year uses it (409 qualification_in_use):
+    courses already given keep their history."""
+    from apps.gradebook.models import Course
+
+    require_role(actor, ADMIN_ROLES, school=qualification.school)
+    teacher = qualification.teacher
+    if qualification.subject_id == teacher.primary_subject_id:
+        raise ValidationError("The primary subject cannot be withdrawn.", code="primary_subject_qualification")
+    in_use = Course.objects.filter(
+        teacher=teacher,
+        subject=qualification.subject,
+        active=True,
+        academic_year__status__in=(AcademicYearStatus.PLANNED, AcademicYearStatus.ACTIVE),
+    ).exists()
+    if in_use:
+        raise ValidationError("An active course uses this qualification.", code="qualification_in_use")
+    old = _qualification_data(qualification)
+    qualification = reject_qualification(qualification, actor=actor, reason=_text(reason, "reason"))
+    _audit_teacher("QUALIFICATION_REJECTED", actor, qualification, old=old, new=_qualification_data(qualification))
+    return qualification
+
+
+@transaction.atomic
+def admin_grant_override(teacher, subject, *, actor, reason, level=None, expires_at=None):
+    """grant_compatibility_override + checks + audit (ADMIN/SUPER_ADMIN only:
+    spec §9 "overrides carry actor + reason + timestamp + scope")."""
+    require_role(actor, ADMIN_ROLES, school=teacher.school)
+    _check_subject(teacher.school, subject)
+    if level is not None and level.school_id != teacher.school_id:
+        raise ValidationError("The level belongs to another school.", code="level_other_school")
+    if expires_at is not None and expires_at <= timezone.now():
+        raise ValidationError("The expiry must be in the future.", code="expiry_past")
+    override = grant_compatibility_override(
+        teacher, subject, actor=actor, reason=reason, level=level, expires_at=expires_at
+    )
+    _audit_teacher(
+        "COMPATIBILITY_OVERRIDE_GRANTED",
+        actor,
+        override,
+        new={"subject": str(subject.pk), "level": str(level.pk) if level else None, "reason": override.reason},
+    )
+    return override
 
 
 # =============================================================================

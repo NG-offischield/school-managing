@@ -23,7 +23,6 @@ from django.urls import path
 from rest_framework import generics, serializers
 
 from common.permissions import membership_has_role
-from common.tenancy import scope_to_current_school
 from common.views import SchoolScopedMixin
 
 from .models import (
@@ -215,24 +214,7 @@ class TeacherVisibilityMixin(SchoolScopedMixin):
         return self.visible_teachers(queryset)
 
 
-# NB: list and detail are two distinct views sharing the mixin. (A first
-# version made the detail view inherit the list view: its get() then served
-# the LIST on /teachers/{id}/ — caught by the cross-school isolation test.)
-class TeacherList(TeacherVisibilityMixin, generics.ListAPIView):
-    pass
-
-
-class TeacherDetail(TeacherVisibilityMixin, generics.RetrieveAPIView):
-    pass
-
-
-class TeacherQualificationList(TeacherVisibilityMixin, generics.ListAPIView):
-    queryset = TeacherSubjectQualification.objects.select_related("subject").order_by("subject__name")
-    serializer_class = QualificationSerializer
-
-    def restrict(self, queryset):
-        teachers = self.visible_teachers(scope_to_current_school(TeacherProfile.objects.all(), self.request))
-        return queryset.filter(teacher_id=self.kwargs["pk"], teacher__in=teachers)
+# Teacher list / detail / qualifications (reads and admin writes): teacher_api.py.
 
 
 class StaffList(SchoolScopedMixin, generics.ListAPIView):
@@ -251,8 +233,5 @@ class StaffList(SchoolScopedMixin, generics.ListAPIView):
 
 urlpatterns = [
     path("parents/children/", ParentChildrenList.as_view(), name="parent-children"),
-    path("teachers/", TeacherList.as_view(), name="teachers"),
-    path("teachers/<uuid:pk>/", TeacherDetail.as_view(), name="teacher"),
-    path("teachers/<uuid:pk>/qualifications/", TeacherQualificationList.as_view(), name="teacher-qualifications"),
     path("staff/", StaffList.as_view(), name="staff"),
 ]

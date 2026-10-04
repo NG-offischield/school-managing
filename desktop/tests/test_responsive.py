@@ -12,7 +12,18 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QDialog, QLabel
 
-from school_admin.models import AcademicYear, Category, Enrollment, Level, Room, SchoolClass, Student
+from school_admin.models import (
+    AcademicYear,
+    Category,
+    Enrollment,
+    Level,
+    Qualification,
+    Room,
+    SchoolClass,
+    Student,
+    Subject,
+    Teacher,
+)
 from school_admin.ui.dialogs.category_dialog import CategoryDialog
 from school_admin.ui.dialogs.class_dialog import ClassDialog
 from school_admin.ui.dialogs.level_dialog import LevelDialog
@@ -23,7 +34,14 @@ from school_admin.ui.dialogs.student_dialogs import (
     StudentRecordDialog,
 )
 from school_admin.ui.dialogs.subject_dialog import SubjectDialog
+from school_admin.ui.dialogs.teacher_dialogs import (
+    QualificationsDialog,
+    ReasonDialog,
+    TeacherDialog,
+    TeacherRecordDialog,
+)
 from school_admin.ui.dialogs.year_dialog import YearDialog
+from school_admin.ui.tasks import ImmediateRunner
 from school_admin.ui.widgets import FIELD_WIDTHS, SCREEN_MARGIN, ConfirmDialog
 
 YEARS = [AcademicYear("y1", "2025-2026", "ACTIVE", True, date(2025, 9, 1), date(2026, 7, 31))]
@@ -34,6 +52,46 @@ CATEGORIES = [Category("c1", "SCI", "Scientifique", "", True)]
 CLASSES = [SchoolClass("c1", "6e A", "l6", "", "y1", "", 40, None, "", False, True)]
 STUDENT = Student("s1", "MAT-1", "INS-1", "Awa", "Ndiaye", date(2013, 2, 1), "F", "ACTIVE", "Douala", "Akwa", 140)
 ENROLLMENT = Enrollment("e1", "y1", "2025-2026", "c1", "6e A", "l6", "6E", "Sixième", "ACTIVE", date(2025, 9, 2))
+
+SUBJECTS = [Subject("s1", "MATH", "Mathématiques", "c1", "SCI — Scientifique", "THEORETICAL", False, True)]
+TEACHER = Teacher(
+    "t1",
+    "ENS-1",
+    "Jean",
+    "Mbarga",
+    "j@ecole.test",
+    "",
+    "c1",
+    "SCI — Scientifique",
+    "s1",
+    "MATH — Mathématiques",
+    ("MATH",),
+    "ACTIVE",
+    "ACTIVE",
+    True,
+    None,
+    "Akwa",
+    "",
+    "",
+    False,
+    2,
+    5,
+)
+QUALS = [Qualification("q1", "s1", "MATH", "Mathématiques", "VERIFIED", "ADMIN", "COMPATIBLE", "COMPATIBLE")]
+
+
+class StubTeachers:
+    """Answers of the API for the qualifications dialog (layout tests only)."""
+
+    def qualifications(self, _teacher_id):
+        return QUALS
+
+    def rules(self, _teacher_id):
+        return []
+
+    def overrides(self, _teacher_id):
+        return []
+
 
 DIALOGS = {
     "catégorie": lambda: CategoryDialog(),
@@ -46,6 +104,11 @@ DIALOGS = {
     "inscription": lambda: EnrollDialog((YEARS, LEVELS, CLASSES), student=STUDENT),
     "changement de classe": lambda: ChangeClassDialog(([], LEVELS, CLASSES), enrollment=ENROLLMENT),
     "fiche élève": lambda: StudentRecordDialog(STUDENT, [ENROLLMENT], []),
+    "enseignant (ajout)": lambda: TeacherDialog(CATEGORIES, SUBJECTS),
+    "enseignant (modification)": lambda: TeacherDialog(CATEGORIES, SUBJECTS, teacher=TEACHER),
+    "qualifications": lambda: QualificationsDialog(TEACHER, StubTeachers(), ImmediateRunner(), SUBJECTS, LEVELS),
+    "dérogation": lambda: ReasonDialog("Accorder une dérogation ?", "Texte " * 30, with_expiry=True),
+    "fiche enseignant": lambda: TeacherRecordDialog(TEACHER, QUALS, []),
     "confirmation": lambda: ConfirmDialog("Désactiver ?", "Texte explicatif " * 20, danger=True),
 }
 SCREENS = [QSize(1366, 768), QSize(1280, 720), QSize(1024, 768), QSize(800, 480)]
@@ -191,3 +254,24 @@ def test_long_student_form_scrolls_with_buttons_always_visible(qapp, screen):
     assert viewport.rect().contains(dialog.enroll.mapTo(viewport, dialog.enroll.rect().center()))
     QTest.keyClick(dialog, Qt.Key_Escape)
     assert dialog.result() == QDialog.Rejected
+
+
+@pytest.mark.parametrize("screen", [QSize(1280, 720), QSize(1024, 768)], ids=["1280x720", "1024x768"])
+def test_long_teacher_form_scrolls_with_buttons_always_visible(qapp, screen):
+    dialog = on_screen(TeacherDialog(CATEGORIES, SUBJECTS, teacher=TEACHER), screen)
+    bar = dialog.scroll.verticalScrollBar()
+    assert dialog.height() <= screen.height() - SCREEN_MARGIN
+    assert bar.isVisible() and bar.maximum() > 0
+    assert inside(dialog.save_button, dialog) and inside(dialog.cancel_button, dialog)
+    assert dialog.employee_number.width() <= FIELD_WIDTHS["short"] and dialog.phone.width() <= FIELD_WIDTHS["short"]
+    assert dialog.email.width() <= FIELD_WIDTHS["medium"] and dialog.last_name.width() <= FIELD_WIDTHS["medium"]
+    dialog.activateWindow()
+    dialog.last_name.setFocus()
+    for _ in range(30):  # Tab down to the last field
+        if dialog.focusWidget() is dialog.bio:
+            break
+        QTest.keyClick(dialog.focusWidget(), Qt.Key_Tab)
+    assert dialog.focusWidget() is dialog.bio and bar.value() > 0
+    viewport = dialog.scroll.viewport()
+    assert viewport.rect().contains(dialog.bio.mapTo(viewport, dialog.bio.rect().center()))
+    dialog.close()

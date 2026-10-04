@@ -54,6 +54,24 @@ RULE_MESSAGES = {
     "photo_format": "Utilisez une photo JPEG, PNG ou WebP.",
     "photo_too_large": "La photo est trop lourde (3 Mo au plus) ou trop grande.",
     "photo_too_small": "La photo est trop petite : au moins 120 pixels de côté.",
+    "duplicate_employee_number": "Ce matricule est déjà attribué à un autre employé de l'école.",
+    "email_in_use": "Cette adresse e-mail est déjà utilisée par un autre compte.",
+    "email_required": "Indiquez une adresse e-mail valide.",
+    "already_employee": "Cette personne est déjà employée par l'école.",
+    "already_qualified": "L'enseignant a déjà cette matière.",
+    "teacher_in_use": "L'enseignant a encore des cours actifs ou des séances à venir : réaffectez-les d'abord.",
+    "qualification_in_use": "Un cours actif utilise cette matière : elle ne peut pas être retirée.",
+    "primary_subject_qualification": (
+        "La matière principale ne peut pas être retirée : changez d'abord de matière principale."
+    ),
+    "incompatible_subject": (
+        "Matière incompatible avec la catégorie pédagogique de l'enseignant : une dérogation motivée est nécessaire."
+    ),
+    "qualification_rejected": "Cette matière a été retirée : ajoutez-la de nouveau pour qu'elle soit réévaluée.",
+    "employment_not_active": "L'emploi de cette personne n'est pas actif : modifiez d'abord son statut d'emploi.",
+    "subject_inactive": "Cette matière est inactive.",
+    "expiry_past": "La date de fin de la dérogation doit être dans le futur.",
+    "reason_required": "Indiquez le motif.",
     "level_in_use": "Des classes actives d'une année ouverte utilisent ce niveau : il ne peut pas être désactivé.",
 }
 

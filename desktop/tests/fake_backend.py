@@ -121,6 +121,13 @@ class FakeBackend:
         self.bruno = self.add_student("MAT-002", "Ekane", "Bruno", "M", class_id=five_a)
         self.chloe = self.add_student("MAT-003", "Fotso", "Chloé", "F")
         self.dan = self.add_student("MAT-004", "Mbia", "Dan", "M", status="ARCHIVED")
+        # Teachers (people/teacher_api.py). None by default: seed_teachers() builds a staff room.
+        self.teachers = {}
+        self.qualifications = {}
+        self.overrides = []
+        self.rules = {}  # (category_id, subject_id) -> COMPATIBLE | REQUIRES_REVIEW | INCOMPATIBLE
+        self.teachers_in_use = set()
+        self.rates = {}
         self.finance = {
             "currency": "XAF",
             "net_collected": "1250000.00",
@@ -408,6 +415,311 @@ class FakeBackend:
         enrollment["school_class"] = school_class["id"]
         history.insert(0, self._event("STUDENT_CLASS_CHANGED", f"{old} → {school_class['name']}"))
         return ok(self._enrollment_out(enrollment))
+
+    # --- teachers -----------------------------------------------------------------
+    def add_subject(self, code, name, category_id, active=True):
+        sid = str(uuid.uuid4())
+        category = self.categories[category_id]
+        self.subjects[sid] = {
+            "id": sid,
+            "code": code,
+            "name": name,
+            "category": {k: category[k] for k in ("id", "code", "name", "active")},
+            "subject_type": "THEORETICAL",
+            "public_visible": False,
+            "default_grading_scale": None,
+            "active": active,
+        }
+        return sid
+
+    def seed_teachers(self):
+        """Two categories, four subjects, two teachers (one per category)."""
+        self.sci = self.add_category("SCI", "Scientifique")
+        self.lit = self.add_category("LIT", "Littéraire")
+        self.math = self.add_subject("MATH", "Mathématiques", self.sci)
+        self.phy = self.add_subject("PHY", "Physique", self.sci)
+        self.fr = self.add_subject("FR", "Français", self.lit)
+        self.mus = self.add_subject("MUS", "Musique", self.lit)
+        self.tm = self.add_teacher("ENS-001", "Mbarga", "Jean", self.sci, self.math)
+        self.tf = self.add_teacher("ENS-002", "Ngo", "Marie", self.lit, self.fr)
+
+    def add_teacher(self, number, last, first, category_id, subject_id, email=None):
+        tid = str(uuid.uuid4())
+        self.teachers[tid] = {
+            "id": tid,
+            "teacher_number": number,
+            "first_name": first,
+            "last_name": last,
+            "email": email or f"{first.lower()}.{last.lower()}@ecole.test",
+            "phone": None,
+            "pedagogical_category": category_id,
+            "primary_subject": subject_id,
+            "professional_status": "ACTIVE",
+            "employment_status": "ACTIVE",
+            "hire_date": None,
+            "address": None,
+            "qualification_summary": None,
+            "bio": None,
+        }
+        self._qualify(tid, subject_id)
+        return tid
+
+    def _verdict(self, teacher, subject_id):
+        if any(o["teacher"] == teacher["id"] and o["subject"]["id"] == subject_id for o in self.overrides):
+            return "OVERRIDDEN", "override"
+        rule = self.rules.get((teacher["pedagogical_category"], subject_id))
+        if rule:
+            return rule, {"COMPATIBLE": "rule_compatible", "REQUIRES_REVIEW": "rule_review"}.get(
+                rule, "rule_incompatible"
+            )
+        if subject_id == teacher["primary_subject"]:
+            return "COMPATIBLE", "primary_subject"
+        if self.subjects[subject_id]["category"]["id"] == teacher["pedagogical_category"]:
+            return "COMPATIBLE", "same_category"
+        return "REQUIRES_REVIEW", "no_rule"
+
+    def _qualify(self, teacher_id, subject_id):
+        result, _ = self._verdict(self.teachers[teacher_id], subject_id)
+        qid = str(uuid.uuid4())
+        self.qualifications[qid] = {
+            "id": qid,
+            "teacher": teacher_id,
+            "subject": subject_id,
+            "status": "PENDING" if result == "REQUIRES_REVIEW" else "DECLARED",
+            "source": "OVERRIDE" if result == "OVERRIDDEN" else "ADMIN",
+            "computed_compatibility": result,
+            "notes": None,
+        }
+        return qid
+
+    def _ref(self, table, rid):
+        row = table.get(rid)
+        return {"id": row["id"], "code": row["code"], "name": row["name"]} if row else None
+
+    def _qualification_out(self, row):
+        subject = self.subjects[row["subject"]]
+        teacher = self.teachers[row["teacher"]]
+        return {
+            **row,
+            "subject": {**self._ref(self.subjects, row["subject"]), "category": subject["category"]["code"]},
+            "verified": row["status"] == "VERIFIED",
+            "current_compatibility": self._verdict(teacher, row["subject"])[0],
+        }
+
+    def _teacher_out(self, row):
+        live = [q for q in self.qualifications.values() if q["teacher"] == row["id"] and q["status"] != "REJECTED"]
+        return {
+            **row,
+            "pedagogical_category": self._ref(self.categories, row["pedagogical_category"]),
+            "primary_subject": self._ref(self.subjects, row["primary_subject"]),
+            "subjects": sorted(self.subjects[q["subject"]]["code"] for q in live),
+            "active": row["professional_status"] == "ACTIVE" and row["employment_status"] == "ACTIVE",
+            "account_activated": False,
+            "active_course_count": 2 if row["id"] in self.teachers_in_use else 0,
+            "upcoming_session_count": 0,
+        }
+
+    def _teachers(self, request, path, body, admin):
+        method, params = request.method, request.url.params
+        parts = path.strip("/").split("/")
+        if path == "teachers/" and method == "GET":
+            rows = [self._teacher_out(t) for t in self.teachers.values()]
+            search = (params.get("search") or "").lower()
+            if search:
+                rows = [
+                    r
+                    for r in rows
+                    if any(
+                        search in (r[f] or "").lower() for f in ("last_name", "first_name", "email", "teacher_number")
+                    )
+                ]
+            if params.get("status") in ("active", "inactive"):
+                rows = [r for r in rows if r["active"] == (params["status"] == "active")]
+            if params.get("category"):
+                rows = [r for r in rows if r["pedagogical_category"]["id"] == params["category"]]
+            if params.get("subject"):
+                code = self.subjects[params["subject"]]["code"]
+                rows = [r for r in rows if code in r["subjects"]]
+            return self._page(sorted(rows, key=lambda r: (r["last_name"], r["first_name"])), request)
+        if path == "admin/dashboard/teachers/":
+            if not admin:
+                return fail(403, "PERMISSION_DENIED", "Permission refusée.")
+            active = [self._teacher_out(t) for t in self.teachers.values()]
+            active = [t for t in active if t["active"]]
+            codes = sorted({t["pedagogical_category"]["code"] for t in active})
+            return ok(
+                {
+                    "active": len(active),
+                    "by_category": [
+                        {"code": c, "name": c, "count": sum(t["pedagogical_category"]["code"] == c for t in active)}
+                        for c in codes
+                    ],
+                }
+            )
+        if path == "admin/payroll/teacher-rates/":
+            return self._page(self.rates.get(params.get("teacher"), []), request)
+        if not admin:
+            return fail(403, "PERMISSION_DENIED", "Permission refusée.")
+        if parts[0] == "teacher-qualifications":
+            row = self.qualifications.get(parts[1])
+            if row is None:
+                return fail(404, "NOT_FOUND", "Qualification introuvable.")
+            if parts[2] == "verify":
+                row["status"] = "VERIFIED"
+            else:
+                if row["subject"] == self.teachers[row["teacher"]]["primary_subject"]:
+                    return fail(409, "CONFLICT", "Matière principale.", {"rule": "primary_subject_qualification"})
+                row.update(status="REJECTED", notes=body.get("reason"))
+            return ok(self._qualification_out(row))
+        if path == "teachers/" and method == "POST":
+            return self._teacher_write(None, body)
+        teacher = self.teachers.get(parts[1])
+        if teacher is None:
+            return fail(404, "NOT_FOUND", "Enseignant introuvable.")
+        action = parts[2] if len(parts) > 2 else ""
+        if action == "" and method == "GET":
+            return ok(self._teacher_out(teacher))
+        if action == "" and method == "PATCH":
+            return self._teacher_write(teacher, body)
+        if action == "deactivate":
+            if teacher["id"] in self.teachers_in_use:
+                return fail(
+                    409, "CONFLICT", "Enseignant utilisé.", {"rule": "teacher_in_use", "context": {"courses": 2}}
+                )
+            teacher["professional_status"] = "INACTIVE"
+            return ok(self._teacher_out(teacher))
+        if action == "reactivate":
+            teacher["professional_status"] = "ACTIVE"
+            return ok(self._teacher_out(teacher))
+        if action == "qualifications" and method == "GET":
+            rows = [self._qualification_out(q) for q in self.qualifications.values() if q["teacher"] == teacher["id"]]
+            return self._page(rows, request)
+        if action == "qualifications":
+            subject_id = body.get("subject")
+            if subject_id not in self.subjects:
+                return fail(404, "NOT_FOUND", "Matière introuvable.")
+            if any(
+                q["teacher"] == teacher["id"] and q["subject"] == subject_id and q["status"] != "REJECTED"
+                for q in self.qualifications.values()
+            ):
+                return fail(409, "CONFLICT", "Déjà qualifié.", {"rule": "already_qualified"})
+            if self._verdict(teacher, subject_id)[0] == "INCOMPATIBLE":
+                return fail(400, "BUSINESS_RULE_VIOLATION", "Incompatible.", {"rule": "incompatible_subject"})
+            return ok(self._qualification_out(self.qualifications[self._qualify(teacher["id"], subject_id)]), 201)
+        if action == "compatibility":
+            subject_id = params.get("subject")
+            result, reason = self._verdict(teacher, subject_id)
+            rule = self.rules.get((teacher["pedagogical_category"], subject_id))
+            override = next(
+                (o for o in self.overrides if o["teacher"] == teacher["id"] and o["subject"]["id"] == subject_id), None
+            )
+            existing = next(
+                (
+                    q
+                    for q in self.qualifications.values()
+                    if q["teacher"] == teacher["id"] and q["subject"] == subject_id
+                ),
+                None,
+            )
+            return ok(
+                {
+                    "subject": self._ref(self.subjects, subject_id),
+                    "level": None,
+                    "result": result,
+                    "reason": reason,
+                    "rule": {
+                        "category": self.categories[teacher["pedagogical_category"]]["code"],
+                        "subject": self._ref(self.subjects, subject_id),
+                        "level": None,
+                        "compatible": rule == "COMPATIBLE",
+                        "requires_admin_review": rule == "REQUIRES_REVIEW",
+                        "priority": 0,
+                    }
+                    if rule
+                    else None,
+                    "override": override,
+                    "qualification_status": existing["status"] if existing else None,
+                }
+            )
+        if action == "compatibility-rules":
+            return ok(
+                [
+                    {
+                        "category": self.categories[c]["code"],
+                        "subject": self._ref(self.subjects, sid),
+                        "level": None,
+                        "compatible": verdict == "COMPATIBLE",
+                        "requires_admin_review": verdict == "REQUIRES_REVIEW",
+                        "priority": 0,
+                    }
+                    for (c, sid), verdict in self.rules.items()
+                    if c == teacher["pedagogical_category"]
+                ]
+            )
+        if action == "overrides" and method == "GET":
+            return ok([o for o in self.overrides if o["teacher"] == teacher["id"]])
+        if action == "overrides":
+            if not (body.get("reason") or "").strip():
+                return fail(400, "BUSINESS_RULE_VIOLATION", "Motif requis.", {"rule": "reason_required"})
+            override = {
+                "id": str(uuid.uuid4()),
+                "teacher": teacher["id"],
+                "subject": self._ref(self.subjects, body["subject"]),
+                "level": None,
+                "reason": body["reason"],
+                "approved_by": "Ada Admin",
+                "created_at": "2026-03-04T08:30:00+00:00",
+                "expires_at": body.get("expires_at"),
+                "active": True,
+            }
+            self.overrides.append(override)
+            return ok(override, 201)
+        return None
+
+    def _teacher_write(self, teacher, body):
+        fields = ("first_name", "last_name", "email", "employee_number", "pedagogical_category", "primary_subject")
+        if teacher is None:
+            missing = {f: ["Ce champ est obligatoire."] for f in fields if not body.get(f)}
+            if missing:
+                return fail(400, "VALIDATION_ERROR", "Données invalides.", missing)
+        number = (body.get("employee_number") or "").lower()
+        if number and any(t["teacher_number"].lower() == number and t is not teacher for t in self.teachers.values()):
+            return fail(409, "CONFLICT", "Matricule utilisé.", {"rule": "duplicate_employee_number"})
+        email = (body.get("email") or "").lower()
+        if email and (
+            email == "admin@school.local"
+            or any(t["email"].lower() == email and t is not teacher for t in self.teachers.values())
+        ):
+            return fail(409, "CONFLICT", "E-mail utilisé.", {"rule": "email_in_use"})
+        for name, table in (("pedagogical_category", self.categories), ("primary_subject", self.subjects)):
+            if body.get(name) and body[name] not in table:
+                return fail(404, "NOT_FOUND", "Introuvable.")
+        if teacher is None:
+            if self.rules.get((body["pedagogical_category"], body["primary_subject"])) == "INCOMPATIBLE":
+                return fail(400, "BUSINESS_RULE_VIOLATION", "Incompatible.", {"rule": "incompatible_subject"})
+            tid = self.add_teacher(
+                body["employee_number"],
+                body["last_name"],
+                body["first_name"],
+                body["pedagogical_category"],
+                body["primary_subject"],
+                email=body["email"],
+            )
+            teacher = self.teachers[tid]
+            status = 201
+        else:
+            status = 200
+            stops = (
+                body.get("professional_status", "ACTIVE") != "ACTIVE"
+                or body.get("employment_status", "ACTIVE") != "ACTIVE"
+            )
+            if stops and teacher["id"] in self.teachers_in_use:
+                return fail(409, "CONFLICT", "Enseignant utilisé.", {"rule": "teacher_in_use"})
+        renames = {"employee_number": "teacher_number"}
+        for name, value in body.items():
+            if name in teacher or name in renames:
+                teacher[renames.get(name, name)] = value
+        return ok(self._teacher_out(teacher), status=status)
 
     def log(self, action, label):
         self.activity.insert(
@@ -698,6 +1010,12 @@ class FakeBackend:
             return ok({"id": "s1", "code": "TEST01", "name": "École Test", "city": "Douala"})
         if path.startswith("levels/"):
             return self._levels(request, path, body, admin)
+        if (
+            path.startswith("teachers/")
+            or path.startswith("teacher-qualifications/")
+            or path in ("admin/dashboard/teachers/", "admin/payroll/teacher-rates/")
+        ):
+            return self._teachers(request, path, body, admin)
         if path.startswith("admin/dashboard/") or path == "admin/finance/dashboard/":
             return self._dashboard(request, path, admin)
         if path == "rooms/":
@@ -711,8 +1029,8 @@ class FakeBackend:
             return self._years(request, path, body, admin)
         if path.startswith("students/") or path.startswith("enrollments/"):
             return self._students(request, path, body, admin)
-        if path in ("teachers/", "sessions/"):
-            sizes = {"teachers/": 9, "sessions/": 37}
+        if path == "sessions/":
+            sizes = {"sessions/": 37}
             return self._page([{"id": str(i)} for i in range(sizes[path])], request)
         if path == "admin/attendance/dashboard/":
             return fail(400, "BUSINESS_RULE_VIOLATION", "Aucune politique de présence.", {"rule": "no_policy"})

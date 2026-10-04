@@ -45,6 +45,14 @@ CONFLICT_RULES = {
     "active_enrollment",
     "enrollment_closed",
     "same_class",
+    # teachers (ADR 0019)
+    "duplicate_employee_number",
+    "email_in_use",
+    "already_employee",
+    "already_qualified",
+    "teacher_in_use",
+    "qualification_in_use",
+    "primary_subject_qualification",
     "category_in_use",
     "subject_in_use",
     # planning (ADR 0012)

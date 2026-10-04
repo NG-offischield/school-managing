@@ -5,7 +5,7 @@ Indicators (cards):
     année active         GET /academic-years/ (is_current)
     classes              GET /classes/?academic_year=<current>          meta.count
     élèves               GET /students/                                 meta.count
-    enseignants          GET /teachers/                                 meta.count
+    enseignants          GET /admin/dashboard/teachers/                 active, by_category
     séances (semaine)    GET /sessions/?date_from=&date_to=             meta.count
     présence (jour)      GET /admin/attendance/dashboard/?date=today    counts
     encaissements        GET /admin/finance/dashboard/                  net_collected, outstanding
@@ -180,7 +180,7 @@ class DashboardService:
                 "de l'année active" if current else "toutes années",
             ),
             self._metric("Élèves", lambda: str(self.api.count("students/", status="ACTIVE")), "actifs"),
-            self._metric("Enseignants", lambda: str(self.api.count("teachers/"))),
+            self._metric("Enseignants", self._teachers, "actifs"),
             self._metric(
                 "Séances cette semaine",
                 lambda: str(
@@ -205,6 +205,12 @@ class DashboardService:
         rate = 100 * (counts.get("PRESENT", 0) + counts.get("LATE", 0)) / checked
         detail = " · ".join(f"{counts.get(k, 0)} {label}" for k, label in ATTENDANCE_LABELS.items())
         return f"{rate:.0f} %", detail
+
+    def _teachers(self):
+        """Active teachers (teaching and employed) and the split by category."""
+        data = self.api.get("admin/dashboard/teachers/")
+        split = " · ".join(f"{c['code']} {c['count']}" for c in data.get("by_category", []))
+        return str(data.get("active", 0)), f"actifs · {split}" if split else "actifs"
 
     def _finance(self):
         data = self.api.get("admin/finance/dashboard/")

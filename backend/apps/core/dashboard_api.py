@@ -172,8 +172,32 @@ def _activity(row):
     }
 
 
+class TeacherStats(AdminView):
+    """Active teachers (teaching AND employed) and their split by pedagogical category."""
+
+    def get(self, request):
+        from apps.people.teacher_api import teacher_counts
+
+        school = self.membership().school
+        rows = list(teacher_counts(school))
+        return Response(
+            {
+                "active": sum(r["count"] for r in rows),
+                "by_category": [
+                    {
+                        "code": r["pedagogical_category__code"],
+                        "name": r["pedagogical_category__name"],
+                        "count": r["count"],
+                    }
+                    for r in rows
+                ],
+            }
+        )
+
+
 urlpatterns = [
     path("admin/dashboard/attendance-trend/", AttendanceTrend.as_view(), name="dashboard-attendance-trend"),
     path("admin/dashboard/enrollments/", EnrollmentStats.as_view(), name="dashboard-enrollments"),
     path("admin/dashboard/activity/", RecentActivity.as_view(), name="dashboard-activity"),
+    path("admin/dashboard/teachers/", TeacherStats.as_view(), name="dashboard-teachers"),
 ]

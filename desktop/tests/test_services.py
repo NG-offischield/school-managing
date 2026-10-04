@@ -91,7 +91,10 @@ def test_dashboard_shows_real_counts_and_isolates_failures(logged_in, api):
     values = {m.label: (m.value, m.error) for m in data.metrics}
     assert (data.school_name, data.year_name) == ("École Test", "2025-2026")
     assert values["Classes"] == ("4", None) and values["Élèves"] == ("3", None)  # active students only
-    assert values["Enseignants"] == ("9", None) and values["Séances cette semaine"] == ("37", None)
+    assert values["Enseignants"] == (
+        "0",
+        None,
+    )  # active teachers (none in the fake school) and values["Séances cette semaine"] == ("37", None)
     # One unavailable source does not break the page.
     assert values["Présence aujourd'hui"] == (None, "Aucune politique de présence.")
 

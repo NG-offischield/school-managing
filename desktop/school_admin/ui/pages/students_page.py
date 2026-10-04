@@ -15,13 +15,13 @@ server decides every rule and the page explains its refusals.
 """
 
 from PySide6.QtGui import QBrush, QColor, QFont
-from PySide6.QtWidgets import QComboBox, QDialog, QHBoxLayout, QLabel, QTableWidgetItem
+from PySide6.QtWidgets import QComboBox, QDialog, QHBoxLayout, QTableWidgetItem
 
 from ...models import SEXES
 from ..dialogs.student_dialogs import ChangeClassDialog, EnrollDialog, StudentDialog, StudentRecordDialog
 from ..theme import TOKENS
 from ..widgets import button, set_variant
-from .catalog_base import STATUS_COLUMN_TITLE, CatalogPage
+from .catalog_base import STATUS_COLUMN_TITLE, PagedCatalogPage
 
 ALL_YEARS = "Toutes les années"
 ALL_LEVELS = "Tous les niveaux"
@@ -35,7 +35,7 @@ ENROLLMENT_FILTERS = [
 ]
 
 
-class StudentsPage(CatalogPage):
+class StudentsPage(PagedCatalogPage):
     title = "Élèves"
     description = "Fiches administratives et inscriptions des élèves : une classe par année scolaire."
     columns = ["Matricule", "Nom", "Prénom(s)", "Sexe", "Classe", "Niveau", "Année scolaire", STATUS_COLUMN_TITLE]
@@ -44,14 +44,12 @@ class StudentsPage(CatalogPage):
     search_placeholder = "Rechercher par nom, prénom ou matricule…"
     status_filters = STUDENT_FILTERS
     has_toggle = False
-    sortable = False  # one page of a server-sorted list: no partial local sort
 
     def __init__(self, service, references, runner, parent=None, **kwargs):
         self.service = service
         self.references = references
-        self.page_number = 1
-        self.total = 0
         self.classes = []
+        self.page_size = service.PAGE_SIZE
         self._filters_ready = False
         super().__init__(runner, parent, **kwargs)
         self.record_button.clicked.connect(self.open_record)
@@ -73,23 +71,6 @@ class StudentsPage(CatalogPage):
         self.level_filter.currentIndexChanged.connect(lambda _: self._filters_ready and self._year_or_level_changed())
         self.class_filter.currentIndexChanged.connect(lambda _: self._filters_ready and self.reload_first_page())
         self.enrollment_filter.currentIndexChanged.connect(lambda _: self._filters_ready and self.reload_first_page())
-        # Search and status restart from the first page.
-        self._debounce.timeout.disconnect()
-        self._debounce.timeout.connect(self.reload_first_page)
-        self.status.currentIndexChanged.disconnect()
-        self.status.currentIndexChanged.connect(lambda _: self.reload_first_page())
-
-        pager = QHBoxLayout()
-        pager.addStretch()
-        self.previous_button = button("‹ Précédente", tooltip="Page précédente")
-        self.page_label = QLabel("", objectName="countLabel")
-        self.next_button = button("Suivante ›", tooltip="Page suivante")
-        for widget in (self.previous_button, self.page_label, self.next_button):
-            pager.addWidget(widget)
-        self.layout_.addLayout(pager)
-        self.previous_button.clicked.connect(lambda: self.go_to(self.page_number - 1))
-        self.next_button.clicked.connect(lambda: self.go_to(self.page_number + 1))
-        self._update_pager()
 
     @staticmethod
     def _combo(name, first, width):
@@ -212,31 +193,6 @@ class StudentsPage(CatalogPage):
             class_id=self.class_filter.currentData() if hasattr(self, "class_filter") else None,
             enrollment_status=self.enrollment_filter.currentData() if hasattr(self, "enrollment_filter") else None,
         )
-
-    def reload_first_page(self):
-        self.page_number = 1
-        self.reload()
-
-    def go_to(self, number):
-        self.page_number = max(1, min(number, self.pages))
-        self.reload()
-
-    @property
-    def pages(self):
-        return max(1, -(-self.total // self.service.PAGE_SIZE))
-
-    def show_rows(self, result):
-        rows, self.total = result
-        super().show_rows(rows)
-        self.count_label.setText(f"{self.total} {self.noun if self.total < 2 else self.plural}")
-        self._update_pager()
-
-    def _update_pager(self):
-        if not hasattr(self, "page_label"):
-            return
-        self.page_label.setText(f"Page {self.page_number} / {self.pages}")
-        self.previous_button.setEnabled(self.page_number > 1)
-        self.next_button.setEnabled(self.page_number < self.pages)
 
     def cells(self, row):
         enrollment = row.enrollment

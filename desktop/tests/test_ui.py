@@ -61,7 +61,7 @@ def test_shell_header_and_dashboard(controller):
     assert shell.logout_button.text() == "Se déconnecter"
     dashboard = shell.pages["dashboard"]
     values = {card.value.text() for card in dashboard.cards}
-    assert {"2025-2026", "4", "3", "9", "37", "Indisponible"} <= values
+    assert {"2025-2026", "4", "3", "0", "37", "Indisponible"} <= values
     assert all(card.label.text() for card in dashboard.cards)
     # Future modules are reserved, not faked.
     assert type(shell.pages["finance"]).__name__ == "PlaceholderPage"

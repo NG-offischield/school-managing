@@ -319,10 +319,11 @@ class CatalogPage(Page):
         if row is None:
             return
         if row.active:
+            when_used = "si elle" if self.feminine else "s'il"
             text = (
                 f"« {self.describe_row(row)} » ne sera plus {self.agree('proposé')} dans les nouvelles "
                 f"saisies. Son historique est conservé et vous pourrez {'la' if self.feminine else 'le'} "
-                f"réactiver.\n\nLe serveur refusera la désactivation si {'elle' if self.feminine else 'il'} "
+                f"réactiver.\n\nLe serveur refusera la désactivation {when_used} "
                 f"est encore {self.agree('utilisé')}."
             )
             title = f"Désactiver {self.the}{self.noun} ?"
@@ -345,5 +346,71 @@ class CatalogPage(Page):
         self.call(
             self.fetch,
             lambda rows: (self.show_rows(rows), self.select_id(saved.id)),
+            action=f"Impossible de charger les {self.plural}",
+        )
+
+
+class PagedCatalogPage(CatalogPage):
+    """List paginated by the SERVER (students, teachers): `fetch()` returns
+    (rows of one page, total count). Search, status and filters restart from
+    page 1; no local sort of a partial page.
+
+        ‹ Précédente   Page 1 / 3   Suivante ›
+    """
+
+    sortable = False
+    page_size = 50
+
+    def __init__(self, runner, parent=None, **kwargs):
+        self.page_number = 1
+        self.total = 0
+        super().__init__(runner, parent, **kwargs)
+        self._debounce.timeout.disconnect()
+        self._debounce.timeout.connect(self.reload_first_page)
+        self.status.currentIndexChanged.disconnect()
+        self.status.currentIndexChanged.connect(lambda _: self.reload_first_page())
+        pager = QHBoxLayout()
+        pager.addStretch()
+        self.previous_button = button("‹ Précédente", tooltip="Page précédente")
+        self.page_label = QLabel("", objectName="countLabel")
+        self.next_button = button("Suivante ›", tooltip="Page suivante")
+        for widget in (self.previous_button, self.page_label, self.next_button):
+            pager.addWidget(widget)
+        self.layout_.addLayout(pager)
+        self.previous_button.clicked.connect(lambda: self.go_to(self.page_number - 1))
+        self.next_button.clicked.connect(lambda: self.go_to(self.page_number + 1))
+        self._update_pager()
+
+    def reload_first_page(self):
+        self.page_number = 1
+        self.reload()
+
+    def go_to(self, number):
+        self.page_number = max(1, min(number, self.pages))
+        self.reload()
+
+    @property
+    def pages(self):
+        return max(1, -(-self.total // self.page_size))
+
+    def show_rows(self, result):
+        rows, self.total = result
+        super().show_rows(rows)
+        self.count_label.setText(f"{self.total} {self.noun if self.total < 2 else self.plural}")
+        self._update_pager()
+
+    def _update_pager(self):
+        if not hasattr(self, "page_label"):
+            return
+        self.page_label.setText(f"Page {self.page_number} / {self.pages}")
+        self.previous_button.setEnabled(self.page_number > 1)
+        self.next_button.setEnabled(self.page_number < self.pages)
+
+    def _reselect(self, saved_id, message):
+        """Success message, then reload the current page and reselect the row."""
+        self.success(message)
+        self.call(
+            self.fetch,
+            lambda result: (self.show_rows(result), self.select_id(saved_id)),
             action=f"Impossible de charger les {self.plural}",
         )

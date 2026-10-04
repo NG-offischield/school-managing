@@ -11,7 +11,8 @@ years -> add a year, make it current -> levels -> add a level ->
 classes -> add a class in that year and level, edit / deactivate / reactivate
 -> dashboard charts -> level still used (409) -> students: add (enrolled,
 with a photo), record, edit, search, filter, change class, withdraw,
-archive -> previous current year
+archive -> teachers: add (no password), record, compatibility verdict, add +
+verify a subject, search, edit, deactivate / reactivate -> previous current year
 restored, test year closed -> logout.
 Codes and dates are random so the test can be replayed; it creates a few
 rows. Run it against a TEST backend (it switches the current year, then
@@ -36,6 +37,7 @@ from school_admin.ui.app import AppController
 from school_admin.ui.dialogs.class_dialog import ClassDialog
 from school_admin.ui.dialogs.student_dialogs import ChangeClassDialog, StudentDialog
 from school_admin.ui.dialogs.subject_dialog import SubjectDialog
+from school_admin.ui.dialogs.teacher_dialogs import QualificationsDialog, TeacherDialog
 from school_admin.ui.tasks import ImmediateRunner
 
 from .conftest import DEVICE
@@ -264,6 +266,69 @@ def test_full_vertical_against_the_real_backend(live, tmp_path):
     students.table.selectRow(0)
     students.toggle_archive()
     assert students.banner.plain_text().endswith("archivé avec succès."), students.banner.plain_text()
+
+    # --- Enseignants: create (account without password), record, compatibility
+    #     verdict from the server, add + verify a subject, search, edit,
+    #     deactivate / reactivate ---
+    own_category = next(c for c in live.categories.list(active=True) if c.code == f"E2E{suffix}")
+    own_subject = next(x for x in live.subjects.list(active=True) if x.code == f"S{suffix}")
+    other_category = live.categories.create(code=f"F{suffix}", name=f"Autre catégorie {suffix}", description="")
+    other_subject = live.subjects.create(
+        code=f"T{suffix}", name=f"Autre matière {suffix}", category_id=other_category.id
+    )
+    teachers = shell.open("teachers")
+
+    def fill_teacher(kind, **context):
+        if kind == "teacher" and context.get("teacher") is None:
+            dialog = TeacherDialog(context["categories"], context["subjects"])
+            dialog.last_name.setText(f"Prof{suffix}")
+            dialog.first_name.setText("Essai")
+            dialog.email.setText(f"prof.{suffix.lower()}@e2e.test")
+            dialog.employee_number.setText(f"ENS-{suffix}")
+            dialog.category.setCurrentIndex(dialog.category.findData(own_category.id))
+            dialog.primary_subject.setCurrentIndex(dialog.primary_subject.findData(own_subject.id))
+            assert dialog.save_enabled, dialog.status.text()
+            return dialog.values()
+        if kind == "teacher":
+            dialog = TeacherDialog(context["categories"], context["subjects"], teacher=context["teacher"])
+            dialog.phone.setText("+237 600 00 00 00")
+            return dialog.values()
+        if kind == "record":
+            return None
+        return None
+
+    teachers.ask = fill_teacher
+    teachers.add()
+    assert teachers.banner.kind == "success", teachers.banner.plain_text()
+    teacher = teachers.selected()
+    assert teacher.subjects == (f"S{suffix}",) and not teacher.account_activated  # no password created
+    teachers.open_record()
+    dialog = QualificationsDialog(
+        teacher, live.teachers, live.runner, live.subjects.list(active=True), live.references.levels()
+    )
+    dialog.subject.setCurrentIndex(dialog.subject.findData(other_subject.id))
+    dialog.check()
+    assert dialog.verdict.result == "REQUIRES_REVIEW" and dialog.verdict.reason == "no_rule"  # the server decides
+    dialog.add()
+    assert f"T{suffix}" in dialog.subject_rows, dialog.banner.plain_text()
+    dialog.subject_rows[f"T{suffix}"][1].click()  # Valider
+    assert "validée" in dialog.banner.plain_text(), dialog.banner.plain_text()
+    dialog.close()
+    teachers.search.setText(f"prof{suffix}")
+    teachers.reload_first_page()
+    assert [teachers.table.item(r, 0).text() for r in range(teachers.table.rowCount())] == [f"ENS-{suffix}"]
+    teachers.table.selectRow(0)
+    assert set(teachers.selected().subjects) == {f"S{suffix}", f"T{suffix}"}
+    teachers.edit()
+    assert teachers.banner.kind == "success", teachers.banner.plain_text()
+    assert live.teachers.get(teacher.id).phone == "+237 600 00 00 00"
+    teachers.confirm = lambda *args, **kwargs: True
+    teachers.toggle()
+    assert teachers.banner.plain_text().endswith("désactivé avec succès."), teachers.banner.plain_text()
+    teachers.status.setCurrentIndex(1)  # Inactifs
+    teachers.table.selectRow(0)
+    teachers.toggle()
+    assert teachers.banner.plain_text().endswith("réactivé avec succès."), teachers.banner.plain_text()
 
     # --- Restore the previous current year, then close the test year ---
     years = shell.open("years")

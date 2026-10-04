@@ -76,7 +76,7 @@ Toutes ces écritures :
 
 ## 5. Tests de mutation
 
-`backend/tools/mutation_students.py` retire tour à tour une protection, puis vérifie que les tests échouent :
+`backend/tools/mutation_check.py students` retire tour à tour une protection, puis vérifie que les tests échouent :
 
 - filtrage école (classe, élève, service) ;
 - contrôles année/classe (autre année, deuxième inscription, date hors de l'année) ;
