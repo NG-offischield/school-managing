@@ -1,0 +1,38 @@
+[project]
+name = "school-admin-desktop"
+version = "0.1.0"
+description = "Client d'administration (PySide6) de la plateforme scolaire — consomme uniquement l'API Django."
+requires-python = ">=3.12"
+dependencies = [
+    "PySide6>=6.10,<7",
+    "httpx~=0.28",
+    # Session persistence in the OS credential vault (Windows Credential
+    # Manager, macOS Keychain, Secret Service): never a plain file.
+    "keyring~=25.6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest~=8.4", "ruff~=0.13"]
+
+[project.scripts]
+school-admin = "school_admin.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["school_admin*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# The live end-to-end test needs a running backend: opt-in with `-m live`.
+addopts = "-m 'not live'"
+markers = ["live: end-to-end test against a running backend (SCHOOL_ADMIN_E2E_* variables)"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "DJ"]
+ignore = ["S101"]  # assert is fine in tests
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S105", "S106"]  # fake test passwords

@@ -12,7 +12,7 @@ Les écarts validés par rapport à la spec sont tracés dans [docs/adr/](docs/a
 | Backend (API REST + WebSocket) | Django 5.2 LTS, DRF, Channels | `backend/` |
 | Base de données | PostgreSQL 17 | conteneur `db` |
 | Temps réel / cache / limitation de débit | Redis 7 | conteneur `redis` |
-| Client administrateur | Python + PySide6 (bureau) | `admin_desktop/` *(phase ultérieure)* |
+| Client administrateur | Python + PySide6 (bureau) | `desktop/` |
 | Enseignant / Parent / Gardien / Personnel | Flutter | `mobile/` *(phase ultérieure)* |
 | Site public | Django Templates | `backend/` *(phase ultérieure)* |
 
@@ -56,4 +56,5 @@ Voir [docs/runbook.md](docs/runbook.md) pour l'exploitation courante.
 - [x] Paie : validation administrative des séances (check-in), taux datés, périodes, calcul déterministe programmé / acquis, paie préparée → validée → payée via Finance, double paiement impossible, corrections tracées, solvabilité QR limitée aux rôles autorisés (ADR 0014)
 - [x] Communication : notifications projetées depuis les domaines (file push prête pour FCM), messagerie privée, forum / annonces, réclamations, pièces jointes privées, WebSocket temps réel (ADR 0015)
 - [x] Documents officiels PDF : bulletins, reçus, bulletins de paie, relevés et registres de présence, carte d'élève (QR annuel existant), emploi du temps ; officiel / provisoire, versions, branding de l'école, stockage privé, traces (ADR 0016)
-- [ ] Phases suivantes — présence par séance (fiches d'appel), envoi FCM, site public, clients PySide6 et Flutter
+- [x] Poste d'administration PySide6 — première verticale : connexion, shell, tableau de bord, catégories pédagogiques, matières (`desktop/`, voir desktop/README.md)
+- [ ] Phases suivantes — autres écrans du poste d'administration, présence par séance (fiches d'appel), envoi FCM, site public, client Flutter
