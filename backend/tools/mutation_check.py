@@ -1,4 +1,5 @@
-"""Mutation check of the administration verticals (ADR 0018 to ADR 0020).
+"""Mutation check of the administration verticals (ADR 0018 to ADR 0020) and of
+the account activation (ADR 0024).
 
 Each mutation removes ONE protection from the code (school filtering,
 year/class control, permission check, compatibility control), runs the
@@ -9,6 +10,7 @@ always restored.
     docker compose run --rm -T web python tools/mutation_check.py students
     docker compose run --rm -T web python tools/mutation_check.py teachers
     docker compose run --rm -T web python tools/mutation_check.py courses
+    docker compose run --rm -T web python tools/mutation_check.py activation
 
 Exit code 0 only if every mutation is killed.
 """
@@ -183,10 +185,56 @@ COURSES = [
     ),
 ]
 
+ACTIVATION = [
+    (
+        "token check: any code matches an activation",
+        "apps/accounts/activation.py",
+        "    activation = queryset.filter(code_hash=code_hash(code)).first()\n",
+        "    activation = queryset.first()\n",
+    ),
+    (
+        "school isolation: a member of another school is reachable by its id",
+        "apps/accounts/activation_api.py",
+        'queryset = scope_to_current_school(SchoolMembership.objects.select_related("user", "school"), self.request)',
+        'queryset = SchoolMembership.objects.select_related("user", "school")',
+    ),
+    (
+        "school isolation: the service accepts an administrator of another school",
+        "apps/accounts/activation.py",
+        "    if actor is None or actor.school_id != school.pk or not (actor.role_codes() & ADMIN_ROLES):\n",
+        "    if actor is None or not (actor.role_codes() & ADMIN_ROLES):\n",
+    ),
+    (
+        "single use: a used code is accepted again",
+        "apps/accounts/activation.py",
+        '    if activation.used_at is not None:\n        _reject("ALREADY_USED", ctx, activation)\n',
+        '    if False:\n        _reject("ALREADY_USED", ctx, activation)\n',
+    ),
+    (
+        "expiry: an expired code is accepted",
+        "apps/accounts/activation.py",
+        '    if activation.expires_at <= timezone.now():\n        _reject("EXPIRED", ctx, activation)\n',
+        '    if False:\n        _reject("EXPIRED", ctx, activation)\n',
+    ),
+    (
+        "revocation: a revoked code is accepted",
+        "apps/accounts/activation.py",
+        '    if activation.revoked_at is not None:\n        _reject("REVOKED", ctx, activation)\n',
+        '    if False:\n        _reject("REVOKED", ctx, activation)\n',
+    ),
+    (
+        "disabled account: its code can still be used",
+        "apps/accounts/activation.py",
+        '    if is_disabled(membership):\n        _reject("ACCOUNT_DISABLED", ctx, activation)\n',
+        '    if False:\n        _reject("ACCOUNT_DISABLED", ctx, activation)\n',
+    ),
+]
+
 SUITES = {
     "students": (["tests/test_students_admin_api.py"], STUDENTS),
     "teachers": (["tests/test_teachers_admin_api.py"], TEACHERS),
     "courses": (["tests/test_courses_admin_api.py"], COURSES),
+    "activation": (["tests/test_account_activation.py"], ACTIVATION),
 }
 
 

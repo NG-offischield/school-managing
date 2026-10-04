@@ -274,7 +274,10 @@ def test_record_dialog_sections_and_actions(qapp):
             "active": True,
         }
     ]
-    record = TeacherRecordDialog(teacher, quals, rates)
+    from school_admin.models import AccountSummary
+
+    account = AccountSummary("m1", "Jean Mbarga", "j@ecole.test", "NOT_ACTIVATED")
+    record = TeacherRecordDialog(teacher, quals, rates, account=account)
     texts = " ".join(label.text() for label in record.content.findChildren(type(record.status)))
     for expected in (
         "IDENTITÉ",
@@ -285,7 +288,8 @@ def test_record_dialog_sections_and_actions(qapp):
         "COMPTE",
         "5000.00 XAF / 60 min",
         "Vérifiée · Compatible",
-        "non activé",
+        "Non activé",
+        "générez un code d'activation",
     ):
         assert expected in texts, expected
     record.qualifications_button.click()

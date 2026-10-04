@@ -15,7 +15,13 @@ from the server only (QualificationsDialog).
 
 from PySide6.QtWidgets import QComboBox, QDialog, QHBoxLayout
 
-from ..dialogs.teacher_dialogs import QualificationsDialog, TeacherDialog, TeacherRecordDialog, ask_reason
+from ..dialogs.teacher_dialogs import (
+    ActivationCodeDialog,
+    QualificationsDialog,
+    TeacherDialog,
+    TeacherRecordDialog,
+    ask_reason,
+)
 from ..widgets import button
 from .catalog_base import STATUS_COLUMN_TITLE, PagedCatalogPage
 
@@ -33,8 +39,11 @@ class TeachersPage(PagedCatalogPage):
     search_placeholder = "Rechercher par nom, prénom, e-mail ou matricule…"
     status_filters = TEACHER_FILTERS
 
-    def __init__(self, service, categories, subjects, references, runner, parent=None, *, payroll=None, **kwargs):
+    def __init__(
+        self, service, categories, subjects, references, runner, parent=None, *, payroll=None, accounts=None, **kwargs
+    ):
         self.service = service
+        self.accounts = accounts  # account lifecycle (ADR 0024)
         self.payroll = payroll  # read-only remuneration (record)
         self.categories = categories
         self.subjects = subjects
@@ -168,6 +177,17 @@ class TeachersPage(PagedCatalogPage):
                 self,
             ).exec()
             return None
+        if kind == "code":
+            ActivationCodeDialog(context["teacher"].name, context["issued"], self).exec()
+            return None
+        if kind == "suspend":
+            return ask_reason(
+                self,
+                f"Suspendre le compte de {context['teacher'].name} ?",
+                "Connexion impossible et sessions fermées. La fiche enseignant est conservée ; "
+                "le compte peut être réactivé.",
+                danger=True,
+            )
         if kind == "record":
             dialog = TeacherRecordDialog(
                 context["teacher"],
@@ -175,6 +195,7 @@ class TeachersPage(PagedCatalogPage):
                 context["rates"],
                 self,
                 with_remuneration=self.payroll is not None and bool(context["teacher"].employee_id),
+                account=context.get("account"),
             )
             return dialog.action if dialog.exec() == QDialog.Accepted else None
         dialog = QualificationsDialog(
@@ -236,9 +257,11 @@ class TeachersPage(PagedCatalogPage):
             return
 
         def show(loaded):
-            teacher, qualifications, rates = loaded
-            action = self.ask("record", teacher=teacher, qualifications=qualifications, rates=rates)
-            if action == "edit":
+            teacher, qualifications, rates, account = loaded
+            action = self.ask("record", teacher=teacher, qualifications=qualifications, rates=rates, account=account)
+            if action in ("issue_code", "revoke_code", "disable_account", "enable_account"):
+                self.account_action(action, teacher, account)
+            elif action == "edit":
                 self.edit(teacher)
             elif action == "qualifications":
                 self.manage_qualifications(teacher)
@@ -246,10 +269,73 @@ class TeachersPage(PagedCatalogPage):
                 self.show_remuneration(teacher)
 
         self.call(
-            lambda: (self.service.get(row.id), self.service.qualifications(row.id), self._rates(row.id)),
+            lambda: self._record(row.id),
             show,
             action="Impossible de charger la fiche de l'enseignant",
         )
+
+    def _record(self, teacher_id):
+        teacher = self.service.get(teacher_id)
+        return teacher, self.service.qualifications(teacher_id), self._rates(teacher_id), self._account(teacher)
+
+    def _account(self, teacher):
+        """The account state is optional on the record: a refusal never prevents opening it."""
+        from ...api.errors import Forbidden, NotFound
+
+        if self.accounts is None or not teacher.membership_id:
+            return None
+        try:
+            return self.accounts.summary(teacher.membership_id)
+        except (Forbidden, NotFound):
+            return None
+
+    def account_action(self, action, teacher, account):
+        """Activation code / suspension of the teacher's account (server rules, ADR 0024)."""
+        member = teacher.membership_id
+        if action == "issue_code":
+            if (
+                account is not None
+                and account.state == "PENDING_ACTIVATION"
+                and not self.confirm(
+                    self,
+                    "Générer un nouveau code ?",
+                    "Le code déjà remis ne fonctionnera plus.",
+                    confirm_text="Générer",
+                )
+            ):
+                return
+
+            def show_code(issued):
+                self.ask("code", teacher=teacher, issued=issued)
+                expires = f"{issued.expires_at:%d/%m/%Y %H:%M}" if issued.expires_at else "—"
+                # The code itself is never written in the banner (nor anywhere else).
+                self._reselect(teacher.id, f"Code d'activation remis pour {teacher.name} (valable jusqu'au {expires}).")
+
+            self.call(
+                lambda: self.accounts.issue_code(member), show_code, action="Impossible de générer le code d'activation"
+            )
+        elif action == "revoke_code":
+            self.call(
+                lambda: self.accounts.revoke_code(member),
+                lambda _: self._reselect(teacher.id, f"Code d'activation de {teacher.name} révoqué."),
+                action="Impossible de révoquer le code",
+            )
+        elif action == "disable_account":
+            values = self.ask("suspend", teacher=teacher)
+            if values:
+                self.call(
+                    lambda: self.accounts.disable(member, values["reason"]),
+                    lambda _: self._reselect(
+                        teacher.id, f"Compte de {teacher.name} suspendu : connexion impossible, sessions fermées."
+                    ),
+                    action="Impossible de suspendre le compte",
+                )
+        elif action == "enable_account":
+            self.call(
+                lambda: self.accounts.enable(member),
+                lambda _: self._reselect(teacher.id, f"Compte de {teacher.name} réactivé."),
+                action="Impossible de réactiver le compte",
+            )
 
     def show_remuneration(self, teacher):
         """Read-only: the server's remuneration of the teacher for the current

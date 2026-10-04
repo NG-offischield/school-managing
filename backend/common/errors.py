@@ -46,6 +46,9 @@ class ErrorCode(StrEnum):
     # Error-code names, not secrets (silences the hardcoded-password lint rule).
     INVALID_ACCESS_TOKEN = "INVALID_ACCESS_TOKEN"  # noqa: S105
     INVALID_REFRESH_TOKEN = "INVALID_REFRESH_TOKEN"  # noqa: S105
+    # Unknown, expired, used or revoked activation code, or account not
+    # activable: one answer for all (anti-enumeration, ADR 0024).
+    INVALID_ACTIVATION_CODE = "INVALID_ACTIVATION_CODE"
     # Authorization / tenancy
     PERMISSION_DENIED = "PERMISSION_DENIED"
     NO_ACTIVE_MEMBERSHIP = "NO_ACTIVE_MEMBERSHIP"
@@ -67,6 +70,7 @@ ERROR_MESSAGES = {
     ErrorCode.INVALID_CREDENTIALS: _("Invalid credentials."),
     ErrorCode.INVALID_ACCESS_TOKEN: _("Invalid or expired access token."),
     ErrorCode.INVALID_REFRESH_TOKEN: _("Invalid or expired refresh token."),
+    ErrorCode.INVALID_ACTIVATION_CODE: _("This activation code is invalid or expired."),
     ErrorCode.PERMISSION_DENIED: _("You do not have permission to perform this action."),
     ErrorCode.NO_ACTIVE_MEMBERSHIP: _("No active school membership for this request."),
 }

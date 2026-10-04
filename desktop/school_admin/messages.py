@@ -166,6 +166,12 @@ RULE_MESSAGES = {
     "invalid_roles": "Rôle non autorisé pour le forum.",
     "student_required": "Un élève est requis pour ce type de conversation.",
     "thread_locked": "Ce sujet est verrouillé ou archivé : il n'accepte plus de réponse.",
+    # account lifecycle (ADR 0024)
+    "account_already_active": "Ce compte est déjà activé : l'enseignant se connecte avec son mot de passe.",
+    "account_disabled": "Ce compte est suspendu : réactivez-le d'abord.",
+    "account_not_disabled": "Ce compte n'est pas suspendu.",
+    "no_pending_activation": "Aucun code d'activation en attente pour ce compte.",
+    "cannot_disable_self": "Vous ne pouvez pas suspendre votre propre compte.",
 }
 
 

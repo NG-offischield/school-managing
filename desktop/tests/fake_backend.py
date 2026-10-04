@@ -11,6 +11,7 @@ import uuid
 
 import httpx
 
+from .fake_accounts import AccountsFake
 from .fake_comm import CommunicationFake
 from .fake_finance import FinanceFake
 
@@ -28,11 +29,12 @@ def fail(status, code, message, details=None):
     return httpx.Response(status, json={"success": False, "error": error})
 
 
-class FakeBackend(FinanceFake, CommunicationFake):
+class FakeBackend(FinanceFake, CommunicationFake, AccountsFake):
     def __init__(self, *, roles=("SUPER_ADMIN",)):
         self.roles = list(roles)
         self.init_finance()
         self.init_comm()
+        self.init_accounts()
         self.sessions = {}  # access token -> refresh token
         self.refresh_tokens = set()
         self.revoked = set()
@@ -534,6 +536,8 @@ class FakeBackend(FinanceFake, CommunicationFake):
             "active": row["professional_status"] == "ACTIVE" and row["employment_status"] == "ACTIVE",
             "account_activated": False,
             "employee": f"emp-{row['id']}",
+            "membership": self.account_for(row["id"]),
+            "account_state": self.accounts[self.account_for(row["id"])]["state"],
             "active_course_count": 2 if row["id"] in self.teachers_in_use else 0,
             "upcoming_session_count": 0,
         }
@@ -1572,6 +1576,8 @@ class FakeBackend(FinanceFake, CommunicationFake):
             or path in ("admin/dashboard/teachers/", "admin/payroll/teacher-rates/")
         ):
             return self._teachers(request, path, body, admin)
+        if path.startswith("admin/accounts/"):
+            return self._accounts(request, path, body, admin)
         comm = ("notifications/", "conversations/", "messages/", "forum/", "complaints/", "attachments/")
         admin_comm = ("admin/communication/", "admin/forum/", "admin/complaints/")
         if path.startswith(comm) or path.startswith(admin_comm):

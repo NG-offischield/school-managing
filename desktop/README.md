@@ -61,7 +61,10 @@ Le test de bout en bout contre un vrai backend est optionnel. Il crée :
   second paiement refusé ;
 - la communication : WebSocket réel (`ws/v1/realtime/`), notification reçue en direct, conversation avec
   pièce jointe (téléchargée), faux PDF refusé, réclamation (statut, pièce jointe, historique) ;
-- les documents : bulletin, reçu, carte d'élève générés, téléchargés et vérifiés aux couleurs de l'école.
+- les documents : bulletin, reçu, carte d'élève générés, téléchargés et vérifiés aux couleurs de l'école ;
+- l'activation d'un compte enseignant (second test `-m live`) : code généré depuis la fiche, premier mot de
+  passe choisi par l'enseignant, connexion / renouvellement / déconnexion, code non réutilisable, compte
+  suspendu puis réactivé.
 
 Avant le test, préparer la base de **test** pour le bulletin (idempotent) :
 

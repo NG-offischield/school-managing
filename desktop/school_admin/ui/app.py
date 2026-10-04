@@ -10,6 +10,7 @@ from ..auth.session import AuthService
 from ..auth.token_store import KeyringTokenStore
 from ..config import load_config
 from ..realtime import RealtimeClient, socket_url
+from ..services.accounts import AccountService
 from ..services.catalog import CategoryService, SubjectService
 from ..services.classes import ClassService, ReferenceService
 from ..services.communication import CommunicationService
@@ -62,6 +63,7 @@ class AppController:
         self.finance = FinanceService(api)
         self.payroll = PayrollService(api)
         self.communication = CommunicationService(api)
+        self.accounts = AccountService(api)
         self.documents = DocumentService(api)
         self.login_window = LoginWindow(auth, runner, config)
         self.login_window.logged_in.connect(self.show_shell)
@@ -88,6 +90,7 @@ class AppController:
                 self.references,
                 self.runner,
                 payroll=self.payroll,
+                accounts=self.accounts,
                 **options.get("teachers", {}),
             ),
             "planning": lambda: PlanningPage(

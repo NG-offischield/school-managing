@@ -552,7 +552,7 @@ class TeacherRecordDialog(FormDialog):
     """Read-only record; its buttons close it with `action` = "edit" or
     "qualifications" (the page then runs the action)."""
 
-    def __init__(self, teacher, qualifications, rates, parent=None, *, with_remuneration=False):
+    def __init__(self, teacher, qualifications, rates, parent=None, *, with_remuneration=False, account=None):
         super().__init__(f"Fiche de l'enseignant — {teacher.name}", "", parent, save_text="Fermer", width=640)
         self.action = None
         self.cancel_button.hide()
@@ -630,17 +630,55 @@ class TeacherRecordDialog(FormDialog):
         if with_remuneration:
             self.remuneration_button = self._action("Rémunération et paies…", "remuneration")
             self.body.addWidget(self.remuneration_button, 0, Qt.AlignLeft)
-        self.add_section("Compte")
-        self.body.addWidget(
-            QLabel(
-                "Compte activé : l'enseignant peut se connecter."
-                if teacher.account_activated
-                else "Compte créé, non activé : aucun mot de passe n'est défini (activation séparée).",
-                objectName="help",
-            )
-        )
+        self._account_section(teacher, account)
         self.finish(required_note=False)
         self.save_button.setFocus()
+
+    def _account_section(self, teacher, account):
+        """Account lifecycle (ADR 0024): state and the actions the state allows.
+        The activation code is never shown here (only once, when generated)."""
+        self.add_section("Compte", "Identifiant de connexion et activation par l'enseignant lui-même.")
+        self.account_buttons = {}
+        if account is None:
+            self.body.addWidget(QLabel("État du compte indisponible.", objectName="help"))
+            return
+        explanations = {
+            "ACTIVE": "L'enseignant a défini son mot de passe : il peut se connecter.",
+            "PENDING_ACTIVATION": "Un code d'activation a été remis ; il n'a pas encore été utilisé.",
+            "NOT_ACTIVATED": "Aucun mot de passe : générez un code d'activation et remettez-le à l'enseignant.",
+            "DISABLED": "Compte suspendu : connexion impossible, sessions fermées.",
+        }
+        rows = [
+            ("État", account.state_label),
+            ("Identifiant", account.login or "—"),
+            ("Détail", explanations.get(account.state, "")),
+        ]
+        if account.pending_expires_at:
+            rows.append(("Code valable jusqu'au", f"{account.pending_expires_at:%d/%m/%Y %H:%M}"))
+        if account.activated_at:
+            rows.append(("Activé le", f"{account.activated_at:%d/%m/%Y %H:%M}"))
+        if account.last_login:
+            rows.append(("Dernière connexion", f"{account.last_login:%d/%m/%Y %H:%M}"))
+        self.body.addWidget(_grid(rows))
+        actions = {
+            "NOT_ACTIVATED": [("issue_code", "Générer un code d'activation…")],
+            "PENDING_ACTIVATION": [("issue_code", "Générer un nouveau code…"), ("revoke_code", "Révoquer le code")],
+            "ACTIVE": [],
+            "DISABLED": [("enable_account", "Réactiver le compte")],
+        }.get(account.state, [])
+        if account.state != "DISABLED":
+            actions.append(("disable_account", "Suspendre le compte…"))
+        row = QWidget()
+        line = QHBoxLayout(row)
+        line.setContentsMargins(0, 0, 0, 0)
+        for name, text in actions:
+            widget = self._action(text, name)
+            if name == "disable_account":
+                set_variant(widget, "danger")
+            self.account_buttons[name] = widget
+            line.addWidget(widget)
+        line.addStretch()
+        self.body.addWidget(row)
 
     def _action(self, text, action):
         widget = button(text)
@@ -650,3 +688,47 @@ class TeacherRecordDialog(FormDialog):
     def _start(self, action):
         self.action = action
         self.accept()
+
+
+class ActivationCodeDialog(FormDialog):
+    """Shows a new activation code ONCE. It is not stored by the desktop and
+    cannot be displayed again (only regenerated)."""
+
+    def __init__(self, teacher_name, issued, parent=None):
+        super().__init__(
+            "Code d'activation",
+            f"À remettre en main propre à {teacher_name}. Il ne sera plus affiché.",
+            parent,
+            save_text="J'ai noté le code",
+            width=520,
+        )
+        self.cancel_button.hide()
+        self.code = QLabel(issued.code, objectName="activationCode")
+        self.code.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.code.setAlignment(Qt.AlignCenter)
+        font = self.code.font()
+        font.setFamily("Consolas")
+        font.setPointSize(font.pointSize() + 6)
+        font.setBold(True)
+        self.code.setFont(font)
+        self.body.addWidget(self.code)
+        self.copy_button = button("Copier")
+        self.copy_button.clicked.connect(self._copy)
+        self.body.addWidget(self.copy_button, 0, Qt.AlignCenter)
+        expires = f"{issued.expires_at:%d/%m/%Y à %H:%M}" if issued.expires_at else "—"
+        steps = QLabel(
+            f"Valable une seule fois, jusqu'au {expires}.\n"
+            f"L'enseignant l'utilise pour choisir lui-même son premier mot de passe, puis se connecte avec "
+            f"l'identifiant « {issued.account.login} ».\n"
+            "Si le code est perdu ou divulgué : générez-en un nouveau (l'ancien est révoqué).",
+            objectName="help",
+        )
+        steps.setWordWrap(True)
+        self.body.addWidget(steps)
+        self.finish(required_note=False)
+
+    def _copy(self):
+        from PySide6.QtWidgets import QApplication
+
+        QApplication.clipboard().setText(self.code.text())
+        self.copy_button.setText("Copié")

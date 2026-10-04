@@ -101,6 +101,11 @@ CONFLICT_RULES = {
     "message_already_deleted",
     "post_already_deleted",
     "client_id_conflict",
+    # account lifecycle (ADR 0024)
+    "account_already_active",
+    "account_disabled",
+    "account_not_disabled",
+    "no_pending_activation",
     # documents (ADR 0016)
     "document_source_not_final",
     "document_official",

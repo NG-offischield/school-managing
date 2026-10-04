@@ -164,6 +164,8 @@ AUTH_PASSWORD_VALIDATORS = [
 # Lifetimes of the API tokens (see apps/accounts/tokens.py and ADR 0002).
 ACCESS_TOKEN_LIFETIME = timedelta(minutes=env.int("ACCESS_TOKEN_LIFETIME_MINUTES", default=15))
 REFRESH_TOKEN_LIFETIME = timedelta(days=env.int("REFRESH_TOKEN_LIFETIME_DAYS", default=30))
+# Account activation codes (ADR 0024): handed to the person by the administration.
+ACCOUNT_ACTIVATION_LIFETIME = timedelta(hours=env.int("ACCOUNT_ACTIVATION_LIFETIME_HOURS", default=72))
 
 
 # --- Internationalisation -----------------------------------------------------
@@ -260,6 +262,8 @@ REST_FRAMEWORK = {
         "user": "600/min",
         "auth-login": "10/min",
         "auth-refresh": "30/min",
+        # Activation codes: brute force is pointless (~100 bits) but still throttled (ADR 0024).
+        "auth-activation": "10/min",
         # Gate scanning: a busy gate scans many pupils per minute (ADR 0011).
         "qr-scan": "240/min",
     },

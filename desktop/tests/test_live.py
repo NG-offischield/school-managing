@@ -767,3 +767,89 @@ def test_full_vertical_against_the_real_backend(live, tmp_path):
 
     shell.logout_button.click()
     assert live.main_window is None and live.api.access_token is None
+
+
+def test_account_activation_lifecycle_against_the_real_backend(live):
+    """ADR 0024 on db_test: teacher created -> not activated -> code generated
+    from the teacher record (shown once) -> the person checks it and sets the
+    first password (public endpoints) -> login, refresh, logout -> the code
+    cannot be reused -> account suspended: login and refresh refused ->
+    re-enabled: login again."""
+    import httpx
+
+    suffix = uuid.uuid4().hex[:5].upper()
+    window = live.login_window
+    window.identifier.setText(USER)
+    window.password.setText(PASSWORD)
+    window.attempt()
+    shell = live.main_window
+    assert shell is not None, window.banner.text()
+    category = live.categories.create(code=f"A{suffix}", name=f"Catégorie activation {suffix}")
+    subject = live.subjects.create(code=f"AS{suffix}", name=f"Matière activation {suffix}", category_id=category.id)
+    email = f"enseignant.{suffix.lower()}@e2e.test"
+    teacher = live.teachers.create(
+        last_name=f"Activation{suffix}",
+        first_name="Prof",
+        email=email,
+        employee_number=f"ACT-{suffix}",
+        category_id=category.id,
+        primary_subject_id=subject.id,
+    )
+    teacher = live.teachers.get(teacher.id)
+    assert teacher.account_state == "NOT_ACTIVATED" and teacher.membership_id
+
+    teachers = shell.open("teachers")
+    seen = {}
+    script = {"record": "issue_code"}
+
+    def ask(kind, **context):
+        seen.setdefault(kind, []).append(context)
+        if kind == "suspend":
+            return {"reason": "Test E2E : suspension"}
+        return script.get(kind)
+
+    teachers.ask = ask
+    teachers.confirm = lambda *args, **kwargs: True
+    teachers.search.setText(f"Activation{suffix}")
+    teachers.reload_first_page()
+    teachers.select_id(teacher.id)
+    teachers.open_record()
+    assert seen["record"][-1]["account"].state == "NOT_ACTIVATED"
+    code = seen["code"][-1]["issued"].code
+    assert code not in teachers.banner.plain_text() and teachers.banner.kind == "success"
+    assert live.accounts.summary(teacher.membership_id).state == "PENDING_ACTIVATION"
+
+    public = httpx.Client(base_url=URL, timeout=15)
+    try:
+        preview = public.post("auth/activation/check/", json={"code": code.lower()}).json()["data"]
+        assert preview["login"] == email
+        weak = public.post("auth/activation/complete/", json={"code": code, "password": "123"})
+        assert weak.status_code == 400 and weak.json()["error"]["code"] == "VALIDATION_ERROR"
+        password = f"Prof-{suffix}-Craie!2026"
+        done = public.post("auth/activation/complete/", json={"code": code, "password": password})
+        assert done.status_code == 200, done.json()
+        login_body = {"identifier": email, "password": password, "device": DEVICE}
+        tokens = public.post("auth/login/", json=login_body).json()["data"]
+        renewed = public.post("auth/refresh/", json={"refresh_token": tokens["refresh_token"]}).json()["data"]
+        logout = public.post("auth/logout/", headers={"Authorization": f"Bearer {renewed['access_token']}"})
+        assert logout.status_code == 200
+        reused = public.post("auth/activation/complete/", json={"code": code, "password": "Autre-Mot-2026!x"})
+        assert reused.status_code == 400 and reused.json()["error"]["code"] == "INVALID_ACTIVATION_CODE"
+        assert live.accounts.summary(teacher.membership_id).state == "ACTIVE"
+
+        # Suspended account: login and refresh refused, then re-enabled.
+        session = public.post("auth/login/", json=login_body).json()["data"]
+        script["record"] = "disable_account"
+        teachers.select_id(teacher.id)
+        teachers.open_record()
+        assert teachers.banner.plain_text().endswith("suspendu : connexion impossible, sessions fermées.")
+        assert public.post("auth/login/", json=login_body).status_code == 401
+        assert public.post("auth/refresh/", json={"refresh_token": session["refresh_token"]}).status_code == 401
+        script["record"] = "enable_account"
+        teachers.select_id(teacher.id)
+        teachers.open_record()
+        assert live.accounts.summary(teacher.membership_id).state == "ACTIVE"
+        assert public.post("auth/login/", json=login_body).status_code == 200
+    finally:
+        public.close()
+    shell.logout_button.click()

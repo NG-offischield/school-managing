@@ -482,6 +482,8 @@ class Teacher:
     active_course_count: int | None = None
     upcoming_session_count: int | None = None
     employee_id: str = ""  # payroll / remuneration (EmployeeProfile)
+    membership_id: str = ""  # account lifecycle (ADR 0024)
+    account_state: str = ""  # ACTIVE | PENDING_ACTIVATION | NOT_ACTIVATED | DISABLED
 
     @property
     def code(self):  # the list screens name a row by `code`
@@ -525,6 +527,8 @@ class Teacher:
             row.get("active_course_count"),
             row.get("upcoming_session_count"),
             str(row.get("employee") or ""),
+            str(row.get("membership") or ""),
+            row.get("account_state") or "",
         )
 
 
@@ -1743,4 +1747,45 @@ class Document:
             row.get("verification_code") or "",
             _datetime(row.get("generated_at")),
             dict(row.get("params") or {}),
+        )
+
+
+# --- account lifecycle (backend accounts/activation_api.py, ADR 0024) ----------------
+
+ACCOUNT_STATES = {
+    "ACTIVE": "Compte activé",
+    "PENDING_ACTIVATION": "En attente d'activation",
+    "NOT_ACTIVATED": "Non activé",
+    "DISABLED": "Compte suspendu",
+}
+
+
+@dataclass(frozen=True)
+class AccountSummary:
+    """What the administration may know about an account — never a code."""
+
+    membership_id: str
+    name: str
+    login: str
+    state: str
+    last_login: datetime | None = None
+    pending_expires_at: datetime | None = None
+    last_issued_at: datetime | None = None
+    activated_at: datetime | None = None
+
+    @property
+    def state_label(self):
+        return ACCOUNT_STATES.get(self.state, self.state)
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["membership"],
+            row.get("name") or "",
+            row.get("login") or "",
+            row.get("state") or "",
+            _datetime(row.get("last_login")),
+            _datetime(row.get("pending_expires_at")),
+            _datetime(row.get("last_issued_at")),
+            _datetime(row.get("activated_at")),
         )

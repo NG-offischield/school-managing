@@ -15,6 +15,7 @@ from PySide6.QtWidgets import QApplication, QDialog, QLabel
 
 from school_admin.models import (
     AcademicYear,
+    AccountSummary,
     Category,
     Complaint,
     Course,
@@ -99,6 +100,7 @@ from school_admin.ui.dialogs.student_dialogs import (
 )
 from school_admin.ui.dialogs.subject_dialog import SubjectDialog
 from school_admin.ui.dialogs.teacher_dialogs import (
+    ActivationCodeDialog,
     QualificationsDialog,
     ReasonDialog,
     TeacherDialog,
@@ -373,6 +375,10 @@ DOC_SOURCES = {
 }
 
 
+ACCOUNT = AccountSummary("m1", "Jean Mbarga", "jean.mbarga@ecole.test", "PENDING_ACTIVATION")
+ISSUED = type("Issued", (), {"code": "7KQ2-M9XA-4TZP-QH3W-B8NC", "expires_at": None, "account": ACCOUNT})()
+
+
 class StubTeachers:
     """Answers of the API for the qualifications dialog (layout tests only)."""
 
@@ -428,6 +434,8 @@ DIALOGS = {
     "versement": lambda: PayDialog(PAYROLL, WALLETS),
     "détail paie": lambda: PayrollDetailDialog(PAYROLL),
     "correction": lambda: AdjustmentDialog([("e1", "Mbarga Jean (ENS-001)")]),
+    "code d'activation": lambda: ActivationCodeDialog("Mbarga Jean", ISSUED),
+    "fiche enseignant (compte)": lambda: TeacherRecordDialog(TEACHER, QUALS, [], account=ACCOUNT),
     "notification": lambda: NotificationDialog(NOTE),
     "nouvelle conversation": lambda: NewConversationDialog(MEMBERS),
     "participant": lambda: AddParticipantDialog(MEMBERS),

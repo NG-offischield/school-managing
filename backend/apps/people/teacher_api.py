@@ -67,6 +67,8 @@ def _ref(obj, *extra):
 class TeacherAdminSerializer(serializers.ModelSerializer):
     teacher_number = serializers.CharField(source="employee.employee_number", read_only=True)
     employee = serializers.UUIDField(source="employee_id", read_only=True)  # payroll / remuneration
+    membership = serializers.UUIDField(source="employee.membership_id", read_only=True)  # account (ADR 0024)
+    account_state = serializers.SerializerMethodField()
     first_name = serializers.CharField(source="employee.membership.user.first_name", read_only=True)
     last_name = serializers.CharField(source="employee.membership.user.last_name", read_only=True)
     email = serializers.CharField(source="employee.membership.user.email", read_only=True)
@@ -85,6 +87,8 @@ class TeacherAdminSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "employee",
+            "membership",
+            "account_state",
             "teacher_number",
             "first_name",
             "last_name",
@@ -120,6 +124,12 @@ class TeacherAdminSerializer(serializers.ModelSerializer):
         return obj.professional_status == ProfessionalStatus.ACTIVE and (
             obj.employee.employment_status == EmploymentStatus.ACTIVE
         )
+
+    def get_account_state(self, obj):
+        """ACTIVE / PENDING_ACTIVATION / NOT_ACTIVATED / DISABLED (ADR 0024)."""
+        from apps.accounts.activation import account_state
+
+        return account_state(obj.employee.membership)
 
     def get_account_activated(self, obj):
         """True once the person has set a password (the account can log in)."""

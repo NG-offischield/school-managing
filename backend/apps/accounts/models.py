@@ -293,6 +293,57 @@ class RotatedRefreshToken(BaseModel):
 
 
 # =============================================================================
+# Account activation (ADR 0024)
+# =============================================================================
+
+
+class AccountActivation(BaseModel):
+    """One-time code that lets a person set the FIRST password of an account
+    created by the administration (teacher, staff...).
+
+    - Only the SHA-256 of the code is stored (like refresh tokens): the code
+      has ~100 random bits, so a fast hash is enough; it is shown to the
+      administrator once and never logged.
+    - Single use (`used_at`), expiry (`expires_at`), revocation (`revoked_at`).
+    - At most ONE pending code per membership (partial unique index): issuing
+      a new code revokes the previous one.
+    - Rows are history (who issued, when used / revoked): never deleted.
+    """
+
+    school = models.ForeignKey("core.School", on_delete=models.PROTECT, related_name="+")
+    membership = models.ForeignKey(SchoolMembership, on_delete=models.PROTECT, related_name="activations")
+    code_hash = models.CharField(max_length=64, unique=True)
+    issued_by = models.ForeignKey(SchoolMembership, on_delete=models.SET_NULL, blank=True, null=True, related_name="+")
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(blank=True, null=True)
+    revoked_at = models.DateTimeField(blank=True, null=True)
+    revoked_by = models.ForeignKey(SchoolMembership, on_delete=models.SET_NULL, blank=True, null=True, related_name="+")
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(expires_at__gt=F("created_at")), name="activation_expires_after_creation"
+            ),
+            models.CheckConstraint(
+                condition=Q(used_at__isnull=True) | Q(revoked_at__isnull=True), name="activation_used_or_revoked"
+            ),
+            models.UniqueConstraint(
+                fields=["membership"],
+                condition=Q(used_at__isnull=True, revoked_at__isnull=True),
+                name="activation_one_pending_per_membership",
+            ),
+        ]
+
+    def is_pending(self, now=None):
+        now = now or timezone.now()
+        return self.used_at is None and self.revoked_at is None and self.expires_at > now
+
+    def __str__(self):
+        return f"Activation {self.id} ({self.membership_id})"
+
+
+# =============================================================================
 # Security events (separate from business audit - spec §3)
 # =============================================================================
 
@@ -312,6 +363,13 @@ class SecurityEventType(models.TextChoices):
     ALL_SESSIONS_REVOKED = "ALL_SESSIONS_REVOKED"
     BOOTSTRAP_COMPLETED = "BOOTSTRAP_COMPLETED"
     BOOTSTRAP_REJECTED = "BOOTSTRAP_REJECTED"
+    # Account lifecycle (ADR 0024). The activation code itself is never logged.
+    ACCOUNT_ACTIVATION_ISSUED = "ACCOUNT_ACTIVATION_ISSUED"
+    ACCOUNT_ACTIVATION_REVOKED = "ACCOUNT_ACTIVATION_REVOKED"
+    ACCOUNT_ACTIVATED = "ACCOUNT_ACTIVATED"
+    ACCOUNT_ACTIVATION_REJECTED = "ACCOUNT_ACTIVATION_REJECTED"
+    ACCOUNT_DISABLED = "ACCOUNT_DISABLED"
+    ACCOUNT_ENABLED = "ACCOUNT_ENABLED"
 
 
 class SecuritySeverity(models.TextChoices):

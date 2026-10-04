@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import views
+from .activation_api import public_urlpatterns
 
 app_name = "accounts"
 
@@ -13,4 +14,6 @@ urlpatterns = [
     path("sessions/revoke-all/", views.SessionRevokeAllView.as_view(), name="sessions-revoke-all"),
     path("sessions/<uuid:pk>/revoke/", views.SessionRevokeView.as_view(), name="session-revoke"),
     path("password/change/", views.PasswordChangeView.as_view(), name="password-change"),
+    # Account activation by the person (ADR 0024): anonymous, throttled.
+    *public_urlpatterns,
 ]

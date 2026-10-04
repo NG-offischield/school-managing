@@ -84,3 +84,7 @@ msgstr "Vous n'avez pas la permission d'effectuer cette action."
 #: common/errors.py:71
 msgid "No active school membership for this request."
 msgstr "Aucune adhésion active à un établissement pour cette requête."
+
+#: common/errors.py
+msgid "This activation code is invalid or expired."
+msgstr "Ce code d'activation est invalide ou expiré."
