@@ -136,6 +136,36 @@ RULE_MESSAGES = {
     "session_in_approved_payroll": "Cette séance figure dans une paie approuvée : annulez d'abord cette paie.",
     "rate_overlap": "Un taux plus récent existe déjà.",
     "rate_locked_by_payroll": "Une paie approuvée ou payée utilise déjà ce taux après cette date.",
+    # communication and documents (ADR 0023)
+    "attachment_corrupted": "Ce fichier est illisible ou endommagé.",
+    "attachment_empty": "Ce fichier est vide.",
+    "attachment_too_large": "Ce fichier dépasse la taille autorisée.",
+    "attachment_type_not_allowed": "Type de fichier refusé : PDF, PNG ou JPEG uniquement (contenu vérifié).",
+    "too_many_attachments": "Trop de pièces jointes (5 au maximum).",
+    "client_id_conflict": "Ce message a déjà été envoyé avec un autre contenu : relancez la saisie.",
+    "complaint_final": "Cette réclamation est close ou annulée : elle ne peut plus changer.",
+    "complaint_not_draft": "Seul un brouillon peut être modifié.",
+    "complaint_not_open": "Cette réclamation n'est plus ouverte.",
+    "complaint_without_recipient": "La réclamation doit avoir un destinataire.",
+    "conversation_closed": "Cette conversation est fermée.",
+    "conversation_type_reserved": "Ce type de conversation est réservé.",
+    "document_official": "Un document officiel est figé : il ne se regénère pas.",
+    "document_source_not_final": (
+        "La source n'est pas encore définitive (bulletin non validé, paiement non abouti, QR absent…)."
+    ),
+    "document_superseded": "Ce document a été remplacé par une version plus récente.",
+    "invalid_transition": "Ce changement de statut n'est pas permis depuis l'état actuel.",
+    "message_already_deleted": "Ce message est déjà masqué.",
+    "message_empty": "Le message est vide.",
+    "message_too_long": "Le message est trop long.",
+    "no_administrator": "Aucun administrateur à qui écrire.",
+    "participant_inactive": "Ce participant n'est plus actif.",
+    "participants_required": "Choisissez au moins un participant.",
+    "post_already_deleted": "Ce message est déjà masqué.",
+    "roles_required": "Choisissez au moins un rôle.",
+    "invalid_roles": "Rôle non autorisé pour le forum.",
+    "student_required": "Un élève est requis pour ce type de conversation.",
+    "thread_locked": "Ce sujet est verrouillé ou archivé : il n'accepte plus de réponse.",
 }
 
 

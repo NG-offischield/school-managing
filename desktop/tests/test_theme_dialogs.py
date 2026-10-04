@@ -227,7 +227,7 @@ def test_sidebar_coming_soon_entries_are_secondary_but_readable(qapp):
     identity = Identity("u1", "admin", "Ada Admin", "TEST01", "École Test", ("SUPER_ADMIN",))
     window = MainWindow(identity, {}, ImmediateRunner())
     items = {window.nav.item(i).text(): window.nav.item(i) for i in range(window.nav.count())}
-    soon = items["Communication   ·  Bientôt"].foreground().color().name()
+    soon = items["Présences   ·  Bientôt"].foreground().color().name()
     section = items["GESTION ACADÉMIQUE"].foreground().color().name()
     assert soon == section == TOKENS.sidebar_muted.lower()
     assert contrast_ratio(soon, TOKENS.sidebar) >= 4.5  # secondary, still readable

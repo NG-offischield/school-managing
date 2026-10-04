@@ -27,6 +27,6 @@ NAVIGATION = [
     NavEntry("attendance", "Présences", "Vie scolaire", False, "Présences, retards, convocations, QR."),
     NavEntry("finance", "Finance", "Gestion"),
     NavEntry("payroll", "Paie", "Gestion"),
-    NavEntry("communication", "Communication", "Gestion", False, "Messagerie, forum, réclamations."),
-    NavEntry("documents", "Documents", "Gestion", False, "Bulletins, reçus, cartes, emplois du temps PDF."),
+    NavEntry("communication", "Communication", "Gestion"),
+    NavEntry("documents", "Documents", "Gestion"),
 ]

@@ -22,6 +22,9 @@ Complaints:
     POST /complaints/{id}/submit/ | /cancel/ {reason} | /status/ {status, reason}
     POST /complaints/{id}/attachments/  (multipart)
     POST /admin/complaints/{id}/status/ {status, reason, assigned_to?}
+Administration directory (ADR 0023, read only):
+    GET  /admin/communication/members/  (?search=, ?role=)   active members: id, name, roles
+         (participants of a conversation, assignee of a complaint)
 Private attachments (permission checked, never a public URL):
     GET  /attachments/message/{id}/download/   GET /attachments/complaint/{id}/download/
 
@@ -29,6 +32,7 @@ Everything is resolved inside the caller's school; what the caller may not
 see answers 404 exactly like what does not exist.
 """
 
+from django.db.models import Q
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.urls import path
@@ -708,6 +712,47 @@ class ComplaintAttachments(ComplaintMixin, APIView):
 
 
 # =============================================================================
+# Administration directory (ADR 0023)
+# =============================================================================
+
+
+class MemberSerializer(serializers.BaseSerializer):
+    def to_representation(self, membership):
+        return {
+            "id": str(membership.pk),
+            "name": membership.user.full_name,
+            "roles": sorted(
+                r.role.code
+                for r in membership.membership_roles.all()
+                if r.active  # prefetched
+            ),
+        }
+
+
+class AdminMembers(AdminMixin, generics.ListAPIView):
+    """Active members of the school (no e-mail, phone or other personal data)."""
+
+    serializer_class = MemberSerializer
+
+    def get_queryset(self):
+        queryset = (
+            notifications.active_members(self.membership().school)
+            .select_related("user")
+            .prefetch_related("membership_roles__role")
+            .order_by("user__last_name", "user__first_name", "id")
+        )
+        params = self.request.query_params
+        search = (params.get("search") or "").strip()
+        if search:
+            queryset = queryset.filter(Q(user__first_name__icontains=search) | Q(user__last_name__icontains=search))
+        if params.get("role"):
+            queryset = queryset.filter(
+                membership_roles__active=True, membership_roles__role__code=params["role"]
+            ).distinct()
+        return queryset
+
+
+# =============================================================================
 # Private attachment download
 # =============================================================================
 
@@ -769,5 +814,6 @@ urlpatterns = [
     path("complaints/<uuid:pk>/status/", ComplaintStatusChange.as_view()),
     path("complaints/<uuid:pk>/attachments/", ComplaintAttachments.as_view()),
     path("admin/complaints/<uuid:pk>/status/", AdminComplaintStatus.as_view()),
+    path("admin/communication/members/", AdminMembers.as_view()),
     path("attachments/<str:kind>/<uuid:pk>/download/", AttachmentDownload.as_view()),
 ]

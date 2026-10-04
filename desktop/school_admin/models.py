@@ -1350,3 +1350,397 @@ class Adjustment:
             bool(row.get("settled_teacher_payroll") or row.get("settled_staff_payroll")),
             _datetime(row.get("created_at")),
         )
+
+
+# --- communication (backend communication/api.py, ADR 0015 / 0023) ------------------
+
+NOTIFICATION_TYPES = {
+    "ATTENDANCE_LATE": "Retard",
+    "ATTENDANCE_ABSENT": "Absence",
+    "CONVOCATION": "Convocation",
+    "SCHEDULE_CHANGE": "Planning",
+    "SUBSTITUTION": "Remplacement",
+    "PAYMENT": "Paiement",
+    "REFUND": "Remboursement",
+    "PAYROLL": "Paie",
+    "REPORT_CARD": "Bulletin",
+    "MESSAGE": "Message",
+    "ANNOUNCEMENT": "Annonce",
+    "COMPLAINT": "Réclamation",
+}
+SEVERITIES = {"INFO": "Information", "WARNING": "Attention", "CRITICAL": "Important"}
+CONVERSATION_TYPES = {
+    "ADMINISTRATION": "Administration",
+    "PARENT_TEACHER": "Parent – enseignant",
+    "COMPLAINT": "Réclamation",
+}
+THREAD_STATUSES = {"OPEN": "Ouvert", "LOCKED": "Verrouillé", "ARCHIVED": "Archivé"}
+THREAD_TYPES = {"GENERAL": "Discussion", "ANNOUNCEMENT": "Annonce"}
+SPACE_AUDIENCES = {"SCHOOL": "Toute l'école (rôles choisis)", "CLASS": "Communauté d'une classe"}
+FORUM_ROLES = {"TEACHER": "Enseignants", "PARENT": "Parents", "STAFF": "Personnel"}
+COMPLAINT_STATUSES = {
+    "DRAFT": "Brouillon",
+    "OPEN": "Ouverte",
+    "IN_PROGRESS": "En traitement",
+    "RESOLVED": "Résolue",
+    "CANCELLED": "Annulée",
+    "CLOSED": "Clôturée",
+}
+COMPLAINT_CATEGORIES = {
+    "PEDAGOGY": "Pédagogie",
+    "BEHAVIOR": "Comportement",
+    "ADMINISTRATIVE": "Administratif",
+    "FINANCE": "Finance",
+    "OTHER": "Autre",
+}
+COMPLAINT_PRIORITIES = {"LOW": "Basse", "NORMAL": "Normale", "HIGH": "Haute", "URGENT": "Urgente"}
+# Status changes the administration may request (the server decides: 409 invalid_transition otherwise).
+COMPLAINT_NEXT = {
+    "OPEN": ("IN_PROGRESS", "RESOLVED"),
+    "IN_PROGRESS": ("RESOLVED",),
+    "RESOLVED": ("CLOSED", "IN_PROGRESS"),
+}
+
+
+@dataclass(frozen=True)
+class Member:
+    id: str
+    name: str
+    roles: tuple = ()
+
+    @property
+    def label(self):
+        return f"{self.name} ({', '.join(self.roles)})" if self.roles else self.name
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(row["id"], row.get("name") or "", tuple(row.get("roles") or ()))
+
+
+@dataclass(frozen=True)
+class Attachment:
+    """A private file: only its id, name, type and size travel; the download
+    goes through the API (never a server path)."""
+
+    id: str
+    kind: str  # "message" | "complaint"
+    name: str
+    mime_type: str
+    size_bytes: int
+
+    @property
+    def size_label(self):
+        size = self.size_bytes or 0
+        if size < 1024:
+            return f"{size} o"
+        return f"{size / 1024:.0f} Ko" if size < 1024 * 1024 else f"{size / 1024 / 1024:.1f} Mo"
+
+    @classmethod
+    def from_api(cls, row, kind):
+        return cls(row["id"], kind, row.get("name") or "", row.get("mime_type") or "", int(row.get("size_bytes") or 0))
+
+
+@dataclass(frozen=True)
+class Notification:
+    id: str
+    kind: str
+    severity: str
+    title: str
+    message: str
+    is_read: bool
+    created_at: datetime | None
+    read_at: datetime | None = None
+
+    @property
+    def code(self):
+        return self.title
+
+    @property
+    def active(self):
+        return not self.is_read
+
+    @property
+    def kind_label(self):
+        return NOTIFICATION_TYPES.get(self.kind, self.kind)
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            row.get("notification_type") or "",
+            row.get("severity") or "INFO",
+            row.get("title") or "",
+            row.get("message") or "",
+            bool(row.get("is_read")),
+            _datetime(row.get("created_at")),
+            _datetime(row.get("read_at")),
+        )
+
+
+@dataclass(frozen=True)
+class Conversation:
+    id: str
+    kind: str
+    title: str
+    student_id: str
+    active: bool
+    last_message_at: datetime | None
+    participants: tuple = ()  # (member id, name, active)
+    unread: int = 0
+    is_participant: bool = True
+
+    @property
+    def code(self):
+        return self.label
+
+    @property
+    def label(self):
+        names = ", ".join(name for _, name, _ in self.participants)
+        return self.title or names or "Conversation"
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            row.get("conversation_type") or "",
+            row.get("title") or "",
+            str(row.get("student") or ""),
+            bool(row.get("active", True)),
+            _datetime(row.get("last_message_at")),
+            tuple(
+                (p["member"], p.get("name") or "", bool(p.get("active", True))) for p in row.get("participants") or ()
+            ),
+            int(row.get("unread_count") or 0),
+            bool(row.get("is_participant", True)),
+        )
+
+
+@dataclass(frozen=True)
+class ChatMessage:
+    id: str
+    conversation_id: str
+    sender_id: str
+    sender_name: str
+    body: str | None
+    created_at: datetime | None
+    deleted: bool = False
+    attachments: tuple = ()
+    client_id: str = ""
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            str(row.get("conversation") or ""),
+            str(row.get("sender") or ""),
+            row.get("sender_name") or "",
+            row.get("body"),
+            _datetime(row.get("created_at")),
+            bool(row.get("deleted_at")),
+            tuple(Attachment.from_api(a, "message") for a in row.get("attachments") or ()),
+            row.get("client_id") or "",
+        )
+
+
+@dataclass(frozen=True)
+class ForumSpace:
+    id: str
+    name: str
+    description: str
+    audience: str
+    roles: tuple
+    class_id: str
+    announcements_only: bool
+    active: bool
+
+    @property
+    def code(self):
+        return self.name
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            row.get("name") or "",
+            row.get("description") or "",
+            row.get("audience") or "",
+            tuple(row.get("roles") or ()),
+            str(row.get("school_class") or ""),
+            bool(row.get("announcements_only")),
+            bool(row.get("active", True)),
+        )
+
+
+@dataclass(frozen=True)
+class Thread:
+    id: str
+    space_id: str
+    title: str
+    kind: str
+    status: str
+    status_reason: str
+    author_name: str
+    created_at: datetime | None
+    last_post_at: datetime | None
+
+    @property
+    def code(self):
+        return self.title
+
+    @property
+    def active(self):
+        return self.status == "OPEN"
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            str(row.get("space") or ""),
+            row.get("title") or "",
+            row.get("thread_type") or "GENERAL",
+            row.get("status") or "OPEN",
+            row.get("status_reason") or "",
+            row.get("author_name") or "",
+            _datetime(row.get("created_at")),
+            _datetime(row.get("last_post_at")),
+        )
+
+
+@dataclass(frozen=True)
+class Post:
+    id: str
+    author_name: str
+    kind: str
+    body: str | None
+    created_at: datetime | None
+    deleted: bool
+    deletion_reason: str = ""
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            row.get("author_name") or "",
+            row.get("post_type") or "MESSAGE",
+            row.get("body"),
+            _datetime(row.get("created_at")),
+            bool(row.get("deleted_at")),
+            row.get("deletion_reason") or "",
+        )
+
+
+@dataclass(frozen=True)
+class Complaint:
+    id: str
+    author_id: str
+    student_id: str
+    category: str
+    subject: str
+    description: str
+    priority: str
+    status: str
+    assigned_to: str
+    created_at: datetime | None
+    submitted_at: datetime | None = None
+    history: tuple = ()  # (old status, new status, changed_by id, comment, at)
+    attachments: tuple = ()
+
+    @property
+    def code(self):
+        return self.subject
+
+    @property
+    def active(self):
+        return self.status in ("OPEN", "IN_PROGRESS", "RESOLVED")
+
+    @property
+    def status_label(self):
+        return COMPLAINT_STATUSES.get(self.status, self.status)
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            str(row.get("author") or ""),
+            str(row.get("student") or ""),
+            row.get("category") or "",
+            row.get("subject") or "",
+            row.get("description") or "",
+            row.get("priority") or "NORMAL",
+            row.get("status") or "",
+            str(row.get("assigned_to") or ""),
+            _datetime(row.get("created_at")),
+            _datetime(row.get("submitted_at")),
+            tuple(
+                (
+                    h.get("old_status") or "",
+                    h.get("new_status") or "",
+                    str(h.get("changed_by") or ""),
+                    h.get("comment") or "",
+                    _datetime(h.get("at")),
+                )
+                for h in row.get("history") or ()
+            ),
+            tuple(Attachment.from_api(a, "complaint") for a in row.get("attachments") or ()),
+        )
+
+
+# --- documents (backend documents/api.py, ADR 0016 / 0023) ---------------------------
+
+DOCUMENT_KINDS = {
+    "REPORT_CARD": "Bulletin scolaire",
+    "STUDENT_CARD": "Carte d'élève",
+    "TIMETABLE": "Emploi du temps",
+    "PAYMENT_RECEIPT": "Reçu de paiement",
+    "PAYSLIP": "Bulletin de paie",
+    "STUDENT_ATTENDANCE": "Relevé de présence (élève)",
+    "CLASS_ATTENDANCE": "Registre de présence (classe)",
+}
+DOCUMENT_STATUSES = {"OFFICIAL": "Officiel", "PROVISIONAL": "Provisoire", "SUPERSEDED": "Remplacé"}
+
+
+@dataclass(frozen=True)
+class Document:
+    id: str
+    kind: str
+    status: str
+    title: str
+    version: int
+    file_name: str
+    size_bytes: int
+    sha256: str
+    verification_code: str
+    generated_at: datetime | None
+    params: dict = field(default_factory=dict, compare=False, hash=False)
+
+    @property
+    def code(self):
+        return self.title
+
+    @property
+    def active(self):
+        return self.status != "SUPERSEDED"
+
+    @property
+    def status_label(self):
+        return DOCUMENT_STATUSES.get(self.status, self.status)
+
+    @property
+    def kind_label(self):
+        return DOCUMENT_KINDS.get(self.kind, self.kind)
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            row.get("kind") or "",
+            row.get("status") or "",
+            row.get("title") or "",
+            int(row.get("version") or 1),
+            row.get("file_name") or "",
+            int(row.get("size_bytes") or 0),
+            row.get("sha256") or "",
+            row.get("verification_code") or "",
+            _datetime(row.get("generated_at")),
+            dict(row.get("params") or {}),
+        )

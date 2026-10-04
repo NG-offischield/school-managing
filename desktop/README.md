@@ -58,7 +58,16 @@ Le test de bout en bout contre un vrai backend est optionnel. Il crée :
 - la finance : motif, facture, paiement par wallet simulé (réussi puis refusé), remboursement, reçu PDF
   aux couleurs de l'école ;
 - la paie : correction, période, calcul, vérification, approbation, paiement (débit de la trésorerie),
-  second paiement refusé.
+  second paiement refusé ;
+- la communication : WebSocket réel (`ws/v1/realtime/`), notification reçue en direct, conversation avec
+  pièce jointe (téléchargée), faux PDF refusé, réclamation (statut, pièce jointe, historique) ;
+- les documents : bulletin, reçu, carte d'élève générés, téléchargés et vérifiés aux couleurs de l'école.
+
+Avant le test, préparer la base de **test** pour le bulletin (idempotent) :
+
+```powershell
+docker exec -e E2E_USER=<utilisateur> <conteneur> python manage.py shell -c "exec(open('tools/e2e_documents_fixture.py').read())"
+```
 
 À lancer contre un backend de **test** :
 
@@ -89,7 +98,11 @@ school_admin/
                        vacances ; conflits décidés et expliqués par le serveur),
                        finance (finance.py : paiements, factures, remboursements, wallets) et paie
                        (payroll.py : périodes, calcul, approbation, paiement) — décisions du serveur,
-                       montants en Decimal (money.py), jamais en float,
+                       montants en Decimal (money.py), jamais en float, communication
+                       (communication.py : notifications, messagerie, forum, réclamations, pièces jointes
+                       privées) et documents (documents.py : registre, génération, téléchargement),
+  realtime.py          client WebSocket de l'endpoint existant ws/v1/realtime/ (resynchronisation,
+                       reconnexion, session révoquée -> connexion),
                        tableau de bord (indicateurs et séries réels de l'API)
   ui/                  écran de connexion, shell (barre latérale, en-tête), pages, dialogues,
                        exécution des appels hors du fil d'affichage, messages d'erreur uniformes

@@ -3,7 +3,8 @@
     POST /documents/                     generate (or get the current) document
                                          {kind, report_card | payment | payroll | student | school_class,
                                           date_from/date_to (student attendance), date (class register)}
-    GET  /documents/                     documents the caller may see (?kind=, ?status=)  paginated
+    GET  /documents/                     documents the caller may see (?kind=, ?status=, ?search= on the
+                                         title / verification code)  paginated
     GET  /documents/{id}/                metadata (no content for others: 404)
     GET  /documents/{id}/download/       the PDF, after the permission check (traced)
     POST /documents/{id}/regenerate/     administration, provisional documents only
@@ -23,6 +24,7 @@ official document -> 409 document_official; a non-admin regenerating -> 403.
 """
 
 from django.core.exceptions import PermissionDenied
+from django.db.models import Q
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.urls import path
@@ -156,6 +158,9 @@ class Documents(SchoolScopedMixin, generics.ListAPIView):
         for param in ("kind", "status"):
             if self.request.query_params.get(param):
                 queryset = queryset.filter(**{param: self.request.query_params[param]})
+        search = (self.request.query_params.get("search") or "").strip()
+        if search:  # narrows what the caller already sees
+            queryset = queryset.filter(Q(title__icontains=search) | Q(verification_code__iexact=search))
         return queryset
 
     def post(self, request):

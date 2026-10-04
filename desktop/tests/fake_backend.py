@@ -11,6 +11,7 @@ import uuid
 
 import httpx
 
+from .fake_comm import CommunicationFake
 from .fake_finance import FinanceFake
 
 PASSWORD = "correct-horse-test"
@@ -27,10 +28,11 @@ def fail(status, code, message, details=None):
     return httpx.Response(status, json={"success": False, "error": error})
 
 
-class FakeBackend(FinanceFake):
+class FakeBackend(FinanceFake, CommunicationFake):
     def __init__(self, *, roles=("SUPER_ADMIN",)):
         self.roles = list(roles)
         self.init_finance()
+        self.init_comm()
         self.sessions = {}  # access token -> refresh token
         self.refresh_tokens = set()
         self.revoked = set()
@@ -1570,6 +1572,12 @@ class FakeBackend(FinanceFake):
             or path in ("admin/dashboard/teachers/", "admin/payroll/teacher-rates/")
         ):
             return self._teachers(request, path, body, admin)
+        comm = ("notifications/", "conversations/", "messages/", "forum/", "complaints/", "attachments/")
+        admin_comm = ("admin/communication/", "admin/forum/", "admin/complaints/")
+        if path.startswith(comm) or path.startswith(admin_comm):
+            return self._comm(request, path, body, admin)
+        if path.startswith("documents/") or path.startswith("report-cards/") or path == "academic-periods/":
+            return self._documents(request, path, body, admin)
         if path.startswith("finance/") or path.startswith("admin/finance/"):
             return self._finance(request, path, body, admin)
         if path.startswith("admin/payroll/"):

@@ -41,7 +41,9 @@ class ApiClient:
 
     # --- core ------------------------------------------------------------------
 
-    def request(self, method, path, *, json=None, params=None, files=None, raw=False, auth=True, _retry=True):
+    def request(
+        self, method, path, *, json=None, params=None, files=None, data=None, raw=False, auth=True, _retry=True
+    ):
         """`files`: multipart upload; `raw=True`: return the response bytes
         (images) instead of the unwrapped envelope."""
         headers = {}
@@ -50,13 +52,17 @@ class ApiClient:
                 raise Unauthorized()
             headers["Authorization"] = f"Bearer {self.access_token}"
         try:
-            response = self._http.request(method, path, json=json, params=params, files=files, headers=headers)
+            response = self._http.request(
+                method, path, json=json, params=params, files=files, data=data, headers=headers
+            )
         except httpx.TimeoutException:
             raise RequestTimeout() from None
         except httpx.TransportError:
             raise NetworkError() from None
         if response.status_code == 401 and auth and _retry and self._try_refresh():
-            return self.request(method, path, json=json, params=params, files=files, raw=raw, auth=auth, _retry=False)
+            return self.request(
+                method, path, json=json, params=params, files=files, data=data, raw=raw, auth=auth, _retry=False
+            )
         if raw and response.status_code < 400:
             return response.content
         try:
@@ -102,6 +108,11 @@ class ApiClient:
         """Multipart POST of `content` (bytes). Only the bytes and a neutral
         file name leave the computer — never a local path."""
         return self.request("POST", path, files={field: (filename, content, content_type)})[0]
+
+    def post_multipart(self, path, fields, files):
+        """Multipart POST of form `fields` and `files` [(field, (name, bytes, type))]:
+        only the bytes and the bare file name leave the computer, never a local path."""
+        return self.request("POST", path, data=fields, files=files)[0]
 
     def get_bytes(self, path):
         return self.request("GET", path, raw=True)

@@ -12,6 +12,8 @@ Indicators (cards):
     présence (jour)      GET /admin/attendance/dashboard/?date=today    counts
     encaissements        GET /admin/finance/dashboard/                  net_collected, outstanding
     paies versées        GET /admin/payroll/                            approved amounts of PAID payrolls
+    communication        GET /notifications/unread-count/, /conversations/ (unread), /complaints/ (open)
+    documents récents    GET /documents/?page_size=1                    meta.count + latest title
 
 Charts (backend core/dashboard_api.py, ADR 0017):
     présences            GET /admin/dashboard/attendance-trend/?days=14
@@ -206,6 +208,8 @@ class DashboardService:
             self._metric("Présence aujourd'hui", lambda: self._attendance(today), f"{today:%d/%m/%Y}"),
             self._metric("Encaissements", self._finance, "net des remboursements"),
             self._metric("Paies versées", self._payroll, ""),
+            self._metric("Communication", self._communication, ""),
+            self._metric("Documents", self._documents, ""),
         ]
         return data
 
@@ -257,6 +261,21 @@ class DashboardService:
         currency = next((r.get("currency") for r in rows if r.get("currency")), "")
         total = sum((to_decimal(r.get("approved_amount")) or ZERO for r in paid), ZERO)
         return money(total, currency), f"{_plural(len(paid), 'paie')} payée(s) · {waiting} approuvée(s) à payer"
+
+    def _communication(self):
+        """Unread notifications (big value); unread messages and open complaints in the hint."""
+        unread = int((self.api.get("notifications/unread-count/") or {}).get("unread", 0))
+        messages = sum(int(c.get("unread_count") or 0) for c in self.api.list_all("conversations/"))
+        open_complaints = sum(self.api.count("complaints/", status=s) for s in ("OPEN", "IN_PROGRESS"))
+        return (
+            f"{unread} non lue(s)",
+            f"{_plural(messages, 'message')} non lu(s) · {_plural(open_complaints, 'réclamation')} ouverte(s)",
+        )
+
+    def _documents(self):
+        rows, total = self.api.page("documents/", page=1, page_size=1)
+        latest = rows[0].get("title") if rows else ""
+        return str(total), f"dernier : {latest}" if latest else "aucun document généré"
 
     # --- charts ---------------------------------------------------------------------
     def load_charts(self):

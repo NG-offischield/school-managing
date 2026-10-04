@@ -20,7 +20,12 @@ substitute (or the server's explained refusal), cancel -> timetable PDF
 branded with the SCHOOL (never School Managing) -> finance: fee type, invoice
 (obligation), simulated wallet payment (succeeded) and a declined one, refund,
 receipt branded with the school -> payroll: correction, period, calculate,
-verify, approve, pay (treasury debit), history -> previous current year
+verify, approve, pay (treasury debit), history -> communication: live
+WebSocket (existing ws/v1/realtime/), notification pushed by a payment,
+conversation with a PDF attachment (download), refused fake PDF, complaint
+status / attachment / history -> documents: report card (fixture year, see
+backend/tools/e2e_documents_fixture.py), receipt, student card: generated,
+downloaded, branded with the SCHOOL -> previous current year
 restored, test year closed -> logout.
 Codes and dates are random so the test can be replayed; it creates a few
 rows. Run it against a TEST backend (it switches the current year, then
@@ -38,12 +43,15 @@ from decimal import Decimal
 import pytest
 from PySide6.QtCore import QDate
 from PySide6.QtGui import QColor, QImage
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from school_admin.api import ApiClient
 from school_admin.auth.session import AuthService
 from school_admin.auth.token_store import MemoryTokenStore
 from school_admin.config import AppConfig
+from school_admin.realtime import RealtimeClient, socket_url
+from school_admin.services.communication import read_attachment
 from school_admin.services.planning import monday_of
 from school_admin.ui.app import AppController
 from school_admin.ui.dialogs.class_dialog import ClassDialog
@@ -73,6 +81,15 @@ def live():
     controller.login_window.close()
     api.close()
     assert app is not None
+
+
+def wait_for(condition, message, timeout_ms=8000):
+    """Let the Qt event loop run (real WebSocket) until `condition()`."""
+    waited = 0
+    while not condition():
+        assert waited < timeout_ms, message
+        QTest.qWait(50)
+        waited += 50
 
 
 def pdf_text(raw):
@@ -605,6 +622,137 @@ def test_full_vertical_against_the_real_backend(live, tmp_path):
     overview = finance.open_tab("overview")
     references = [overview.table.item(r, 2).text() for r in range(overview.table.rowCount())]
     assert settled.payment_reference in references and paid.reference in references  # treasury history
+
+    # --- Communication (desktop): live WebSocket, notification, message, complaint ---
+    sockets_state = []
+    live_client = RealtimeClient(live.api, socket_url(URL))
+    pushed = []
+    live_client.state_changed.connect(sockets_state.append)
+    live_client.notification.connect(pushed.append)
+    live_client.start()
+    wait_for(lambda: live_client.state == "online", "the WebSocket did not authenticate")
+    cash_for_fee = live.finance.initiate(
+        student_id=student.id,
+        amount="1500",
+        method="CASH",
+        idempotency_key=str(uuid.uuid4()),
+        fee_type_id=fee_id,
+    )
+    assert cash_for_fee.status == "SUCCEEDED"
+    wait_for(lambda: any(n.get("notification_type") == "PAYMENT" for n in pushed), "no live PAYMENT notification")
+    communication = shell.open("communication")
+    notes = communication.open_tab("notifications")
+    notes.reload_first_page()
+    assert any(r.kind == "PAYMENT" and not r.is_read for r in notes.rows), [r.title for r in notes.rows]
+    notes.select_id(next(r.id for r in notes.rows if r.kind == "PAYMENT" and not r.is_read))
+    notes.ask = lambda notification: None
+    notes.open_row()
+    assert notes.banner.plain_text() == "Notification marquée comme lue.", notes.banner.plain_text()
+
+    attachment_path = tmp_path / "convocation.pdf"
+    attachment_path.write_bytes(b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n")
+    teacher_member = next(m for m in live.communication.members(search=teacher.last_name) if "TEACHER" in m.roles)
+    messaging = communication.open_tab("messaging")
+    messaging.choose_files = lambda parent: [str(attachment_path)]
+    messaging.ask = lambda kind, **context: {
+        "participant_ids": [teacher_member.id],
+        "title": f"E2E {suffix}",
+        "body": "Bonjour, voici la convocation.",
+        "files": [read_attachment(str(attachment_path))],
+    }
+    messaging.new_conversation()
+    assert messaging.banner.plain_text() == f"Conversation « E2E {suffix} » créée.", messaging.banner.plain_text()
+    assert messaging.current.label == f"E2E {suffix}" and messaging.messages[0].attachments
+    messaging.thread.setCurrentRow(0)
+    saved = tmp_path / "copie.pdf"
+    messaging.save_path = lambda parent, name: str(saved)
+    messaging.download()
+    assert saved.read_bytes().startswith(b"%PDF")
+    disguised = tmp_path / "facture.pdf"
+    disguised.write_bytes(b"MZ\x90\x00" + b"\x00" * 64)  # an executable renamed .pdf
+    messaging.compose.setPlainText("Pièce jointe suspecte")
+    messaging.choose_files = lambda parent: [str(disguised)]
+    messaging.attachments.pick()
+    messaging.send()
+    assert "Type de fichier refusé" in messaging.banner.plain_text(), messaging.banner.plain_text()
+    messaging.attachments.paths = []
+    messaging.compose.setPlainText("Message E2E en temps réel")
+    messaging.send()
+    assert messaging.messages[-1].body == "Message E2E en temps réel"
+
+    complaint = live.api.post(
+        "complaints/",
+        {
+            "category": "ADMINISTRATIVE",
+            "subject": f"Réclamation E2E {suffix}",
+            "description": "Test de bout en bout du poste.",
+            "include_administration": True,
+            "submit": True,
+        },
+    )
+    complaints = communication.open_tab("complaints")
+    complaints.reload()
+    complaints.select_id(complaint["id"])
+    complaints.ask = lambda kind, **context: {"status": "IN_PROGRESS", "assigned_to": None, "reason": ""}
+    complaints.complaint_action("status")
+    assert complaints.banner.plain_text().endswith("en traitement."), complaints.banner.plain_text()
+    complaints.choose_files = lambda parent: [str(attachment_path)]
+    complaints.complaint_action("attach")
+    assert complaints.banner.plain_text() == "1 pièce(s) jointe(s) ajoutée(s).", complaints.banner.plain_text()
+    complaints.ask = lambda kind, **context: {"status": "RESOLVED", "assigned_to": None, "reason": "Réglé (E2E)"}
+    complaints.complaint_action("status")
+    detail = live.communication.complaint(complaint["id"])
+    assert [h[1] for h in detail.history][-2:] == ["IN_PROGRESS", "RESOLVED"] and detail.attachments
+    assert live.communication.download(detail.attachments[0]).startswith(b"%PDF")
+    live_client.stop()
+
+    # --- Documents (desktop): report card, receipt, student card — school branding ---
+    documents = shell.open("documents")
+    fixture_class = next(c for c in live.api.list_all("classes/") if c["name"] == "E2E-DOCS")
+    fixture_period = next(p for p in live.documents.periods() if p["name"] == "T1 E2E")
+    fixture_student = next(s for s in live.api.list_all("students/", search="E2E-BULL"))
+    reports = documents.open_tab("report_cards")
+    reports.ask = lambda kind, **context: {"class_id": fixture_class["id"], "period_id": fixture_period["id"]}
+    reports.compute_report_cards()
+    assert "bulletin(s) calculé(s)" in reports.banner.plain_text(), reports.banner.plain_text()
+    card_id = live.documents.report_cards(fixture_student["id"])[0]["id"]
+    reports.ask = lambda kind, **context: {"report_card": card_id}
+    reports.add()
+    assert reports.banner.plain_text().startswith("Bulletin scolaire prêt"), reports.banner.plain_text()
+
+    receipts = documents.open_tab("receipts")
+    receipts.ask = lambda kind, **context: {"payment": paid.id}
+    receipts.add()
+    assert receipts.banner.plain_text().startswith("Reçu de paiement prêt"), receipts.banner.plain_text()
+
+    card_pupil = live.students.create(
+        student_number=f"CARD-{suffix}",
+        registration_number=f"INS-CARD-{suffix}",
+        last_name=f"Carte{suffix}",
+        first_name="Élève",
+        sex="M",
+        date_of_birth=date(2012, 1, 9),
+        class_id=class_id,
+    )
+    live.api.post("admin/qr-codes/issue/", {"student": card_pupil.id})  # the EXISTING annual QR
+    cards = documents.open_tab("cards")
+    cards.ask = lambda kind, **context: {"student": card_pupil.id}
+    cards.add()
+    assert cards.banner.plain_text().startswith("Carte d'élève prêt"), cards.banner.plain_text()
+
+    for tab in (reports, receipts, cards):
+        document = tab.selected()
+        target = tmp_path / document.file_name
+        tab.save_path = lambda parent, name, target=target: str(target)
+        tab.download(document)
+        text = pdf_text(target.read_bytes())
+        assert b"School Managing" not in text and b"School\\040Managing" not in text, document.title
+        assert school_ascii[:12] in text, f"school name missing from {document.title}"
+        assert live.documents.verify(document.verification_code)["valid"]
+    # The card pupil leaves the test year (history kept), so that the year can be closed.
+    for enrollment in live.students.enrollments(card_pupil.id):
+        if enrollment.status == "ACTIVE":
+            live.students.withdraw(enrollment.id)
 
     # --- Restore the previous current year, then close the test year ---
     years = shell.open("years")

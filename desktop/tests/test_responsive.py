@@ -16,13 +16,19 @@ from PySide6.QtWidgets import QApplication, QDialog, QLabel
 from school_admin.models import (
     AcademicYear,
     Category,
+    Complaint,
     Course,
+    Document,
     Enrollment,
     FeeType,
+    ForumSpace,
     Invoice,
     Level,
+    Member,
+    Notification,
     Payment,
     Payroll,
+    Post,
     Qualification,
     Room,
     SchoolBreak,
@@ -32,12 +38,29 @@ from school_admin.models import (
     Student,
     Subject,
     Teacher,
+    Thread,
     UnavailabilityRequest,
     Wallet,
 )
 from school_admin.ui.dialogs.category_dialog import CategoryDialog
 from school_admin.ui.dialogs.class_dialog import ClassDialog
+from school_admin.ui.dialogs.communication_dialogs import (
+    AddParticipantDialog,
+    ComplaintDialog,
+    ComplaintStatusDialog,
+    NewConversationDialog,
+    NotificationDialog,
+    SpaceDialog,
+    ThreadDialog,
+    ThreadViewDialog,
+)
 from school_admin.ui.dialogs.course_dialogs import CourseDialog, CourseRecordDialog
+from school_admin.ui.dialogs.document_dialogs import (
+    ComputeReportCardsDialog,
+    DocumentDetailDialog,
+    GenerateDocumentDialog,
+    VerifyDialog,
+)
 from school_admin.ui.dialogs.finance_dialogs import (
     FeeTypeDialog,
     InvoiceDetailDialog,
@@ -271,6 +294,85 @@ def _obligations(student_id, done):
     done([INVOICE] * 6)
 
 
+MEMBERS = [Member(f"m{i}", f"Membre numéro {i} avec un nom long", ("TEACHER",)) for i in range(12)]
+NOTE = Notification.from_api(
+    {
+        "id": "n1",
+        "notification_type": "PAYMENT",
+        "severity": "INFO",
+        "title": "Paiement reçu",
+        "message": "Votre paiement de 60 000 XAF a été reçu. " * 6,
+        "is_read": False,
+        "created_at": "2026-03-04T10:00:00+01:00",
+    }
+)
+SPACES = [ForumSpace.from_api({"id": "s1", "name": "Annonces", "audience": "SCHOOL", "roles": ["TEACHER"]})]
+THREAD = Thread.from_api(
+    {
+        "id": "t1",
+        "space": "s1",
+        "title": "Rentrée 2026",
+        "status": "OPEN",
+        "author_name": "Ada Admin",
+        "created_at": "2026-03-04T10:00:00+01:00",
+    }
+)
+POSTS = [
+    Post.from_api(
+        {
+            "id": f"p{i}",
+            "author_name": "Jean Mbarga",
+            "body": "Texte du message. " * 10,
+            "created_at": "2026-03-04T10:00:00+01:00",
+        }
+    )
+    for i in range(8)
+]
+COMPLAINT = Complaint.from_api(
+    {
+        "id": "c1",
+        "author": "m1",
+        "category": "ADMINISTRATIVE",
+        "subject": "Cantine froide",
+        "description": "Description détaillée. " * 12,
+        "status": "OPEN",
+        "history": [
+            {
+                "old_status": "DRAFT",
+                "new_status": "OPEN",
+                "changed_by": "m1",
+                "comment": "Soumise",
+                "at": "2026-03-04T10:00:00+01:00",
+            }
+        ]
+        * 6,
+        "attachments": [{"id": "a1", "name": "photo.png", "mime_type": "image/png", "size_bytes": 2048}] * 3,
+    }
+)
+DOCUMENT = Document.from_api(
+    {
+        "id": "d1",
+        "kind": "PAYMENT_RECEIPT",
+        "status": "PROVISIONAL",
+        "title": "Reçu PAY-000001 — Awa Ndiaye",
+        "version": 2,
+        "file_name": "recu.pdf",
+        "size_bytes": 20480,
+        "sha256": "ab" * 32,
+        "verification_code": "V001-CODE",
+        "generated_at": "2026-03-04T10:00:00+01:00",
+    }
+)
+DOC_SOURCES = {
+    "search_students": _no_search,
+    "load_cards": lambda student, done: done([{"id": "rc1", "period_name": "Trimestre 1", "status": "DRAFT"}]),
+    "find_payments": lambda text, done: done([PAYMENT]),
+    "classes": CLASSES,
+    "teachers": [TEACHER],
+    "payrolls": [PAYROLL],
+}
+
+
 class StubTeachers:
     """Answers of the API for the qualifications dialog (layout tests only)."""
 
@@ -326,6 +428,29 @@ DIALOGS = {
     "versement": lambda: PayDialog(PAYROLL, WALLETS),
     "détail paie": lambda: PayrollDetailDialog(PAYROLL),
     "correction": lambda: AdjustmentDialog([("e1", "Mbarga Jean (ENS-001)")]),
+    "notification": lambda: NotificationDialog(NOTE),
+    "nouvelle conversation": lambda: NewConversationDialog(MEMBERS),
+    "participant": lambda: AddParticipantDialog(MEMBERS),
+    "espace de forum": lambda: SpaceDialog(CLASSES),
+    "publication": lambda: ThreadDialog(SPACES),
+    "sujet du forum": lambda: ThreadViewDialog(THREAD, POSTS),
+    "réclamation": lambda: ComplaintDialog(COMPLAINT, {"m1": "Parent Ndiaye"}),
+    "statut de réclamation": lambda: ComplaintStatusDialog(COMPLAINT, MEMBERS),
+    "document (détail)": lambda: DocumentDetailDialog(DOCUMENT),
+    "vérification": lambda: VerifyDialog(),
+    "calcul des bulletins": lambda: ComputeReportCardsDialog(CLASSES, [{"id": "p1", "name": "Trimestre 1"}]),
+    **{
+        f"génération {kind}": (lambda kind=kind: GenerateDocumentDialog(kind, DOC_SOURCES))
+        for kind in (
+            "REPORT_CARD",
+            "STUDENT_CARD",
+            "TIMETABLE",
+            "PAYMENT_RECEIPT",
+            "PAYSLIP",
+            "STUDENT_ATTENDANCE",
+            "CLASS_ATTENDANCE",
+        )
+    },
     "rémunération": lambda: TeacherPayDialog(
         TEACHER,
         {"programmed_amount": Decimal("20000"), "earned_unpaid_amount": Decimal("10000"), "paid_amount": Decimal("0")},

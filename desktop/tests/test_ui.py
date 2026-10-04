@@ -64,7 +64,7 @@ def test_shell_header_and_dashboard(controller):
     assert {"2025-2026", "4", "3", "0", "Indisponible"} <= values
     assert all(card.label.text() for card in dashboard.cards)
     # Future modules are reserved, not faked.
-    assert type(shell.pages["communication"]).__name__ == "PlaceholderPage"
+    assert type(shell.pages["attendance"]).__name__ == "PlaceholderPage"
 
 
 def test_sidebar_navigation_and_coming_soon_entries(controller):
@@ -73,11 +73,11 @@ def test_sidebar_navigation_and_coming_soon_entries(controller):
         shell.open(key)
         assert shell.current_key == key and shell.current_page is shell.pages[key]
     labels = [shell.nav.item(i).text() for i in range(shell.nav.count())]
-    assert "GESTION ACADÉMIQUE" in labels and "Communication   ·  Bientôt" in labels and "Finance" in labels
+    assert "GESTION ACADÉMIQUE" in labels and "Présences   ·  Bientôt" in labels and "Communication" in labels
     headers = [shell.nav.item(i) for i in range(shell.nav.count()) if shell.nav.item(i).text().isupper()]
     assert headers and all(item.flags() == Qt.NoItemFlags for item in headers)  # not selectable
-    page = shell.open("communication")
-    assert page.title == "Communication" and shell.current_key == "communication"
+    page = shell.open("attendance")
+    assert page.title == "Présences" and shell.current_key == "attendance"
 
 
 def test_categories_add_edit_deactivate_reactivate(controller, backend):
