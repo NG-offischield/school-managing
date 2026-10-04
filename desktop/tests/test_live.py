@@ -12,7 +12,9 @@ classes -> add a class in that year and level, edit / deactivate / reactivate
 -> dashboard charts -> level still used (409) -> students: add (enrolled,
 with a photo), record, edit, search, filter, change class, withdraw,
 archive -> teachers: add (no password), record, compatibility verdict, add +
-verify a subject, search, edit, deactivate / reactivate -> previous current year
+verify a subject, search, edit, deactivate / reactivate -> courses: create a
+course (eligible teacher from the server), schedule it with the planning API,
+deactivation refused while scheduled -> previous current year
 restored, test year closed -> logout.
 Codes and dates are random so the test can be replayed; it creates a few
 rows. Run it against a TEST backend (it switches the current year, then
@@ -35,6 +37,7 @@ from school_admin.auth.token_store import MemoryTokenStore
 from school_admin.config import AppConfig
 from school_admin.ui.app import AppController
 from school_admin.ui.dialogs.class_dialog import ClassDialog
+from school_admin.ui.dialogs.course_dialogs import CourseDialog
 from school_admin.ui.dialogs.student_dialogs import ChangeClassDialog, StudentDialog
 from school_admin.ui.dialogs.subject_dialog import SubjectDialog
 from school_admin.ui.dialogs.teacher_dialogs import QualificationsDialog, TeacherDialog
@@ -329,6 +332,46 @@ def test_full_vertical_against_the_real_backend(live, tmp_path):
     teachers.table.selectRow(0)
     teachers.toggle()
     assert teachers.banner.plain_text().endswith("réactivé avec succès."), teachers.banner.plain_text()
+
+    # --- Cours: Matière + Enseignant + Classe + Année -> Course, then the
+    #     existing planning uses it (a slot through the planning API) ---
+    courses = shell.open("courses")
+    offered = {}
+
+    def fill_course(kind, **context):
+        if kind != "course" or context.get("course") is not None:
+            return None
+        dialog = CourseDialog(context["references"], courses.find_teachers)
+        dialog.year.setCurrentIndex(dialog.year.findData(new_year.id))
+        dialog.school_class.setCurrentIndex(dialog.school_class.findData(class_id))
+        dialog.subject.setCurrentIndex(dialog.subject.findData(own_subject.id))
+        offered["teachers"] = [dialog.teacher.itemData(i) for i in range(1, dialog.teacher.count())]
+        dialog.teacher.setCurrentIndex(dialog.teacher.findData(teacher.id))
+        dialog.coefficient.setText("3")
+        assert dialog.save_enabled, dialog.status.text()
+        return dialog.values()
+
+    courses.ask = fill_course
+    courses.add()
+    assert courses.banner.kind == "success", courses.banner.plain_text()
+    assert teacher.id in offered["teachers"]  # proposed by the server as eligible
+    course = courses.selected()
+    assert (course.class_name, course.subject_code, course.teacher_id, course.year_name) == (
+        f"C{suffix} bis",
+        f"S{suffix}",
+        teacher.id,
+        new_year.name,
+    )
+    slot = live.api.post(
+        "admin/schedules/",
+        {"course": course.id, "weekday": 2, "start_time": "08:00", "end_time": "10:00"},
+    )
+    timetable = live.api.list_all("schedules/", school_class=class_id)
+    assert [(row["id"], row["course"]) for row in timetable] == [(slot["id"], course.id)]
+    assert live.courses.get(course.id).published_slot_count == 1
+    courses.confirm = lambda *args, **kwargs: True
+    courses.toggle()
+    assert courses.banner.kind == "warning" and "planning" in courses.banner.plain_text()  # still scheduled
 
     # --- Restore the previous current year, then close the test year ---
     years = shell.open("years")

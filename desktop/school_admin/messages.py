@@ -72,6 +72,17 @@ RULE_MESSAGES = {
     "subject_inactive": "Cette matière est inactive.",
     "expiry_past": "La date de fin de la dérogation doit être dans le futur.",
     "reason_required": "Indiquez le motif.",
+    "duplicate_course": "Cet enseignant a déjà cette matière dans cette classe.",
+    "course_coefficient_conflict": (
+        "Cette matière a déjà un autre coefficient dans cette classe : utilisez le même coefficient."
+    ),
+    "course_identity_immutable": "La classe, la matière et l'année d'un cours ne changent pas : créez un autre cours.",
+    "course_scheduled": "Ce cours est encore utilisé par le planning (créneaux en cours ou séances à venir).",
+    "teacher_inactive": "Cet enseignant n'est pas actif.",
+    "teacher_not_qualified": "Cet enseignant n'a pas de qualification validée pour cette matière.",
+    "teacher_other_school": "Cet enseignant appartient à une autre école.",
+    "subject_other_school": "Cette matière appartient à une autre école.",
+    "scale_unavailable": "Ce barème ne peut pas être utilisé.",
     "level_in_use": "Des classes actives d'une année ouverte utilisent ce niveau : il ne peut pas être désactivé.",
 }
 

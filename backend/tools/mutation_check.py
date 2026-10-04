@@ -1,4 +1,4 @@
-"""Mutation check of the administration verticals (ADR 0018, ADR 0019).
+"""Mutation check of the administration verticals (ADR 0018 to ADR 0020).
 
 Each mutation removes ONE protection from the code (school filtering,
 year/class control, permission check, compatibility control), runs the
@@ -8,6 +8,7 @@ always restored.
 
     docker compose run --rm -T web python tools/mutation_check.py students
     docker compose run --rm -T web python tools/mutation_check.py teachers
+    docker compose run --rm -T web python tools/mutation_check.py courses
 
 Exit code 0 only if every mutation is killed.
 """
@@ -137,9 +138,55 @@ TEACHERS = [
     ),
 ]
 
+COURSES = [
+    (
+        "school filter: class / subject / teacher / scale looked up outside the current school",
+        "apps/gradebook/course_api.py",
+        "    found = scope_to_current_school(model.objects.all(), request).filter(pk=pk).first()\n",
+        "    found = model.objects.all().filter(pk=pk).first()\n",
+    ),
+    (
+        "school filter: course looked up outside the current school",
+        "apps/gradebook/course_api.py",
+        "found = self.visible(scope_to_current_school(Course.objects.all(), self.request)).filter(",
+        "found = self.visible(Course.objects.all()).filter(",
+    ),
+    (
+        "school filter: service accepts a teacher of another school",
+        "apps/gradebook/services.py",
+        '    if teacher.school_id != school_class.school_id:\n        return "teacher_other_school"\n',
+        '    if False:\n        return "teacher_other_school"\n',
+    ),
+    (
+        "compatibility: an incompatible verdict is ignored",
+        "apps/gradebook/services.py",
+        '    if verdict == CompatibilityResult.INCOMPATIBLE:\n        return "incompatible_subject"\n',
+        '    if False:\n        return "incompatible_subject"\n',
+    ),
+    (
+        "compatibility: the teacher is not checked at all",
+        "apps/gradebook/services.py",
+        "    _check_course_frame(school_class, subject)\n    _check_teacher(teacher, subject, school_class)\n",
+        "    _check_course_frame(school_class, subject)\n",
+    ),
+    (
+        "year: a course can be created in a closed year",
+        "apps/gradebook/services.py",
+        "    if school_class.academic_year.status not in OPEN_YEARS:\n",
+        "    if False:\n",
+    ),
+    (
+        "year: a course of a closed year can be modified",
+        "apps/gradebook/services.py",
+        "    if course.academic_year.status not in OPEN_YEARS:\n",
+        "    if False:\n",
+    ),
+]
+
 SUITES = {
     "students": (["tests/test_students_admin_api.py"], STUDENTS),
     "teachers": (["tests/test_teachers_admin_api.py"], TEACHERS),
+    "courses": (["tests/test_courses_admin_api.py"], COURSES),
 }
 
 

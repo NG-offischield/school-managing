@@ -92,31 +92,132 @@ def express(fraction, scale):
 
 
 # =============================================================================
-# Courses
+# Courses (admin desktop: Gestion académique → Cours, ADR 0020)
 # =============================================================================
+# Course stays THE pedagogical relation: subject + teacher + class + year
+# (no parallel teacher↔class table). Several teachers may share a subject in
+# a class (co-teaching), with the same coefficient; the same teacher twice is
+# a duplicate. Whether a teacher may teach is decided HERE, from the teacher's
+# state, their qualification and the compatibility engine evaluated at the
+# class's level — clients only display the list of eligible teachers.
+
+OPEN_YEARS = (AcademicYearStatus.PLANNED, AcademicYearStatus.ACTIVE)
+COURSE_FIELDS = ["school_class", "subject", "teacher", "academic_year", "coefficient", "weekly_hours", "active"]
 
 
+def teacher_refusal(teacher, subject, school_class):
+    """None if `teacher` may teach `subject` in `school_class`, otherwise the
+    rule code that forbids it:
+    - teacher_other_school   the teacher belongs to another school;
+    - teacher_inactive       not teaching (professional status) or not employed;
+    - teacher_not_qualified  no accepted qualification (none, pending review, rejected),
+                             or the engine asks for a review not yet done (not VERIFIED);
+    - incompatible_subject   the compatibility engine says INCOMPATIBLE for the class's level.
+    """
+    from apps.people.compatibility import evaluate
+    from apps.people.models import CompatibilityResult, EmploymentStatus, ProfessionalStatus
+
+    if teacher.school_id != school_class.school_id:
+        return "teacher_other_school"
+    if (
+        teacher.professional_status != ProfessionalStatus.ACTIVE
+        or teacher.employee.employment_status != EmploymentStatus.ACTIVE
+    ):
+        return "teacher_inactive"
+    qualification = teacher.qualifications.filter(subject=subject).first()
+    if qualification is None or qualification.status in (QualificationStatus.PENDING, QualificationStatus.REJECTED):
+        return "teacher_not_qualified"
+    verdict = evaluate(teacher, subject, school_class.level).result
+    if verdict == CompatibilityResult.INCOMPATIBLE:
+        return "incompatible_subject"
+    if verdict == CompatibilityResult.REQUIRES_REVIEW and qualification.status != QualificationStatus.VERIFIED:
+        return "teacher_not_qualified"
+    return None
+
+
+TEACHER_REFUSALS = {
+    "teacher_other_school": "The teacher belongs to another school.",
+    "teacher_inactive": "The teacher is not active.",
+    "teacher_not_qualified": "The teacher has no accepted qualification for this subject.",
+    "incompatible_subject": "This subject is incompatible with the teacher's profile at this level.",
+}
+
+
+def _check_teacher(teacher, subject, school_class):
+    refusal = teacher_refusal(teacher, subject, school_class)
+    if refusal is not None:
+        raise ValidationError(TEACHER_REFUSALS[refusal], code=refusal)
+
+
+def _check_course_frame(school_class, subject):
+    """Class, subject (and its category) and year must be usable."""
+    if subject.school_id != school_class.school_id:
+        raise ValidationError("The subject belongs to another school.", code="subject_other_school")
+    subject = Subject.objects.select_related("category").get(pk=subject.pk)  # re-read: may be stale
+    if not subject.active:
+        raise ValidationError("This subject is inactive.", code="subject_inactive")
+    if not subject.category.active:
+        raise ValidationError("The subject's category is inactive.", code="category_inactive")
+    if not school_class.active:
+        raise ValidationError("This class is inactive.", code="class_inactive")
+    if school_class.academic_year.status not in OPEN_YEARS:
+        raise ValidationError("The academic year is closed.", code="year_closed")
+
+
+def _check_coefficient(school_class, subject, coefficient, exclude=None):
+    """Co-taught subject: every active course of the subject in the class has
+    the same coefficient (report cards need one coefficient per subject)."""
+    others = Course.objects.filter(
+        school_class=school_class, subject=subject, academic_year=school_class.academic_year, active=True
+    )
+    if exclude is not None:
+        others = others.exclude(pk=exclude.pk)
+    other = others.exclude(coefficient=coefficient).first()
+    if other is not None:
+        raise ValidationError(
+            f"The subject already has coefficient {other.coefficient} in this class.",
+            code="course_coefficient_conflict",
+            params={"coefficient": str(other.coefficient)},
+        )
+
+
+def _check_duplicate(school_class, subject, teacher, exclude=None):
+    same = Course.objects.filter(
+        school_class=school_class, subject=subject, academic_year=school_class.academic_year, teacher=teacher
+    )
+    if exclude is not None:
+        same = same.exclude(pk=exclude.pk)
+    if same.exists():
+        raise ValidationError("This teacher already has this subject in this class.", code="duplicate_course")
+
+
+def _check_scale(school, grading_scale):
+    if grading_scale is not None and (grading_scale.school_id != school.pk or not grading_scale.active):
+        raise ValidationError("This grading scale cannot be used.", code="scale_unavailable")
+
+
+def _course_snapshot(course):
+    from apps.audit.services import snapshot
+
+    return snapshot(course, COURSE_FIELDS) | {
+        "grading_scale": str(course.grading_scale_id) if course.grading_scale_id else None
+    }
+
+
+@transaction.atomic
 def create_course(
     school_class, subject, teacher, *, actor, coefficient=Decimal("1.00"), weekly_hours=0, grading_scale=None
 ):
     """Assign a teacher to teach a subject in a class (administrators only).
-
-    The teacher must hold a non-rejected qualification for the subject that is
-    not waiting for review: the compatibility process (people phase) has to be
-    completed before a course is assigned.
-    """
+    The year is the class's year. Every rule is checked here, for every
+    caller (admin API, planning API, scripts)."""
     require_role(actor, ADMIN_ROLES, school=school_class.school)
-    # Re-read from the database: the caller's instance may be stale (e.g.
-    # deactivated meanwhile by another administrator).
-    subject = Subject.objects.select_related("category").get(pk=subject.pk)
-    if not (subject.active and subject.category.active):
-        raise ValidationError("This subject (or its category) is inactive.", code="subject_inactive")
-    qualification = teacher.qualifications.filter(subject=subject).first()
-    if qualification is None or qualification.status in (QualificationStatus.PENDING, QualificationStatus.REJECTED):
-        raise ValidationError(
-            "The teacher has no accepted qualification for this subject.", code="teacher_not_qualified"
-        )
-    return Course.objects.create(
+    _check_course_frame(school_class, subject)
+    _check_teacher(teacher, subject, school_class)
+    _check_duplicate(school_class, subject, teacher)
+    _check_coefficient(school_class, subject, Decimal(coefficient))
+    _check_scale(school_class.school, grading_scale)
+    course = Course.objects.create(
         school=school_class.school,
         school_class=school_class,
         subject=subject,
@@ -126,6 +227,65 @@ def create_course(
         weekly_hours=weekly_hours,
         grading_scale=grading_scale,
     )
+    record_audit("COURSE_CREATED", actor=actor, entity=course, new=_course_snapshot(course))
+    return course
+
+
+def _scheduled(course):
+    """What the planning still needs: published slots of an open year that
+    are not over yet, and sessions still to come."""
+    from django.db.models import Q
+
+    from apps.scheduling.models import SessionStatus
+
+    today = timezone.localdate()
+    slots = (
+        course.schedule_slots.filter(status=SlotStatus.PUBLISHED, academic_year__status__in=OPEN_YEARS)
+        .filter(Q(effective_to__isnull=True) | Q(effective_to__gte=today))
+        .count()
+    )
+    sessions = course.sessions.filter(status=SessionStatus.SCHEDULED, date__gte=today).count()
+    return slots, sessions
+
+
+@transaction.atomic
+def update_course(course, *, actor, **changes):
+    """Editable: teacher, coefficient, weekly_hours, grading_scale. The class,
+    subject and year define the course and never change (409
+    course_identity_immutable: create another course). A new teacher goes
+    through the same checks as a creation and is refused while the course is
+    scheduled (slots and sessions carry the planned teacher)."""
+    require_role(actor, ADMIN_ROLES, school=course.school)
+    course = (
+        Course.objects.select_for_update().select_related("school_class__academic_year", "subject").get(pk=course.pk)
+    )
+    for name in ("school_class", "subject", "academic_year"):
+        if name in changes and changes[name] != getattr(course, name):
+            raise ValidationError(
+                "The class, subject and year of a course cannot change.", code="course_identity_immutable"
+            )
+    if course.academic_year.status not in OPEN_YEARS:
+        raise ValidationError("The academic year is closed.", code="year_closed")
+    old = _course_snapshot(course)
+    teacher = changes.get("teacher", course.teacher)
+    if teacher != course.teacher:
+        if any(_scheduled(course)):
+            raise ValidationError("This course is still scheduled.", code="course_scheduled")
+        _check_teacher(teacher, course.subject, course.school_class)
+        _check_duplicate(course.school_class, course.subject, teacher, exclude=course)
+        course.teacher = teacher
+    if "coefficient" in changes:
+        if course.active:
+            _check_coefficient(course.school_class, course.subject, Decimal(changes["coefficient"]), exclude=course)
+        course.coefficient = changes["coefficient"]
+    if "weekly_hours" in changes:
+        course.weekly_hours = changes["weekly_hours"]
+    if "grading_scale" in changes:
+        _check_scale(course.school, changes["grading_scale"])
+        course.grading_scale = changes["grading_scale"]
+    course.save()
+    record_audit("COURSE_UPDATED", actor=actor, entity=course, old=old, new=_course_snapshot(course))
+    return course
 
 
 # =============================================================================
@@ -624,20 +784,40 @@ def class_dashboard(school_class, period, *, actor):
 
 @transaction.atomic
 def set_course_active(course, active, *, actor):
-    """Deactivate / reactivate a course (admin desktop "Cours"). Refused (409)
-    while the course is still scheduled: end or archive its slots first."""
+    """Deactivate / reactivate a course (admin desktop "Cours").
+
+    Deactivation is refused (409 course_scheduled) while the planning still
+    uses the course: published slots of an open year or sessions to come
+    (end / archive them first). Grades, sessions and report cards keep the
+    course (history). Reactivation re-checks everything a creation checks:
+    class, subject and year usable, teacher still active and compatible,
+    coefficient consistent."""
     require_role(actor, ADMIN_ROLES, school=course.school)
-    course = Course.objects.select_for_update().get(pk=course.pk)
-    # "Still scheduled" = published slots in a planned / active year.
-    if (
-        not active
-        and course.schedule_slots.filter(
-            status=SlotStatus.PUBLISHED,
-            academic_year__status__in=[AcademicYearStatus.PLANNED, AcademicYearStatus.ACTIVE],
-        ).exists()
-    ):
-        raise ValidationError("This course is still scheduled.", code="course_scheduled")
+    course = (
+        Course.objects.select_for_update().select_related("school_class__academic_year", "subject").get(pk=course.pk)
+    )
+    if active == course.active:
+        return course
+    old = _course_snapshot(course)
+    if active:
+        _check_course_frame(course.school_class, course.subject)
+        _check_teacher(course.teacher, course.subject, course.school_class)
+        _check_coefficient(course.school_class, course.subject, course.coefficient, exclude=course)
+    else:
+        slots, sessions = _scheduled(course)
+        if slots or sessions:
+            raise ValidationError(
+                "This course is still scheduled.",
+                code="course_scheduled",
+                params={"slots": slots, "sessions": sessions},
+            )
     course.active = active
     course.save(update_fields=["active", "updated_at"])
-    record_audit("COURSE_ACTIVATED" if active else "COURSE_DEACTIVATED", actor=actor, entity=course)
+    record_audit(
+        "COURSE_ACTIVATED" if active else "COURSE_DEACTIVATED",
+        actor=actor,
+        entity=course,
+        old=old,
+        new=_course_snapshot(course),
+    )
     return course

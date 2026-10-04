@@ -575,3 +575,89 @@ class CompatibilityVerdict:
             row.get("override"),
             row.get("qualification_status"),
         )
+
+
+# --- courses (ADR 0020) ------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Course:
+    """Course = subject + teacher + class + year (the only pedagogical relation)."""
+
+    id: str
+    subject_id: str
+    subject_code: str
+    subject_name: str
+    teacher_id: str
+    teacher_number: str
+    teacher_name: str
+    class_id: str
+    class_name: str
+    level_code: str
+    year_id: str
+    year_name: str
+    coefficient: str
+    weekly_hours: str
+    active: bool
+    scale_id: str | None = None
+    scale_label: str = ""
+    published_slot_count: int | None = None
+    upcoming_session_count: int | None = None
+
+    @property
+    def code(self):  # the list screens name a row by `code`
+        return f"{self.subject_code} — {self.class_name}"
+
+    @property
+    def subject_label(self):
+        return f"{self.subject_code} — {self.subject_name}"
+
+    @classmethod
+    def from_api(cls, row):
+        subject, teacher = row.get("subject_ref") or {}, row.get("teacher_ref") or {}
+        klass, level, year, scale = (
+            row.get("class_ref") or {},
+            row.get("level") or {},
+            row.get("year") or {},
+            row.get("scale") or {},
+        )
+        return cls(
+            row["id"],
+            subject.get("id", row.get("subject", "")),
+            subject.get("code", row.get("subject_code", "")),
+            subject.get("name", ""),
+            teacher.get("id", row.get("teacher", "")),
+            teacher.get("number", ""),
+            teacher.get("name", row.get("teacher_name", "")),
+            klass.get("id", row.get("school_class", "")),
+            klass.get("name", row.get("class_name", "")),
+            level.get("code", ""),
+            year.get("id", row.get("academic_year", "")),
+            year.get("name", ""),
+            str(row.get("coefficient", "")),
+            str(row.get("weekly_hours", "")),
+            bool(row.get("active")),
+            scale.get("id"),
+            f"{scale.get('code', '')} — {scale.get('label', '')}".strip(" —") if scale else "",
+            row.get("published_slot_count"),
+            row.get("upcoming_session_count"),
+        )
+
+
+@dataclass(frozen=True)
+class EligibleTeacher:
+    id: str
+    number: str
+    name: str
+    category: str
+    reason: str = ""  # empty when eligible; the server's rule code otherwise
+
+    @property
+    def label(self):
+        return f"{self.name} ({self.number}, {self.category})"
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"], row.get("number", ""), row.get("name", ""), row.get("category", ""), row.get("reason", "")
+        )

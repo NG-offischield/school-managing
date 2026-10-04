@@ -11,6 +11,7 @@ from ..auth.token_store import KeyringTokenStore
 from ..config import load_config
 from ..services.catalog import CategoryService, SubjectService
 from ..services.classes import ClassService, ReferenceService
+from ..services.courses import CourseService
 from ..services.dashboard import DashboardService
 from ..services.structure import LevelService, YearService
 from ..services.students import StudentService
@@ -19,6 +20,7 @@ from .login_window import LoginWindow
 from .main_window import MainWindow
 from .pages.catalog_pages import CategoriesPage, SubjectsPage
 from .pages.classes_page import ClassesPage
+from .pages.courses_page import CoursesPage
 from .pages.dashboard_page import DashboardPage
 from .pages.structure_pages import LevelsPage, YearsPage
 from .pages.students_page import StudentsPage
@@ -40,6 +42,7 @@ class AppController:
         self.levels = LevelService(api)
         self.students = StudentService(api)
         self.teachers = TeacherService(api)
+        self.courses = CourseService(api)
         self.login_window = LoginWindow(auth, runner, config)
         self.login_window.logged_in.connect(self.show_shell)
         self.main_window = None
@@ -65,6 +68,9 @@ class AppController:
                 self.references,
                 self.runner,
                 **options.get("teachers", {}),
+            ),
+            "courses": lambda: CoursesPage(
+                self.courses, self.subjects, self.references, self.runner, **options.get("courses", {})
             ),
         }
 

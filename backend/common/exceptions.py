@@ -53,6 +53,10 @@ CONFLICT_RULES = {
     "teacher_in_use",
     "qualification_in_use",
     "primary_subject_qualification",
+    # courses (ADR 0020)
+    "duplicate_course",
+    "course_coefficient_conflict",
+    "course_identity_immutable",
     "category_in_use",
     "subject_in_use",
     # planning (ADR 0012)

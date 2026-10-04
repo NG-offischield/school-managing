@@ -15,6 +15,7 @@ from PySide6.QtWidgets import QApplication, QDialog, QLabel
 from school_admin.models import (
     AcademicYear,
     Category,
+    Course,
     Enrollment,
     Level,
     Qualification,
@@ -26,6 +27,7 @@ from school_admin.models import (
 )
 from school_admin.ui.dialogs.category_dialog import CategoryDialog
 from school_admin.ui.dialogs.class_dialog import ClassDialog
+from school_admin.ui.dialogs.course_dialogs import CourseDialog, CourseRecordDialog
 from school_admin.ui.dialogs.level_dialog import LevelDialog
 from school_admin.ui.dialogs.student_dialogs import (
     ChangeClassDialog,
@@ -77,6 +79,23 @@ TEACHER = Teacher(
     2,
     5,
 )
+COURSE = Course(
+    "k1",
+    "s1",
+    "MATH",
+    "Mathématiques",
+    "t1",
+    "ENS-1",
+    "Mbarga Jean",
+    "c1",
+    "6e A",
+    "6E",
+    "y1",
+    "2025-2026",
+    "4.00",
+    "5.00",
+    True,
+)
 QUALS = [Qualification("q1", "s1", "MATH", "Mathématiques", "VERIFIED", "ADMIN", "COMPATIBLE", "COMPATIBLE")]
 
 
@@ -109,6 +128,8 @@ DIALOGS = {
     "qualifications": lambda: QualificationsDialog(TEACHER, StubTeachers(), ImmediateRunner(), SUBJECTS, LEVELS),
     "dérogation": lambda: ReasonDialog("Accorder une dérogation ?", "Texte " * 30, with_expiry=True),
     "fiche enseignant": lambda: TeacherRecordDialog(TEACHER, QUALS, []),
+    "cours (ajout)": lambda: CourseDialog((YEARS, CLASSES, SUBJECTS, []), lambda c, s, done: done(([], []))),
+    "fiche cours": lambda: CourseRecordDialog(COURSE),
     "confirmation": lambda: ConfirmDialog("Désactiver ?", "Texte explicatif " * 20, danger=True),
 }
 SCREENS = [QSize(1366, 768), QSize(1280, 720), QSize(1024, 768), QSize(800, 480)]
@@ -274,4 +295,21 @@ def test_long_teacher_form_scrolls_with_buttons_always_visible(qapp, screen):
     assert dialog.focusWidget() is dialog.bio and bar.value() > 0
     viewport = dialog.scroll.viewport()
     assert viewport.rect().contains(dialog.bio.mapTo(viewport, dialog.bio.rect().center()))
+    dialog.close()
+
+
+def test_course_form_scrolls_with_buttons_always_visible(qapp):
+    dialog = CourseDialog((YEARS, CLASSES, SUBJECTS, []), lambda c, s, done: done(([], [])))
+    on_screen(dialog, QSize(1024, 520))
+    bar = dialog.scroll.verticalScrollBar()
+    assert bar.isVisible() and bar.maximum() > 0
+    assert inside(dialog.save_button, dialog) and inside(dialog.cancel_button, dialog)
+    assert dialog.coefficient.width() <= FIELD_WIDTHS["short"] and dialog.weekly_hours.width() <= FIELD_WIDTHS["short"]
+    dialog.activateWindow()
+    dialog.year.setFocus()
+    for _ in range(20):  # Tab down to the last field
+        if dialog.focusWidget() is dialog.scale:
+            break
+        QTest.keyClick(dialog.focusWidget(), Qt.Key_Tab)
+    assert dialog.focusWidget() is dialog.scale and bar.value() > 0
     dialog.close()

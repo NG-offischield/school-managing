@@ -532,13 +532,17 @@ def test_teacher_withdraws_pending_request(w):
 
 
 def test_course_scheduled_cannot_be_deactivated(w):
+    from unittest import mock
+
     from apps.gradebook import services as gb
 
     slot(w)
-    with pytest.raises(ValidationError) as exc:
-        gb.set_course_active(w.course_maths, False, actor=w.admin)
-    assert code_of(exc) == "course_scheduled"
-    gb.set_course_active(w.course_french, False, actor=w.admin)
+    # During the school year (the world's year is 2025-2026): the slot is not over.
+    with mock.patch("django.utils.timezone.localdate", return_value=MONDAY):
+        with pytest.raises(ValidationError) as exc:
+            gb.set_course_active(w.course_maths, False, actor=w.admin)
+        assert code_of(exc) == "course_scheduled"
+        gb.set_course_active(w.course_french, False, actor=w.admin)
 
 
 def test_postgresql_forbids_a_teacher_in_two_sessions_at_once(w):

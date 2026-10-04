@@ -50,7 +50,8 @@ Le test de bout en bout contre un vrai backend est optionnel. Il crée :
 - une année lointaine (rendue courante, puis l'ancienne courante est rétablie et l'année de test clôturée) ;
 - un niveau et une classe ;
 - un élève (inscrit, avec photo), qui change de classe, est retiré puis archivé ;
-- un enseignant (compte sans mot de passe) avec une matière ajoutée puis validée, désactivé puis réactivé.
+- un enseignant (compte sans mot de passe) avec une matière ajoutée puis validée, désactivé puis réactivé ;
+- un cours (enseignant proposé par le serveur), planifié par l'API du planning.
 
 À lancer contre un backend de **test** :
 
@@ -76,6 +77,7 @@ school_admin/
   services/            catalogue (catégories, matières), années et niveaux (structure.py), classes et
                        listes de référence, élèves (students.py : fiche, inscription, photo),
                        enseignants (teachers.py : fiche, qualifications, verdicts du serveur),
+                       cours (courses.py : enseignants autorisés calculés par le serveur),
                        tableau de bord (indicateurs et séries réels de l'API)
   ui/                  écran de connexion, shell (barre latérale, en-tête), pages, dialogues,
                        exécution des appels hors du fil d'affichage, messages d'erreur uniformes

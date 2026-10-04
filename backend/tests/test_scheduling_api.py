@@ -115,7 +115,10 @@ def test_courses_admin_endpoints(w):
     course = data(admin.post("/api/v1/admin/courses/", body, format="json"), 201)
     assert course["coefficient"] == "3.00"
     slot(w)
-    response = admin.post(f"/api/v1/admin/courses/{w.course_maths.id}/deactivate/")
+    from unittest import mock
+
+    with mock.patch("django.utils.timezone.localdate", return_value=MONDAY):  # during the school year
+        response = admin.post(f"/api/v1/admin/courses/{w.course_maths.id}/deactivate/")
     assert (response.status_code, response.json()["error"]["details"]["rule"]) == (409, "course_scheduled")
     assert data(admin.post(f"/api/v1/admin/courses/{course['id']}/deactivate/"))["active"] is False
 

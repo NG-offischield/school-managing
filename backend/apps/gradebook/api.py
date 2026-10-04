@@ -200,24 +200,7 @@ class TeacherScopeMixin(SchoolScopedMixin):
 # =============================================================================
 
 
-class CourseList(TeacherScopeMixin, generics.ListAPIView):
-    """Filters: ?school_class=, ?academic_year="""
-
-    queryset = Course.objects.select_related("school_class", "subject", "teacher__employee__membership__user").order_by(
-        "school_class__name", "subject__name"
-    )
-    serializer_class = CourseSerializer
-
-    def restrict(self, queryset):
-        for name in ("school_class", "academic_year"):
-            value = self.uuid_param(name)
-            if value:
-                queryset = queryset.filter(**{f"{name}_id": value})
-        if self.is_admin():
-            return queryset
-        if self.is_teacher():
-            return queryset.filter(self.own_courses_q())
-        return queryset.none()
+# Course list / detail / admin writes: course_api.py (ADR 0020).
 
 
 class AssessmentListCreate(TeacherScopeMixin, generics.ListAPIView):
@@ -417,7 +400,6 @@ class ReportCardValidate(SchoolScopedMixin, APIView):
 
 
 urlpatterns = [
-    path("courses/", CourseList.as_view(), name="courses"),
     path("assessments/", AssessmentListCreate.as_view(), name="assessments"),
     path("grades/", GradeList.as_view(), name="grades"),
     path("grades/bulk/", GradeBulkCreate.as_view(), name="grades-bulk"),

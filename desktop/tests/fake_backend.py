@@ -128,6 +128,9 @@ class FakeBackend:
         self.rules = {}  # (category_id, subject_id) -> COMPATIBLE | REQUIRES_REVIEW | INCOMPATIBLE
         self.teachers_in_use = set()
         self.rates = {}
+        # Courses (gradebook/course_api.py): course = subject + teacher + class + year.
+        self.courses = {}
+        self.courses_scheduled = set()
         self.finance = {
             "currency": "XAF",
             "net_collected": "1250000.00",
@@ -676,6 +679,157 @@ class FakeBackend:
             return ok(override, 201)
         return None
 
+    # --- courses ------------------------------------------------------------------
+    def _refusal(self, teacher, subject_id):
+        """What the server's teacher_refusal would answer (fake engine)."""
+        if teacher["professional_status"] != "ACTIVE" or teacher["employment_status"] != "ACTIVE":
+            return "teacher_inactive"
+        qualification = next(
+            (q for q in self.qualifications.values() if q["teacher"] == teacher["id"] and q["subject"] == subject_id),
+            None,
+        )
+        if qualification is None or qualification["status"] in ("PENDING", "REJECTED"):
+            return "teacher_not_qualified"
+        if self._verdict(teacher, subject_id)[0] == "INCOMPATIBLE":
+            return "incompatible_subject"
+        return None
+
+    def add_course(self, class_id, subject_id, teacher_id, coefficient="1.00"):
+        cid = str(uuid.uuid4())
+        self.courses[cid] = {
+            "id": cid,
+            "school_class": class_id,
+            "subject": subject_id,
+            "teacher": teacher_id,
+            "academic_year": self.classes[class_id]["academic_year"],
+            "coefficient": coefficient,
+            "weekly_hours": "0.00",
+            "grading_scale": None,
+            "active": True,
+        }
+        return cid
+
+    def _course_out(self, row):
+        klass, subject, teacher = (
+            self.classes[row["school_class"]],
+            self.subjects[row["subject"]],
+            self.teachers[row["teacher"]],
+        )
+        level = self.levels[klass["level"]]
+        return {
+            **row,
+            "class_name": klass["name"],
+            "subject_code": subject["code"],
+            "teacher_name": f"{teacher['first_name']} {teacher['last_name']}",
+            "class_ref": {"id": klass["id"], "name": klass["name"], "active": klass["active"]},
+            "level": {"id": level["id"], "code": level["code"], "name": level["name"]},
+            "subject_ref": {"id": subject["id"], "code": subject["code"], "name": subject["name"], "active": True},
+            "teacher_ref": {
+                "id": teacher["id"],
+                "number": teacher["teacher_number"],
+                "name": f"{teacher['last_name']} {teacher['first_name']}",
+                "category": self.categories[teacher["pedagogical_category"]]["code"],
+            },
+            "year": {"id": row["academic_year"], "name": self.year(row["academic_year"])["name"], "status": "ACTIVE"},
+            "scale": {"id": "sc20", "code": "SUR20", "label": "/20"} if row["grading_scale"] == "sc20" else None,
+            "published_slot_count": 1 if row["id"] in self.courses_scheduled else 0,
+            "upcoming_session_count": 0,
+        }
+
+    def _courses(self, request, path, body, admin):
+        method, params = request.method, request.url.params
+        parts = path.strip("/").split("/")
+        if path == "grading-scales/":
+            return self._page([{"id": "sc20", "code": "SUR20", "label": "/20", "active": True}], request)
+        if path == "courses/" and method == "GET":
+            rows = [self._course_out(c) for c in self.courses.values()]
+            for name in ("academic_year", "school_class", "subject"):
+                if params.get(name):
+                    rows = [r for r in rows if r[name] == params[name]]
+            if params.get("status") in ("active", "inactive"):
+                rows = [r for r in rows if r["active"] == (params["status"] == "active")]
+            search = (params.get("search") or "").lower()
+            if search:
+                rows = [
+                    r
+                    for r in rows
+                    if any(search in v.lower() for v in (r["subject_code"], r["class_name"], r["teacher_name"]))
+                ]
+            return self._page(sorted(rows, key=lambda r: (r["class_name"], r["subject_code"])), request)
+        if not admin:
+            return fail(403, "PERMISSION_DENIED", "Permission refusée.")
+        if path == "courses/eligible-teachers/":
+            subject_id = params.get("subject")
+            eligible, excluded = [], []
+            for teacher in self.teachers.values():
+                if not any(
+                    q["teacher"] == teacher["id"] and q["subject"] == subject_id and q["status"] != "REJECTED"
+                    for q in self.qualifications.values()
+                ):
+                    continue
+                ref = self._teacher_out(teacher)
+                row = {
+                    "id": teacher["id"],
+                    "number": teacher["teacher_number"],
+                    "name": f"{teacher['last_name']} {teacher['first_name']}",
+                    "category": ref["pedagogical_category"]["code"],
+                }
+                refusal = self._refusal(teacher, subject_id)
+                (excluded if refusal else eligible).append({**row, "reason": refusal} if refusal else row)
+            return ok({"eligible": eligible, "excluded": excluded})
+        if path == "courses/" and method == "POST":
+            for name, table in (("school_class", self.classes), ("subject", self.subjects), ("teacher", self.teachers)):
+                if body.get(name) not in table:
+                    return fail(404, "NOT_FOUND", "Introuvable.")
+            refusal = self._refusal(self.teachers[body["teacher"]], body["subject"])
+            if refusal:
+                return fail(400, "BUSINESS_RULE_VIOLATION", "Refusé.", {"rule": refusal})
+            same = [
+                c
+                for c in self.courses.values()
+                if c["school_class"] == body["school_class"] and c["subject"] == body["subject"]
+            ]
+            if any(c["teacher"] == body["teacher"] for c in same):
+                return fail(409, "CONFLICT", "Doublon.", {"rule": "duplicate_course"})
+            coefficient = body.get("coefficient") or "1.00"
+            if any(c["active"] and float(c["coefficient"]) != float(coefficient) for c in same):
+                return fail(409, "CONFLICT", "Coefficient.", {"rule": "course_coefficient_conflict"})
+            cid = self.add_course(body["school_class"], body["subject"], body["teacher"], coefficient)
+            self.courses[cid].update(
+                weekly_hours=body.get("weekly_hours") or "0.00", grading_scale=body.get("grading_scale")
+            )
+            return ok(self._course_out(self.courses[cid]), 201)
+        course = self.courses.get(parts[1])
+        if course is None:
+            return fail(404, "NOT_FOUND", "Cours introuvable.")
+        action = parts[2] if len(parts) > 2 else ""
+        if action == "" and method == "GET":
+            return ok(self._course_out(course))
+        if action == "deactivate":
+            if course["id"] in self.courses_scheduled:
+                return fail(409, "CONFLICT", "Planifié.", {"rule": "course_scheduled"})
+            course["active"] = False
+            return ok(self._course_out(course))
+        if action == "reactivate":
+            refusal = self._refusal(self.teachers[course["teacher"]], course["subject"])
+            if refusal:
+                return fail(400, "BUSINESS_RULE_VIOLATION", "Refusé.", {"rule": refusal})
+            course["active"] = True
+            return ok(self._course_out(course))
+        if any(name in body and body[name] != course[name] for name in ("school_class", "subject")):
+            return fail(409, "CONFLICT", "Identité.", {"rule": "course_identity_immutable"})
+        if body.get("teacher") and body["teacher"] != course["teacher"]:
+            if course["id"] in self.courses_scheduled:
+                return fail(409, "CONFLICT", "Planifié.", {"rule": "course_scheduled"})
+            refusal = self._refusal(self.teachers[body["teacher"]], course["subject"])
+            if refusal:
+                return fail(400, "BUSINESS_RULE_VIOLATION", "Refusé.", {"rule": refusal})
+            course["teacher"] = body["teacher"]
+        for name in ("coefficient", "weekly_hours", "grading_scale"):
+            if name in body:
+                course[name] = body[name] if body[name] is not None or name == "grading_scale" else course[name]
+        return ok(self._course_out(course))
+
     def _teacher_write(self, teacher, body):
         fields = ("first_name", "last_name", "email", "employee_number", "pedagogical_category", "primary_subject")
         if teacher is None:
@@ -1010,6 +1164,8 @@ class FakeBackend:
             return ok({"id": "s1", "code": "TEST01", "name": "École Test", "city": "Douala"})
         if path.startswith("levels/"):
             return self._levels(request, path, body, admin)
+        if path.startswith("courses/") or path == "grading-scales/":
+            return self._courses(request, path, body, admin)
         if (
             path.startswith("teachers/")
             or path.startswith("teacher-qualifications/")

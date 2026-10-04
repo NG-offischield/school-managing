@@ -4,8 +4,8 @@ Sidebar: sections in small capitals, the active entry highlighted (filled
 background + white bar), modules not yet available kept readable but
 secondary with a "Bientôt" mention. Header: school name + code chip on the
 left, the connected user (initials, name, role) and "Se déconnecter" on the
-right. Ctrl+1 … Ctrl+8 open Tableau de bord / Années scolaires / Niveaux /
-Catégories / Matières / Classes / Élèves / Enseignants.
+right. Ctrl+1 … Ctrl+9 open Tableau de bord / Années scolaires / Niveaux /
+Catégories / Matières / Classes / Élèves / Enseignants / Cours.
 """
 
 from PySide6.QtCore import QSize, Qt, Signal
@@ -106,7 +106,17 @@ class MainWindow(QMainWindow):
         self.pages = {}
         self._build_navigation(page_factories, runner)
         self.nav.currentItemChanged.connect(self._navigate)
-        shortcuts = ("dashboard", "years", "levels", "categories", "subjects", "classes", "students", "teachers")
+        shortcuts = (
+            "dashboard",
+            "years",
+            "levels",
+            "categories",
+            "subjects",
+            "classes",
+            "students",
+            "teachers",
+            "courses",
+        )
         for index, key in enumerate(shortcuts, start=1):
             QShortcut(QKeySequence(f"Ctrl+{index}"), self, activated=lambda k=key: self.open(k))
         self.open("dashboard")

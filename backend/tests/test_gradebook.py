@@ -420,7 +420,20 @@ def test_validation_requires_closed_period_and_freezes_the_card(w):
 
 def test_conflicting_coefficients_for_one_subject_are_refused(w):
     second_teacher = make_teacher(w.school, category=w.maths.category, primary_subject=w.maths)
-    gb.create_course(w.klass, w.maths, second_teacher, actor=w.admin, coefficient=D(3))
+    with pytest.raises(ValidationError) as exc:  # refused at creation since ADR 0020
+        gb.create_course(w.klass, w.maths, second_teacher, actor=w.admin, coefficient=D(3))
+    assert exc.value.code == "course_coefficient_conflict"
+    # Defence in depth: a conflicting row written around the service is still caught by report cards.
+    from apps.gradebook.models import Course
+
+    Course.objects.create(
+        school=w.school,
+        school_class=w.klass,
+        subject=w.maths,
+        teacher=second_teacher,
+        academic_year=w.year,
+        coefficient=D(3),
+    )
     with pytest.raises(ValidationError) as exc:
         gb.generate_report_cards(w.klass, w.t1, actor=w.admin)
     assert exc.value.code == "coefficient_conflict"
