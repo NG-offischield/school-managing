@@ -8,6 +8,10 @@
     └────────────────────────────────────────────────────────────────┘
 
 Button roles: Ajouter = primary, Désactiver = danger, the rest secondary.
+A page may replace Désactiver/Réactiver by its own actions (`has_toggle`,
+`extra_actions`, e.g. Années scolaires: Définir comme courante, Clôturer).
+`cells()` may return (text, sort_key) pairs: dates and numbers then sort
+by value, not alphabetically.
 Keyboard: Ctrl+N add, Entrée / double-clic edit, F5 reload, Ctrl+F search.
 A disabled action says why in its tooltip.
 """
@@ -32,16 +36,35 @@ from ..theme import TOKENS
 from ..widgets import Page, button, set_variant
 
 STATUS_FILTERS = [("Actives", True), ("Inactives", False), ("Toutes", None)]
+MASCULINE_STATUS_FILTERS = [("Actifs", True), ("Inactifs", False), ("Tous", None)]
 STATUS_COLUMN_TITLE = "Statut"
 
 
-def status_item(active):
-    item = QTableWidgetItem("●  Active" if active else "○  Inactive")
+class SortableItem(QTableWidgetItem):
+    """Table cell sorted by a key (date, number) instead of its text."""
+
+    def __init__(self, text, key):
+        super().__init__(text)
+        self.key = key
+
+    def __lt__(self, other):
+        other_key = getattr(other, "key", None)
+        if other_key is None or type(other_key) is not type(self.key):
+            return super().__lt__(other)
+        return self.key < other_key
+
+
+def status_item(active, feminine=True):
+    e = "e" if feminine else ""
+    word = ("Active" if active else "Inactive") if feminine else ("Actif" if active else "Inactif")
+    item = QTableWidgetItem(f"●  {word}" if active else f"○  {word}")
     item.setForeground(QBrush(QColor(TOKENS.success if active else TOKENS.text_secondary)))
     font = QFont()
     font.setWeight(QFont.DemiBold if active else QFont.Normal)
     item.setFont(font)
-    item.setToolTip("Proposée dans les nouvelles saisies" if active else "Désactivée : conservée pour l'historique")
+    item.setToolTip(
+        f"Proposé{e} dans les nouvelles saisies" if active else f"Désactivé{e} : conservé{e} pour l'historique"
+    )
     return item
 
 
@@ -49,9 +72,13 @@ class CatalogPage(Page):
     title = ""
     description = ""
     columns = []
-    noun = ""  # "catégorie", "matière"
+    noun = ""  # "catégorie", "matière", "niveau"
     feminine = True
+    plural_noun = ""  # irregular plural ("niveaux"); default noun + "s"
     search_placeholder = "Rechercher par code ou nom…"
+    status_filters = STATUS_FILTERS
+    has_toggle = True  # Désactiver / Réactiver
+    default_sort = (0, Qt.AscendingOrder)  # (column, order) when the list opens
 
     def __init__(self, runner, parent=None, **kwargs):
         super().__init__(runner, parent, **kwargs)
@@ -69,10 +96,12 @@ class CatalogPage(Page):
         self.refresh_button = button("Actualiser", tooltip="Recharger la liste (F5)")
         self.edit_button = button("Modifier")
         self.toggle_button = button("Désactiver", "danger")
-        self.add_button = button("Ajouter", "primary", tooltip=f"Ajouter une {self.noun} (Ctrl+N)")
+        self.add_button = button("Ajouter", "primary", tooltip=f"Ajouter {self.a} {self.noun} (Ctrl+N)")
         actions = QHBoxLayout()
         actions.setSpacing(8)
-        for widget in (self.refresh_button, self.edit_button, self.toggle_button, self.add_button):
+        self.toggle_button.setVisible(self.has_toggle)
+        buttons = (self.refresh_button, self.edit_button, self.toggle_button, *self.extra_actions(), self.add_button)
+        for widget in buttons:
             actions.addWidget(widget)
         head.addLayout(actions)
         head.setAlignment(actions, Qt.AlignTop)
@@ -86,7 +115,10 @@ class CatalogPage(Page):
         self.status = QComboBox()
         self.status.setAccessibleName("Filtrer par statut")
         self.status.setToolTip("Filtrer par statut")
-        for label, value in STATUS_FILTERS:
+        filters = self.status_filters
+        if filters is STATUS_FILTERS and not self.feminine:
+            filters = MASCULINE_STATUS_FILTERS
+        for label, value in filters:
             self.status.addItem(label, value)
         self.status.setMinimumWidth(130)
         tools.addWidget(self.search, 1)
@@ -108,7 +140,7 @@ class CatalogPage(Page):
         self.table.setShowGrid(False)
         self.table.setWordWrap(False)
         # Ascending by the first column (Qt defaults to DESCENDING once sorting is on).
-        self.table.horizontalHeader().setSortIndicator(0, Qt.AscendingOrder)
+        self.table.horizontalHeader().setSortIndicator(*self.default_sort)
         self.table.setSortingEnabled(True)
         self.table.verticalHeader().setVisible(False)
         self.table.verticalHeader().setDefaultSectionSize(40)
@@ -149,6 +181,16 @@ class CatalogPage(Page):
     def add_filters(self, layout):
         pass
 
+    def extra_actions(self):
+        """Buttons placed before « Ajouter » (created here, wired by the page)."""
+        return []
+
+    def update_extra_actions(self, row):
+        """Enable / explain the extra actions for the selected row (or None)."""
+
+    def status_cell(self, row):
+        return status_item(row.active, self.feminine)
+
     def fetch(self):
         raise NotImplementedError
 
@@ -157,15 +199,32 @@ class CatalogPage(Page):
 
     def is_filtered(self):
         """Does a filter hide rows? (wording of the empty state)"""
-        return bool(self.search.text().strip()) or self.status.currentData() is not True
+        return bool(self.search.text().strip()) or self.status.currentData() != self.status_filters[0][1]
 
     def describe_row(self, row):
         """How a row is named in confirmations."""
         return f"{row.code} — {row.name}"
 
+    # --- French agreement (une catégorie / un niveau) -------------------------
     @property
     def plural(self):
-        return f"{self.noun}s"
+        return self.plural_noun or f"{self.noun}s"
+
+    @property
+    def a(self):
+        return "une" if self.feminine else "un"
+
+    @property
+    def the(self):
+        return "l'" if self.noun[:1] in "aeiouyéèh" else ("la " if self.feminine else "le ")
+
+    @property
+    def none(self):
+        return "Aucune" if self.feminine else "Aucun"
+
+    def agree(self, participle):
+        """« créé » -> « créée » for a feminine noun."""
+        return f"{participle}e" if self.feminine else participle
 
     # --- list -------------------------------------------------------------------
     def reload(self):
@@ -177,7 +236,13 @@ class CatalogPage(Page):
         self.table.setRowCount(len(rows))
         for r, row in enumerate(rows):
             for c, value in enumerate(self.cells(row)):
-                item = status_item(row.active) if self.columns[c] == STATUS_COLUMN_TITLE else QTableWidgetItem(value)
+                if self.columns[c] == STATUS_COLUMN_TITLE:
+                    item = self.status_cell(row)
+                elif isinstance(value, tuple):
+                    value, key = value
+                    item = SortableItem(value, key)
+                else:
+                    item = QTableWidgetItem(value)
                 item.setData(Qt.UserRole, row.id)
                 if value and self.columns[c] != STATUS_COLUMN_TITLE:
                     item.setToolTip(value)
@@ -187,9 +252,9 @@ class CatalogPage(Page):
         self.count_label.setText(f"{count} {self.noun if count < 2 else self.plural}")
         filtered = self.is_filtered()
         self.empty.setText(
-            f"Aucune {self.noun} ne correspond à ces critères."
+            f"{self.none} {self.noun} ne correspond à ces critères."
             if filtered
-            else f"Aucune {self.noun} pour le moment. Cliquez sur « Ajouter » pour en créer une."
+            else f"{self.none} {self.noun} pour le moment. Cliquez sur « Ajouter » pour en créer {self.a}."
         )
         self.table_stack.setCurrentWidget(self.table if rows else self.empty)
         self._update_actions()
@@ -215,10 +280,11 @@ class CatalogPage(Page):
         reactivate = row is not None and not row.active
         self.toggle_button.setText("Réactiver" if reactivate else "Désactiver")
         set_variant(self.toggle_button, "secondary" if reactivate else "danger")
-        why = "" if row is not None else f"Sélectionnez d'abord une {self.noun} dans la liste."
+        why = "" if row is not None else f"Sélectionnez d'abord {self.a} {self.noun} dans la liste."
         self.edit_button.setToolTip(why or "Modifier la ligne sélectionnée (Entrée)")
         self.toggle_button.setToolTip(why or ("Réactiver" if reactivate else "Désactiver (l'historique est conservé)"))
         self.add_button.setEnabled(not self.busy)
+        self.update_extra_actions(row if not self.busy else None)
 
     def set_busy(self, busy):
         super().set_busy(busy)
@@ -238,22 +304,24 @@ class CatalogPage(Page):
             return
         if row.active:
             text = (
-                f"« {self.describe_row(row)} » ne sera plus proposée dans les nouvelles saisies. "
-                f"Son historique est conservé et vous pourrez la réactiver.\n\n"
-                f"Le serveur refusera la désactivation si elle est encore utilisée."
+                f"« {self.describe_row(row)} » ne sera plus {self.agree('proposé')} dans les nouvelles "
+                f"saisies. Son historique est conservé et vous pourrez {'la' if self.feminine else 'le'} "
+                f"réactiver.\n\nLe serveur refusera la désactivation si {'elle' if self.feminine else 'il'} "
+                f"est encore {self.agree('utilisé')}."
             )
-            if not self.confirm(self, f"Désactiver la {self.noun} ?", text, confirm_text="Désactiver", danger=True):
+            title = f"Désactiver {self.the}{self.noun} ?"
+            if not self.confirm(self, title, text, confirm_text="Désactiver", danger=True):
                 return
             self.call(
                 lambda: self.deactivate(row.id),
-                lambda saved: self._saved(saved, "désactivée"),
-                action=f"Impossible de désactiver la {self.noun}",
+                lambda saved: self._saved(saved, self.agree("désactivé")),
+                action=f"Impossible de désactiver {self.the}{self.noun}",
             )
         else:
             self.call(
                 lambda: self.reactivate(row.id),
-                lambda saved: self._saved(saved, "réactivée"),
-                action=f"Impossible de réactiver la {self.noun}",
+                lambda saved: self._saved(saved, self.agree("réactivé")),
+                action=f"Impossible de réactiver {self.the}{self.noun}",
             )
 
     def _saved(self, saved, verb):

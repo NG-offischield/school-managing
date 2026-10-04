@@ -68,6 +68,12 @@ class Tokens:
     sidebar_muted: str = "#A9B8CC"  # sections, "bientôt" entries
     sidebar_hover: str = "#1A3A66"
     sidebar_selected: str = "#1D4ED8"
+    # Charts: few colours, each >= 3:1 on a white card (graphical objects).
+    chart_1: str = "#1D4ED8"  # main series (= primary blue)
+    chart_2: str = "#0F766E"  # second series (teal)
+    chart_3: str = "#B45309"  # third series / attention (amber)
+    chart_soft: str = "#BFDBFE"  # bar under the cursor, area under a line
+    chart_grid: str = "#E5E9F0"  # gridlines (decorative)
 
 
 TOKENS = Tokens()
@@ -155,6 +161,10 @@ def build_stylesheet(t=TOKENS, s=TYPE):
 QWidget {{ font-size: {s.base}pt; color: {t.text}; }}
 QMainWindow, #page, #loginBackground {{ background: {t.background}; }}
 QDialog, QMessageBox {{ background: {t.panel}; }}
+#dialogContent, #dialogHeader {{ background: {t.panel}; }}
+#dialogScroll {{ background: {t.panel}; border: none; }}
+#dialogFooter {{ background: {t.panel}; border-top: 1px solid {t.border}; }}
+#dashboardContent {{ background: {t.background}; }}
 QLabel {{ background: transparent; }}
 
 /* ---------- typography roles ---------- */
@@ -195,6 +205,11 @@ QLabel {{ background: transparent; }}
 #cardValue {{ font-size: {s.metric}pt; font-weight: 600; color: {t.text}; }}
 #cardError {{ font-size: 13pt; font-weight: 600; color: {t.warning}; }}
 #emptyState {{ color: {t.text_secondary}; padding: 24px; }}
+#chartTitle {{ font-size: 11pt; font-weight: 600; color: {t.text}; }}
+#chartState {{ color: {t.text_secondary}; padding: 12px; }}
+#chartError {{ color: {t.warning}; padding: 12px; }}
+#legend {{ color: {t.text_secondary}; font-size: {s.small}pt; }}
+#activityTime {{ color: {t.text_secondary}; font-size: {s.small}pt; }}
 
 /* ---------- banners ---------- */
 #banner {{ border-radius: 8px; padding: 10px 14px; border: 1px solid transparent; }}
@@ -228,16 +243,24 @@ QPushButton[variant="danger"]:disabled, QPushButton[variant="danger-solid"]:disa
     background: {t.disabled_fill}; color: {t.text_disabled}; border: 1px dashed {t.field_border}; }}
 
 /* ---------- inputs ---------- */
-QLineEdit, QPlainTextEdit, QComboBox {{ background: {t.field}; color: {t.text}; border: 1px solid {t.field_border};
-    border-radius: 6px; padding: 6px 10px; min-height: 22px; selection-background-color: {t.primary};
+QLineEdit, QPlainTextEdit, QComboBox, QDateEdit {{ background: {t.field}; color: {t.text};
+    border: 1px solid {t.field_border}; border-radius: 6px; padding: 6px 10px; min-height: 22px;
+    selection-background-color: {t.primary};
     selection-color: {t.on_primary}; }}
-QLineEdit:hover, QPlainTextEdit:hover, QComboBox:hover {{ border-color: {t.text_secondary}; }}
-QLineEdit:focus, QPlainTextEdit:focus, QComboBox:focus {{ border: 2px solid {t.focus}; padding: 5px 9px; }}
+QLineEdit:hover, QPlainTextEdit:hover, QComboBox:hover, QDateEdit:hover {{ border-color: {t.text_secondary}; }}
+QLineEdit:focus, QPlainTextEdit:focus, QComboBox:focus, QDateEdit:focus {{ border: 2px solid {t.focus};
+    padding: 5px 9px; }}
 QLineEdit:read-only {{ background: {t.field_disabled}; color: {t.text_secondary}; }}
-QLineEdit:disabled, QComboBox:disabled, QPlainTextEdit:disabled {{ background: {t.field_disabled};
+QLineEdit:disabled, QComboBox:disabled, QPlainTextEdit:disabled, QDateEdit:disabled {{ background: {t.field_disabled};
     color: {t.text_disabled}; }}
 QLineEdit[invalid="true"], QComboBox[invalid="true"] {{ border: 2px solid {t.error}; padding: 5px 9px; }}
-QComboBox {{ padding-right: 30px; }}
+QComboBox, QDateEdit {{ padding-right: 30px; }}
+QDateEdit::drop-down {{ subcontrol-origin: padding; subcontrol-position: center right; width: 28px;
+    border: none; border-left: 1px solid {t.border}; }}
+QDateEdit::down-arrow {{ image: url("{_asset("chevron-down.svg")}"); width: 12px; height: 12px; }}
+QCalendarWidget QWidget {{ alternate-background-color: {t.row_alt}; }}
+QCalendarWidget QToolButton {{ color: {t.text}; background: transparent; font-weight: 600; padding: 4px 8px; }}
+QCalendarWidget QAbstractItemView {{ selection-background-color: {t.primary}; selection-color: {t.on_primary}; }}
 QComboBox::drop-down {{ subcontrol-origin: padding; subcontrol-position: center right; width: 28px;
     border: none; border-left: 1px solid {t.border}; }}
 QComboBox::down-arrow {{ image: url("{_asset("chevron-down.svg")}"); width: 12px; height: 12px; }}
@@ -267,6 +290,7 @@ QToolTip {{ background: {t.text}; color: #FFFFFF; border: none; padding: 6px 8px
 QScrollBar:vertical {{ background: transparent; width: 10px; margin: 2px; }}
 QScrollBar::handle:vertical {{ background: #C3CCD7; border-radius: 4px; min-height: 30px; }}
 QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
+QScrollArea#pageScroll {{ background: transparent; border: none; }}
 """
 
 

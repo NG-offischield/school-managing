@@ -94,7 +94,7 @@ def test_dialog_lists_validation_and_values(qapp, refs):
         "Sixième (6E)",
         "Cinquième (5E)",
     ]
-    assert dialog.academic_year.currentText() == "2025-2026 — année courante"  # current year preselected
+    assert dialog.academic_year.currentText() == "2025-2026 (courante)"  # current year preselected, compact label
     assert dialog.main_room.currentText() == NO_ROOM and dialog.main_room.count() == 3  # active rooms only
     assert not dialog.save_enabled and dialog.status.text() == "Pour enregistrer, complétez : Nom, Niveau."
     QTest.keyClicks(dialog.name, "4e A")

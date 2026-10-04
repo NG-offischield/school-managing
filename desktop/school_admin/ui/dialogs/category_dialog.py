@@ -19,12 +19,18 @@ class CategoryDialog(FormDialog):
             "Code",
             QLineEdit(placeholderText="Ex. SCI", maxLength=40),
             required=True,
+            width="short",
             help_text="Le code ne peut plus être modifié après la création."
             if editing
-            else "Court et unique, en majuscules (ex. SCI, LIT).",
+            else "Court et unique (ex. SCI, LIT).",
         )
         self.name = self.add_field(
-            "name", "Nom", QLineEdit(placeholderText="Ex. Scientifique", maxLength=120), required=True
+            "name",
+            "Nom",
+            QLineEdit(placeholderText="Ex. Scientifique", maxLength=120),
+            required=True,
+            width="medium",
+            beside=True,
         )
         description = QPlainTextEdit(placeholderText="Facultatif")
         description.setFixedHeight(84)

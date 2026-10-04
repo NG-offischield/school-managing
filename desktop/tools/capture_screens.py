@@ -6,7 +6,8 @@ PNG captures (visual review of contrast and layout, e.g. after a theme change).
     set SCHOOL_ADMIN_E2E_PASSWORD=...          (environment only, never committed)
     python tools/capture_screens.py OUTPUT_DIR [WIDTHxHEIGHT ...]
 
-Creates one category and one subject (random codes) on the target backend.
+Creates one category, one subject and one class (random codes) on the
+target backend; years, levels and the dashboard are only displayed.
 """
 
 import os
@@ -128,6 +129,23 @@ def main(out, sizes):
     subjects.add()
     shell.resize(QSize(1366, 768))
     save(shell, out / "07-subject-created.png")
+    from school_admin.ui.dialogs.level_dialog import LevelDialog
+    from school_admin.ui.dialogs.year_dialog import YearDialog, suggested_dates
+
+    for size in sizes:  # read-only screens of the academic structure and the charts
+        width, height = (int(v) for v in size.split("x"))
+        shell.resize(QSize(width, height))
+        years = shell.open("years")
+        save(shell, out / f"10-years-{size}.png")
+        shell.open("levels")
+        save(shell, out / f"11-levels-{size}.png")
+        dashboard = shell.open("dashboard")
+        bar = dashboard.scroll.verticalScrollBar()
+        bar.setValue(bar.maximum())
+        save(shell, out / f"12-dashboard-charts-{size}.png")
+        bar.setValue(0)
+    save(YearDialog(suggested=suggested_dates(years.rows)), out / "13-year-dialog.png")
+    save(LevelDialog(), out / "13-level-dialog.png")
     controller.auth.logout()
 
 

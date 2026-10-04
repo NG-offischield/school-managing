@@ -12,11 +12,13 @@ from ..config import load_config
 from ..services.catalog import CategoryService, SubjectService
 from ..services.classes import ClassService, ReferenceService
 from ..services.dashboard import DashboardService
+from ..services.structure import LevelService, YearService
 from .login_window import LoginWindow
 from .main_window import MainWindow
 from .pages.catalog_pages import CategoriesPage, SubjectsPage
 from .pages.classes_page import ClassesPage
 from .pages.dashboard_page import DashboardPage
+from .pages.structure_pages import LevelsPage, YearsPage
 from .tasks import TaskRunner
 from .theme import apply_theme
 
@@ -30,6 +32,8 @@ class AppController:
         self.dashboard = DashboardService(api)
         self.classes = ClassService(api)
         self.references = ReferenceService(api)
+        self.years = YearService(api)
+        self.levels = LevelService(api)
         self.login_window = LoginWindow(auth, runner, config)
         self.login_window.logged_in.connect(self.show_shell)
         self.main_window = None
@@ -38,6 +42,8 @@ class AppController:
         options = self.page_options
         return {
             "dashboard": lambda: DashboardPage(self.dashboard, self.runner),
+            "years": lambda: YearsPage(self.years, self.runner, **options.get("years", {})),
+            "levels": lambda: LevelsPage(self.levels, self.runner, **options.get("levels", {})),
             "categories": lambda: CategoriesPage(self.categories, self.runner, **options.get("categories", {})),
             "subjects": lambda: SubjectsPage(
                 self.subjects, self.categories, self.runner, **options.get("subjects", {})

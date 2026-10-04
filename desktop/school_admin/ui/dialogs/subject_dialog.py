@@ -24,12 +24,18 @@ class SubjectDialog(FormDialog):
             "Code",
             QLineEdit(placeholderText="Ex. MATH", maxLength=30),
             required=True,
+            width="short",
             help_text="Le code ne peut plus être modifié après la création."
             if editing
-            else "Court et unique (ex. MATH, FR, SVT).",
+            else "Court et unique (ex. MATH, SVT).",
         )
         self.name = self.add_field(
-            "name", "Nom", QLineEdit(placeholderText="Ex. Mathématiques", maxLength=120), required=True
+            "name",
+            "Nom",
+            QLineEdit(placeholderText="Ex. Mathématiques", maxLength=120),
+            required=True,
+            width="medium",
+            beside=True,
         )
         category = QComboBox()
         category.setEditable(False)  # no free text
@@ -41,6 +47,7 @@ class SubjectDialog(FormDialog):
             "Catégorie",
             category,
             required=True,
+            width="medium",
             help_text="Seules les catégories actives sont proposées."
             if categories
             else "Aucune catégorie active : créez d'abord une catégorie pédagogique.",
@@ -52,7 +59,9 @@ class SubjectDialog(FormDialog):
             "subject_type",
             "Type",
             subject_type,
-            help_text="Pratique : nécessite un lieu ou un équipement (sport, laboratoire…).",
+            width="short",
+            beside=True,
+            help_text="Pratique : lieu ou équipement requis.",
         )
         self.public_visible = self.add_field("options", "Options", QCheckBox("Visible sur le site public de l'école"))
         if editing:

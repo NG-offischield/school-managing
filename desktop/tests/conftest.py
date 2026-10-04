@@ -5,6 +5,10 @@ import pytest
 
 # UI tests run without a display.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+# Offscreen Qt has no font database of its own: give it the system fonts so
+# sizes measured by the layout tests are those of the real application.
+if os.path.isdir("C:/Windows/Fonts"):
+    os.environ.setdefault("QT_QPA_FONTDIR", "C:/Windows/Fonts")
 
 from school_admin.api import ApiClient  # noqa: E402
 from school_admin.auth.session import AuthService  # noqa: E402

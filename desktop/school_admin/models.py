@@ -1,6 +1,7 @@
 """Plain data objects built from API payloads (no business rule here)."""
 
 from dataclasses import dataclass, field
+from datetime import date, datetime
 
 ADMIN_ROLES = frozenset({"SUPER_ADMIN", "ADMIN"})
 
@@ -93,12 +94,20 @@ YEAR_STATUSES = {"PLANNED": "planifiée", "ACTIVE": "en cours", "CLOSED": "clôt
 OPEN_YEAR_STATUSES = frozenset({"PLANNED", "ACTIVE"})  # where classes can be created / edited
 
 
+def _date(value):
+    """'2026-09-01' -> date (None if missing)."""
+    return date.fromisoformat(value) if value else None
+
+
 @dataclass(frozen=True)
 class AcademicYear:
     id: str
     name: str
     status: str
     is_current: bool
+    start_date: date | None = None
+    end_date: date | None = None
+    class_count: int | None = None
 
     @property
     def label(self):
@@ -106,12 +115,38 @@ class AcademicYear:
         return f"{self.name}{suffix}"
 
     @property
+    def short_label(self):
+        """Compact form for narrow lists: '2025-2026 (courante)'."""
+        return f"{self.name} ({'courante' if self.is_current else YEAR_STATUSES.get(self.status, self.status)})"
+
+    @property
     def open(self):
         return self.status in OPEN_YEAR_STATUSES
 
+    # The list screens name a row by `code`; a year is identified by its name.
+    @property
+    def code(self):
+        return self.name
+
+    @property
+    def active(self):
+        return self.open
+
+    @property
+    def status_label(self):
+        return YEAR_STATUSES.get(self.status, self.status).capitalize()
+
     @classmethod
     def from_api(cls, row):
-        return cls(row["id"], row["name"], row.get("status", ""), bool(row.get("is_current")))
+        return cls(
+            row["id"],
+            row["name"],
+            row.get("status", ""),
+            bool(row.get("is_current")),
+            _date(row.get("start_date")),
+            _date(row.get("end_date")),
+            row.get("class_count"),
+        )
 
 
 @dataclass(frozen=True)
@@ -121,6 +156,10 @@ class Level:
     name: str
     order_index: int
     active: bool
+    cycle: str = ""
+    first_character: str = ""
+    public_visible: bool = False
+    class_count: int | None = None
 
     @property
     def label(self):
@@ -128,7 +167,17 @@ class Level:
 
     @classmethod
     def from_api(cls, row):
-        return cls(row["id"], row.get("code", ""), row["name"], row.get("order_index", 0), bool(row.get("active")))
+        return cls(
+            row["id"],
+            row.get("code", ""),
+            row["name"],
+            row.get("order_index", 0),
+            bool(row.get("active")),
+            row.get("cycle") or "",
+            row.get("first_character") or "",
+            bool(row.get("public_visible")),
+            row.get("class_count"),
+        )
 
 
 @dataclass(frozen=True)
@@ -199,3 +248,46 @@ class DashboardData:
     school_city: str = ""
     year_name: str = ""
     metrics: list = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class Point:
+    """One x position of a chart: label on the axis, values per series,
+    full text of the tooltip."""
+
+    label: str
+    values: tuple
+    tooltip: str = ""
+
+
+@dataclass
+class ChartData:
+    """What a dashboard chart shows: real points, or why there are none.
+    `error` = the API failed; no points and no error = nothing recorded yet."""
+
+    series: tuple = ()  # names of the series (legend)
+    points: list = field(default_factory=list)
+    unit: str = ""  # "%" or "" (axis labels)
+    maximum: float | None = None  # fixed top of the axis (100 for percentages)
+    empty_text: str = "Aucune donnée pour le moment."
+    error: str | None = None
+    note: str = ""  # small text under the title (period, source)
+
+
+@dataclass(frozen=True)
+class Activity:
+    at: datetime | None
+    action: str
+    entity_type: str
+    label: str
+    actor: str
+
+
+@dataclass
+class DashboardCharts:
+    attendance: ChartData = field(default_factory=ChartData)
+    by_level: ChartData = field(default_factory=ChartData)
+    by_class: ChartData = field(default_factory=ChartData)
+    enrollment_trend: ChartData = field(default_factory=ChartData)
+    activity: list = field(default_factory=list)
+    activity_error: str | None = None

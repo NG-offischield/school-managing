@@ -12,6 +12,7 @@ All functions raise django.core.exceptions.ValidationError with a stable
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 
 from apps.audit.services import snapshot
 from common.permissions import ADMIN_ROLES, require_role
@@ -21,6 +22,7 @@ from .models import (
     AcademicYear,
     AcademicYearStatus,
     GradingScale,
+    Level,
     PedagogicalCategory,
     SchoolClass,
     Subject,
@@ -449,3 +451,213 @@ def set_class_active(school_class, active, *, actor):
             new=snapshot(school_class, CLASS_FIELDS),
         )
     return school_class
+
+
+# =============================================================================
+# Academic years administration (admin desktop: Gestion académique → Années)
+# =============================================================================
+# Life cycle: PLANNED --set_current--> ACTIVE (current) --close--> CLOSED.
+# A year is never deleted. Its name and dates may change while it is open,
+# as long as everything already dated inside it (periods, daily attendance,
+# teaching sessions) still fits. Closing freezes it: classes, enrollments,
+# courses and attendance of a closed year are refused by their services.
+# PostgreSQL keeps the hard rules (unique name, no overlap, one current year,
+# current = ACTIVE); the checks below give a clear message first.
+
+YEAR_FIELDS = ["name", "start_date", "end_date", "status", "is_current"]
+
+
+def _year_name(name):
+    name = (name or "").strip()
+    if not name:
+        raise ValidationError("A name is required.", code="name_required")
+    return name
+
+
+def _check_year_dates(school, start_date, end_date, exclude=None):
+    if start_date is None or end_date is None or end_date <= start_date:
+        raise ValidationError("The end date must be after the start date.", code="invalid_dates")
+    overlapping = AcademicYear.objects.filter(school=school, start_date__lte=end_date, end_date__gte=start_date)
+    if exclude is not None:
+        overlapping = overlapping.exclude(pk=exclude.pk)
+    other = overlapping.first()
+    if other is not None:
+        raise ValidationError(
+            f"These dates overlap the year {other.name}.", code="year_overlap", params={"year": other.name}
+        )
+
+
+def _unique_year_name(school, name, exclude=None):
+    duplicates = AcademicYear.objects.filter(school=school, name__iexact=name)
+    if exclude is not None:
+        duplicates = duplicates.exclude(pk=exclude.pk)
+    if duplicates.exists():
+        raise ValidationError(f"A year named {name} already exists.", code="duplicate_year_name")
+
+
+def _dated_content_outside(year, start_date, end_date):
+    """True if something already dated in `year` would fall outside the new range."""
+    from apps.attendance.models import StudentDailyAttendance
+    from apps.scheduling.models import TeachingSession
+
+    outside = Q(date__lt=start_date) | Q(date__gt=end_date)
+    return (
+        AcademicPeriod.objects.filter(academic_year=year)
+        .filter(Q(start_date__lt=start_date) | Q(end_date__gt=end_date))
+        .exists()
+        or StudentDailyAttendance.objects.filter(Q(academic_year=year) & outside).exists()
+        or TeachingSession.objects.filter(Q(academic_year=year) & outside).exists()
+    )
+
+
+def _require_open_year(year):
+    if year.status not in OPEN_YEAR_STATUSES:
+        raise ValidationError("This academic year is closed.", code="year_closed")
+
+
+@transaction.atomic
+def admin_create_year(school, *, actor, name, start_date, end_date):
+    """A new year starts PLANNED; it becomes ACTIVE when made current."""
+    require_role(actor, ADMIN_ROLES, school=school)
+    name = _year_name(name)
+    _check_year_dates(school, start_date, end_date)
+    _unique_year_name(school, name)
+    year = AcademicYear.objects.create(school=school, name=name, start_date=start_date, end_date=end_date)
+    _audit("ACADEMIC_YEAR_CREATED", actor, year, new=snapshot(year, YEAR_FIELDS))
+    return year
+
+
+@transaction.atomic
+def admin_update_year(year, *, actor, **changes):
+    """Editable while open: name, start_date, end_date."""
+    require_role(actor, ADMIN_ROLES, school=year.school)
+    year = AcademicYear.objects.select_for_update().get(pk=year.pk)
+    _require_open_year(year)
+    old = snapshot(year, YEAR_FIELDS)
+    if "name" in changes:
+        name = _year_name(changes["name"])
+        _unique_year_name(year.school, name, exclude=year)
+        year.name = name
+    start, end = changes.get("start_date", year.start_date), changes.get("end_date", year.end_date)
+    if (start, end) != (year.start_date, year.end_date):
+        _check_year_dates(year.school, start, end, exclude=year)
+        if _dated_content_outside(year, start, end):
+            raise ValidationError(
+                "Periods, attendance or sessions of this year would fall outside the new dates.",
+                code="year_content_outside_dates",
+            )
+        year.start_date, year.end_date = start, end
+    year.save()
+    _audit("ACADEMIC_YEAR_UPDATED", actor, year, old=old, new=snapshot(year, YEAR_FIELDS))
+    return year
+
+
+@transaction.atomic
+def admin_set_current_year(year, *, actor):
+    """Make `year` the current year (and ACTIVE); the previous current year
+    stays ACTIVE but is no longer the default one of the screens."""
+    require_role(actor, ADMIN_ROLES, school=year.school)
+    year = AcademicYear.objects.select_for_update().get(pk=year.pk)
+    old = snapshot(year, YEAR_FIELDS)
+    year = set_current_year(year)
+    _audit("ACADEMIC_YEAR_SET_CURRENT", actor, year, old=old, new=snapshot(year, YEAR_FIELDS))
+    return year
+
+
+@transaction.atomic
+def admin_close_year(year, *, actor):
+    """CLOSED is final from the desktop. Refused (409) while the year is the
+    current one (make the next year current first) or while pupils are still
+    actively enrolled in it (record their end-of-year decisions first)."""
+    require_role(actor, ADMIN_ROLES, school=year.school)
+    year = AcademicYear.objects.select_for_update().get(pk=year.pk)
+    _require_open_year(year)
+    if year.is_current:
+        raise ValidationError("The current year cannot be closed.", code="year_is_current")
+    from apps.people.models import EnrollmentStatus
+
+    if year.enrollments.filter(status=EnrollmentStatus.ACTIVE).exists():
+        raise ValidationError("Pupils are still actively enrolled in this year.", code="year_has_active_enrollments")
+    old = snapshot(year, YEAR_FIELDS)
+    year.status = AcademicYearStatus.CLOSED
+    year.save(update_fields=["status", "updated_at"])
+    _audit("ACADEMIC_YEAR_CLOSED", actor, year, old=old, new=snapshot(year, YEAR_FIELDS))
+    return year
+
+
+# =============================================================================
+# Levels administration (admin desktop: Gestion académique → Niveaux)
+# =============================================================================
+# `code` is the stable identifier (imports, compatibility rules): set at
+# creation, never changed. A level is deactivated, never deleted; it cannot be
+# deactivated while an active class of an open year still uses it.
+
+LEVEL_FIELDS = ["code", "name", "cycle", "order_index", "first_character", "active", "public_visible"]
+
+
+def _level_name(name):
+    name = (name or "").strip()
+    if not name:
+        raise ValidationError("A name is required.", code="name_required")
+    return name
+
+
+@transaction.atomic
+def create_level(school, *, actor, code, name, cycle="", order_index=0, first_character=None, public_visible=False):
+    require_role(actor, ADMIN_ROLES, school=school)
+    code = _normalise_code(code)
+    name = _level_name(name)
+    if Level.objects.filter(school=school, code=code).exists():
+        raise ValidationError(f"The code {code} is already used.", code="duplicate_code")
+    level = Level.objects.create(
+        school=school,
+        code=code,
+        name=name,
+        cycle=(cycle or "").strip(),
+        order_index=order_index or 0,
+        first_character=(first_character or "").strip() or None,
+        public_visible=bool(public_visible),
+    )
+    _audit("LEVEL_CREATED", actor, level, new=snapshot(level, LEVEL_FIELDS))
+    return level
+
+
+@transaction.atomic
+def update_level(level, *, actor, **changes):
+    """Editable: name, cycle, order_index, first_character, public_visible."""
+    require_role(actor, ADMIN_ROLES, school=level.school)
+    level = Level.objects.select_for_update().get(pk=level.pk)
+    if "code" in changes and _normalise_code(changes["code"]) != level.code:
+        raise ValidationError("The code cannot be changed.", code="code_immutable")
+    old = snapshot(level, LEVEL_FIELDS)
+    if "name" in changes:
+        level.name = _level_name(changes["name"])
+    if "cycle" in changes:
+        level.cycle = (changes["cycle"] or "").strip()
+    if "order_index" in changes:
+        level.order_index = changes["order_index"] or 0
+    if "first_character" in changes:
+        level.first_character = (changes["first_character"] or "").strip() or None
+    if "public_visible" in changes:
+        level.public_visible = bool(changes["public_visible"])
+    level.save()
+    _audit("LEVEL_UPDATED", actor, level, old=old, new=snapshot(level, LEVEL_FIELDS))
+    return level
+
+
+@transaction.atomic
+def set_level_active(level, active, *, actor):
+    """Deactivation refused (409 level_in_use) while an active class of an
+    open (planned / current) year still uses the level."""
+    require_role(actor, ADMIN_ROLES, school=level.school)
+    level = Level.objects.select_for_update().get(pk=level.pk)
+    in_use = SchoolClass.objects.filter(level=level, active=True, academic_year__status__in=OPEN_YEAR_STATUSES)
+    if not active and in_use.exists():
+        raise ValidationError("Active classes of an open year still use this level.", code="level_in_use")
+    if level.active != active:
+        old = snapshot(level, LEVEL_FIELDS)
+        level.active = active
+        level.save(update_fields=["active", "updated_at"])
+        action = "LEVEL_ACTIVATED" if active else "LEVEL_DEACTIVATED"
+        _audit(action, actor, level, old=old, new=snapshot(level, LEVEL_FIELDS))
+    return level

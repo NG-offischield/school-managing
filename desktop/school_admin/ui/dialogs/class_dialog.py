@@ -1,6 +1,7 @@
-"""Add / edit a class. Order: Nom, Année scolaire, Niveau, Salle principale,
-Capacité, Options. Year, level and room are picked from lists provided by the
-API (never free text); the year is fixed once the class exists."""
+"""Add / edit a class. Rows: Nom | Capacité, Année scolaire | Niveau,
+Salle principale, Options (two columns, one on a narrow screen). Year,
+level and room are picked from lists provided by the API (never free
+text); the year is fixed once the class exists."""
 
 from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import QCheckBox, QComboBox, QLineEdit
@@ -35,13 +36,20 @@ class ClassDialog(FormDialog):
             "Nom",
             QLineEdit(placeholderText="Ex. 6e A", maxLength=80),
             required=True,
+            width="medium",
             help_text="Unique dans l'année scolaire (ex. 6e A, Tle C2).",
+        )
+        capacity = QLineEdit(placeholderText="Ex. 40", maxLength=3)
+        capacity.setValidator(QIntValidator(1, 500, capacity))
+        self.capacity = self.add_field(
+            "capacity", "Capacité (élèves)", capacity, width="short", beside=True, help_text="Facultatif."
         )
         self.academic_year = self.add_field(
             "academic_year",
             "Année scolaire",
-            _combo(CHOOSE_YEAR, years),
+            _combo(CHOOSE_YEAR, years, lambda year: year.short_label),
             required=True,
+            width="medium",
             help_text="L'année d'une classe ne change plus après sa création."
             if editing
             else ("Années planifiées ou en cours." if years else "Aucune année ouverte : créez d'abord l'année."),
@@ -51,17 +59,17 @@ class ClassDialog(FormDialog):
             "Niveau",
             _combo(CHOOSE_LEVEL, levels),
             required=True,
+            width="medium",
+            beside=True,
             help_text="Seuls les niveaux actifs sont proposés." if levels else "Aucun niveau actif.",
         )
         self.main_room = self.add_field(
             "main_room",
             "Salle principale",
             _combo(NO_ROOM, rooms),
+            width="medium",
             help_text="Facultatif : salle par défaut des cours théoriques de la classe.",
         )
-        capacity = QLineEdit(placeholderText="Facultatif, ex. 40", maxLength=3)
-        capacity.setValidator(QIntValidator(1, 500, capacity))
-        self.capacity = self.add_field("capacity", "Capacité (élèves)", capacity, help_text="Nombre maximal d'élèves.")
         self.public_visible = self.add_field("options", "Options", QCheckBox("Visible sur le site public de l'école"))
 
         if editing:

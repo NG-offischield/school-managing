@@ -15,6 +15,8 @@ class NavEntry:
 
 NAVIGATION = [
     NavEntry("dashboard", "Tableau de bord"),
+    NavEntry("years", "Années scolaires", "Gestion académique"),
+    NavEntry("levels", "Niveaux", "Gestion académique"),
     NavEntry("categories", "Catégories pédagogiques", "Gestion académique"),
     NavEntry("subjects", "Matières", "Gestion académique"),
     NavEntry("classes", "Classes", "Gestion académique"),

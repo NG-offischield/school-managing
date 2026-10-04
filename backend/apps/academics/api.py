@@ -1,9 +1,9 @@
 """Read-only endpoints of the academic structure (spec §6.4, §6.6).
 
 Who can read: every ACTIVE member of the school. These are catalogues
-(years, periods, levels, scales; classes: class_api.py) that every role
-needs to display its own screens; they contain no personal data. Writes go
-through services (admin desktop phase).
+(periods, scales) that every role needs to display its own screens; they
+contain no personal data. Years and levels (with their admin writes) live
+in structure_api.py, classes in class_api.py.
 """
 
 from django.urls import path
@@ -11,13 +11,7 @@ from rest_framework import generics, serializers
 
 from common.views import SchoolScopedMixin
 
-from .models import AcademicPeriod, AcademicYear, GradingScale, Level
-
-
-class AcademicYearSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = AcademicYear
-        fields = ["id", "name", "start_date", "end_date", "status", "is_current"]
+from .models import AcademicPeriod, GradingScale
 
 
 class AcademicPeriodSerializer(serializers.ModelSerializer):
@@ -36,12 +30,6 @@ class AcademicPeriodSerializer(serializers.ModelSerializer):
         ]
 
 
-class LevelSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Level
-        fields = ["id", "code", "name", "cycle", "order_index", "first_character", "active"]
-
-
 class GradingScaleSerializer(serializers.ModelSerializer):
     class Meta:
         model = GradingScale
@@ -51,16 +39,6 @@ class GradingScaleSerializer(serializers.ModelSerializer):
 class GradingScaleList(SchoolScopedMixin, generics.ListAPIView):
     queryset = GradingScale.objects.all()
     serializer_class = GradingScaleSerializer
-
-
-class AcademicYearList(SchoolScopedMixin, generics.ListAPIView):
-    queryset = AcademicYear.objects.all()
-    serializer_class = AcademicYearSerializer
-
-
-class AcademicYearDetail(SchoolScopedMixin, generics.RetrieveAPIView):
-    queryset = AcademicYear.objects.all()
-    serializer_class = AcademicYearSerializer
 
 
 class AcademicPeriodList(SchoolScopedMixin, generics.ListAPIView):
@@ -74,15 +52,7 @@ class AcademicPeriodList(SchoolScopedMixin, generics.ListAPIView):
         return queryset.filter(academic_year_id=year) if year else queryset
 
 
-class LevelList(SchoolScopedMixin, generics.ListAPIView):
-    queryset = Level.objects.all()
-    serializer_class = LevelSerializer
-
-
 urlpatterns = [
-    path("academic-years/", AcademicYearList.as_view(), name="academic-years"),
-    path("academic-years/<uuid:pk>/", AcademicYearDetail.as_view(), name="academic-year"),
     path("academic-periods/", AcademicPeriodList.as_view(), name="academic-periods"),
-    path("levels/", LevelList.as_view(), name="levels"),
     path("grading-scales/", GradingScaleList.as_view(), name="grading-scales"),
 ]

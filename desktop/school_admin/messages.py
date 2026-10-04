@@ -20,6 +20,20 @@ RULE_MESSAGES = {
     "room_inactive": "Cette salle est inactive : choisissez une salle active.",
     "room_capacity_exceeded": "La salle est trop petite pour les élèves inscrits dans la classe.",
     "name_required": "Le nom est obligatoire.",
+    "academic_year_required": "Choisissez une année scolaire.",
+    "duplicate_year_name": "Une année scolaire porte déjà ce nom : choisissez-en un autre.",
+    "year_overlap": "Ces dates chevauchent une autre année scolaire de l'école : ajustez le début ou la fin.",
+    "invalid_dates": "La date de fin doit être postérieure à la date de début.",
+    "year_is_current": (
+        "L'année courante ne peut pas être clôturée : définissez d'abord une autre année comme courante."
+    ),
+    "year_has_active_enrollments": (
+        "Des élèves sont encore inscrits dans cette année : enregistrez d'abord les décisions de fin d'année."
+    ),
+    "year_content_outside_dates": (
+        "Des périodes, présences ou séances de cette année tomberaient hors des nouvelles dates."
+    ),
+    "level_in_use": "Des classes actives d'une année ouverte utilisent ce niveau : il ne peut pas être désactivé.",
 }
 
 

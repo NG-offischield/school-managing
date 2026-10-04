@@ -30,6 +30,13 @@ CONFLICT_RULES = {
     "duplicate_class_name",
     "class_in_use",
     "class_year_immutable",
+    # academic years and levels (ADR 0017)
+    "duplicate_year_name",
+    "year_overlap",
+    "year_is_current",
+    "year_has_active_enrollments",
+    "year_content_outside_dates",
+    "level_in_use",
     "category_in_use",
     "subject_in_use",
     # planning (ADR 0012)

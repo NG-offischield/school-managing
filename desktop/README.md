@@ -44,7 +44,13 @@ Utilisez le SUPER_ADMIN créé par `manage.py bootstrap_school` (sur la base de 
 .venv\Scripts\python -m ruff check .
 ```
 
-Le test de bout en bout contre un vrai backend est optionnel. Il crée une catégorie et une matière :
+Le test de bout en bout contre un vrai backend est optionnel. Il crée :
+
+- une catégorie et une matière ;
+- une année lointaine (rendue courante, puis l'ancienne courante est rétablie et l'année de test clôturée) ;
+- un niveau et une classe.
+
+À lancer contre un backend de **test** :
 
 ```powershell
 $env:SCHOOL_ADMIN_E2E_URL = "http://127.0.0.1:8000/api/v1/"
@@ -63,8 +69,10 @@ school_admin/
                        erreurs typées 400/401/403/404/409/429/5xx, hors ligne, délai dépassé
   auth/                connexion / rafraîchissement / déconnexion via /auth/* (jetons du backend),
                        identifiant d'installation, coffre du système pour « rester connecté »
-  models.py            objets de données (Identity, Category, Subject, Metric)
-  services/            catalogue (catégories, matières), classes + listes de référence (années, niveaux, salles), tableau de bord (indicateurs réels de l'API)
+  models.py            objets de données (Identity, Category, Subject, AcademicYear, Level, SchoolClass,
+                       Metric, ChartData…)
+  services/            catalogue (catégories, matières), années et niveaux (structure.py), classes et
+                       listes de référence, tableau de bord (indicateurs et séries réels de l'API)
   ui/                  écran de connexion, shell (barre latérale, en-tête), pages, dialogues,
                        exécution des appels hors du fil d'affichage, messages d'erreur uniformes
 ```
@@ -78,7 +86,21 @@ school_admin/
 
 Rôles de boutons : `primary` (Ajouter, Enregistrer), `secondary` (Annuler, Actualiser, Modifier), `danger` (Désactiver).
 
-Composants partagés dans `ui/widgets.py` : `button()`, `FormDialog`, `ConfirmDialog`, `Banner`.
+Composants partagés dans `ui/widgets.py` : `button()`, `FormDialog`, `ConfirmDialog`, `Banner`. Graphiques du tableau de bord dans `ui/charts.py` (QPainter, couleurs du thème) :
+
+- `LineChart` et `BarChart` ;
+- `ChartCard`, avec quatre états : chargement, données, aucune donnée, erreur ;
+- `ActivityCard`.
+
+### Règle obligatoire : dialogues et petits écrans
+
+Aucun dialogue ne doit sortir de l'écran. L'application reste utilisable en 1366×768, en 1280×720 et en 1024×768. Tout dialogue passe par `FormDialog` (ADR 0017 §5) :
+
+- **Structure :** en-tête fixe, formulaire **défilant**, pied fixe (« * champ obligatoire », raison d'un bouton désactivé, Annuler / Enregistrer toujours visibles).
+- **Champs :** `add_field(..., width="short" | "medium" | "long", beside=True)`. La largeur dépend de la donnée. Les champs côte à côte repassent sur une colonne quand le dialogue est étroit.
+- **Clavier :** Tab parcourt les champs et fait défiler le formulaire ; Entrée enregistre ; Échap ferme.
+
+Avant tout nouveau dialogue, posez-vous la question : « Peut-il être entièrement utilisé sur un écran 1280×720 ? ». Le test `tests/test_responsive.py` doit couvrir chaque nouveau dialogue.
 
 Captures des vrais écrans contre un backend (revue visuelle) :
 
@@ -87,7 +109,7 @@ $env:QT_QPA_FONTDIR = "C:/Windows/Fonts"
 .venv\Scripts\python tools\capture_screens.py C:\temp\captures 1366x768 1920x1080
 ```
 
-L'outil utilise les mêmes variables `SCHOOL_ADMIN_E2E_*` que le test de bout en bout. Il crée une catégorie et une matière.
+L'outil utilise les mêmes variables `SCHOOL_ADMIN_E2E_*` que le test de bout en bout. Il crée une catégorie, une matière et une classe ; les années, les niveaux et le tableau de bord sont seulement affichés.
 
 ## Sécurité
 
