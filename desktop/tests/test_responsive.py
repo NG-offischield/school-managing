@@ -6,6 +6,7 @@ keyboard), the form scrolls instead of growing, fields have a width that
 matches their data, side-by-side fields stack when the dialog is narrow."""
 
 from datetime import date, datetime
+from decimal import Decimal
 
 import pytest
 from PySide6.QtCore import QSize, Qt
@@ -17,7 +18,11 @@ from school_admin.models import (
     Category,
     Course,
     Enrollment,
+    FeeType,
+    Invoice,
     Level,
+    Payment,
+    Payroll,
     Qualification,
     Room,
     SchoolBreak,
@@ -28,11 +33,27 @@ from school_admin.models import (
     Subject,
     Teacher,
     UnavailabilityRequest,
+    Wallet,
 )
 from school_admin.ui.dialogs.category_dialog import CategoryDialog
 from school_admin.ui.dialogs.class_dialog import ClassDialog
 from school_admin.ui.dialogs.course_dialogs import CourseDialog, CourseRecordDialog
+from school_admin.ui.dialogs.finance_dialogs import (
+    FeeTypeDialog,
+    InvoiceDetailDialog,
+    InvoiceDialog,
+    PaymentDetailDialog,
+    PaymentDialog,
+    RefundDialog,
+)
 from school_admin.ui.dialogs.level_dialog import LevelDialog
+from school_admin.ui.dialogs.payroll_dialogs import (
+    AdjustmentDialog,
+    PayDialog,
+    PayrollDetailDialog,
+    PeriodDialog,
+    TeacherPayDialog,
+)
 from school_admin.ui.dialogs.planning_dialogs import (
     BreakDialog,
     DecisionDialog,
@@ -156,6 +177,99 @@ SESSION = Session(
 REQUEST = UnavailabilityRequest("u1", "t1", date(2026, 3, 2), "08:00", "12:00", "Rendez-vous médical " * 4, "PENDING")
 BREAK = SchoolBreak("b1", "y1", "Vacances de Pâques", datetime(2026, 4, 6), datetime(2026, 4, 20), "HOLIDAY", True)
 
+FEE_TYPES = [FeeType("f1", "SCOL", "Scolarité annuelle du premier cycle")]
+WALLETS = [
+    Wallet.from_api(
+        {
+            "id": "w1",
+            "owner": "m1",
+            "owner_name": "Ada Admin",
+            "provider_code": "FAKE_ORANGE",
+            "wallet_identifier": "690000001",
+            "balance": "50000.00",
+            "currency": "XAF",
+            "status": "ACTIVE",
+        }
+    )
+]
+INVOICE = Invoice.from_api(
+    {
+        "id": "i1",
+        "invoice_number": "F25-000001",
+        "student": "s1",
+        "student_name": "Awa Ndiaye",
+        "issue_date": "2025-09-15",
+        "due_date": "2025-10-15",
+        "status": "ISSUED",
+        "total_amount": "60000.00",
+        "amount_paid": "0.00",
+        "balance_due": "60000.00",
+        "currency": "XAF",
+        "lines": [{"description": "Scolarité", "total": "60000.00"}] * 4,
+    }
+)
+PAYMENT = Payment.from_api(
+    {
+        "id": "p1",
+        "payment_reference": "PAY-000001",
+        "student": "s1",
+        "student_name": "Awa Ndiaye",
+        "amount": "60000.00",
+        "refunded_amount": "10000.00",
+        "currency": "XAF",
+        "payment_method": "CASH",
+        "provider": "CASH",
+        "status": "PARTIALLY_REFUNDED",
+        "initiated_at": "2026-03-04T10:00:00+01:00",
+        "completed_at": "2026-03-04T10:00:01+01:00",
+        "allocations": [{"invoice_number": "F25-000001", "amount": "60000.00"}],
+        "refunds": [
+            {
+                "id": "r1",
+                "amount": "10000.00",
+                "reason": "Trop perçu " * 6,
+                "status": "COMPLETED",
+                "completed_at": "2026-03-05T10:00:00+01:00",
+            }
+        ],
+    }
+)
+LINE = {
+    "version": 1,
+    "kind": "EARNED",
+    "session_date": "2025-10-06",
+    "duration_minutes": 120,
+    "rate": "5000.00",
+    "amount": "5000.00",
+}
+PAYROLL = Payroll.from_api(
+    {
+        "id": "pr1",
+        "kind": "TEACHER",
+        "employee": "e1",
+        "employee_name": "Jean Mbarga",
+        "period": "p1",
+        "period_name": "Octobre 2025",
+        "status": "CALCULATED",
+        "version": 2,
+        "adjustments_amount": "5000.00",
+        "payable_amount": "15000.00",
+        "currency": "XAF",
+        "programmed_amount": "20000.00",
+        "earned_amount": "10000.00",
+        "lines": [LINE] * 12,
+        "reconstructible": False,
+    }
+)
+
+
+def _no_search(text, done):
+    done([("s1", "Ndiaye Awa (MAT-001)")])
+
+
+def _obligations(student_id, done):
+    done([INVOICE] * 6)
+
 
 class StubTeachers:
     """Answers of the API for the qualifications dialog (layout tests only)."""
@@ -200,6 +314,26 @@ DIALOGS = {
     "salle principale": lambda: MainRoomDialog(CLASSES, ROOMS),
     "indisponibilité": lambda: DecisionDialog(REQUEST, "Mbarga Jean", [SESSION] * 6),
     "interruption": lambda: BreakDialog(YEARS, school_break=BREAK),
+    "paiement": lambda: PaymentDialog(
+        FEE_TYPES, WALLETS, _no_search, _obligations, student=("s1", "Awa"), invoice="i1"
+    ),
+    "remboursement": lambda: RefundDialog(PAYMENT),
+    "facture": lambda: InvoiceDialog(FEE_TYPES, _no_search),
+    "motif de frais": lambda: FeeTypeDialog(),
+    "détail paiement": lambda: PaymentDetailDialog(PAYMENT, can_refund=True),
+    "détail facture": lambda: InvoiceDetailDialog(INVOICE),
+    "période de paie": lambda: PeriodDialog(YEARS),
+    "versement": lambda: PayDialog(PAYROLL, WALLETS),
+    "détail paie": lambda: PayrollDetailDialog(PAYROLL),
+    "correction": lambda: AdjustmentDialog([("e1", "Mbarga Jean (ENS-001)")]),
+    "rémunération": lambda: TeacherPayDialog(
+        TEACHER,
+        {"programmed_amount": Decimal("20000"), "earned_unpaid_amount": Decimal("10000"), "paid_amount": Decimal("0")},
+        [PAYROLL] * 5,
+        2,
+        date(2025, 9, 1),
+        date(2026, 7, 31),
+    ),
     "confirmation": lambda: ConfirmDialog("Désactiver ?", "Texte explicatif " * 20, danger=True),
 }
 SCREENS = [QSize(1366, 768), QSize(1280, 720), QSize(1024, 768), QSize(800, 480)]
@@ -390,4 +524,12 @@ def test_slot_form_scrolls_with_buttons_always_visible(qapp):
     on_screen(dialog, QSize(800, 480))
     assert inside(dialog.save_button, dialog) and inside(dialog.cancel_button, dialog)
     assert dialog.start_time.width() <= FIELD_WIDTHS["short"] and dialog.end_time.width() <= FIELD_WIDTHS["short"]
+    dialog.close()
+
+
+def test_payment_form_scrolls_with_buttons_always_visible(qapp):
+    dialog = PaymentDialog(FEE_TYPES, WALLETS, _no_search, _obligations, student=("s1", "Awa"), invoice="i1")
+    on_screen(dialog, QSize(800, 480))
+    assert inside(dialog.save_button, dialog) and inside(dialog.cancel_button, dialog)
+    assert dialog.amount.width() <= FIELD_WIDTHS["short"]
     dialog.close()

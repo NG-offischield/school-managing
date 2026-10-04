@@ -11,12 +11,14 @@ Indicators (cards):
     changements          GET /planning/changes/?date_from=today-6       7 derniers jours
     présence (jour)      GET /admin/attendance/dashboard/?date=today    counts
     encaissements        GET /admin/finance/dashboard/                  net_collected, outstanding
+    paies versées        GET /admin/payroll/                            approved amounts of PAID payrolls
 
 Charts (backend core/dashboard_api.py, ADR 0017):
     présences            GET /admin/dashboard/attendance-trend/?days=14
     élèves par niveau,
     par classe, effectifs GET /admin/dashboard/enrollments/
     activité récente     GET /admin/dashboard/activity/?limit=8
+    finances             GET /admin/finance/dashboard/ payments_by_status, GET /admin/payroll/ (counts)
 
 Each indicator and each chart is loaded on its own: one failing source
 shows "Indisponible" with the reason instead of breaking the whole page.
@@ -25,11 +27,20 @@ Authentication errors still propagate (-> login).
 """
 
 from datetime import date, datetime, timedelta
-from decimal import Decimal, InvalidOperation
 
 from ..api.errors import ApiError, NetworkError, Unauthorized
 from ..messages import explain
-from ..models import Activity, ChartData, DashboardCharts, DashboardData, Metric, Point
+from ..models import (
+    PAYMENT_STATUSES,
+    PAYROLL_STATUSES,
+    Activity,
+    ChartData,
+    DashboardCharts,
+    DashboardData,
+    Metric,
+    Point,
+)
+from ..money import ZERO, format_money, to_decimal
 
 ATTENDANCE_LABELS = {"PRESENT": "présents", "LATE": "retards", "ABSENT": "absents", "EXCUSED": "excusés"}
 TREND_DAYS = 14
@@ -80,15 +91,7 @@ ACTIVITY_LABELS = {
 }
 
 
-def money(amount, currency):
-    """'1250000.00', 'XAF' -> '1 250 000 XAF' (no decimals when there are none)."""
-    try:
-        value = Decimal(str(amount))
-    except (InvalidOperation, TypeError):
-        return f"{amount} {currency}".strip()
-    text = f"{value:,.0f}" if value == value.to_integral() else f"{value:,.2f}"
-    text = text.replace(",", " ").replace(".", ",")
-    return f"{text} {currency}".strip()
+money = format_money  # '1250000.00', 'XAF' -> '1 250 000 XAF'
 
 
 def relative_time(moment, now=None):
@@ -202,6 +205,7 @@ class DashboardService:
             ),
             self._metric("Présence aujourd'hui", lambda: self._attendance(today), f"{today:%d/%m/%Y}"),
             self._metric("Encaissements", self._finance, "net des remboursements"),
+            self._metric("Paies versées", self._payroll, ""),
         ]
         return data
 
@@ -245,9 +249,20 @@ class DashboardService:
             hint += f" · {_plural(overdue, 'facture')} en retard"
         return money(data.get("net_collected", 0), currency), hint
 
+    def _payroll(self):
+        """Sum (Decimal) of the approved amounts of the PAID payrolls, as stored by the server."""
+        rows = self.api.get("admin/payroll/") or []
+        paid = [r for r in rows if r.get("status") == "PAID"]
+        waiting = sum(1 for r in rows if r.get("status") == "APPROVED")
+        currency = next((r.get("currency") for r in rows if r.get("currency")), "")
+        total = sum((to_decimal(r.get("approved_amount")) or ZERO for r in paid), ZERO)
+        return money(total, currency), f"{_plural(len(paid), 'paie')} payée(s) · {waiting} approuvée(s) à payer"
+
     # --- charts ---------------------------------------------------------------------
     def load_charts(self):
         charts = DashboardCharts()
+        charts.payments = self._chart(self._payments_by_status)
+        charts.payrolls = self._chart(self._payrolls_by_status)
         charts.attendance = self._chart(self._attendance_trend)
         enrollments = self._chart(lambda: self.api.get("admin/dashboard/enrollments/"))
         if isinstance(enrollments, ChartData):  # the API failed: the three charts say why
@@ -270,6 +285,28 @@ class DashboardService:
         except ApiError as exc:
             charts.activity_error = explain(exc)
         return charts
+
+    def _payments_by_status(self):
+        counts = self.api.get("admin/finance/dashboard/").get("payments_by_status") or {}
+        points = [
+            Point(label, (counts[code],), f"{label} : {_plural(counts[code], 'paiement')}")
+            for code, label in PAYMENT_STATUSES.items()
+            if counts.get(code)
+        ]
+        return ChartData(
+            series=("Paiements",), points=points, note="Nombre de paiements par résultat", empty_text="Aucun paiement."
+        )
+
+    def _payrolls_by_status(self):
+        rows = self.api.get("admin/payroll/") or []
+        points = []
+        for code, label in PAYROLL_STATUSES.items():
+            count = sum(1 for r in rows if r.get("status") == code)
+            if count:
+                points.append(Point(label, (count,), f"{label} : {_plural(count, 'paie')}"))
+        return ChartData(
+            series=("Paies",), points=points, note="Nombre de paies par étape", empty_text="Aucune paie calculée."
+        )
 
     def _attendance_trend(self):
         data = self.api.get("admin/dashboard/attendance-trend/", days=TREND_DAYS)

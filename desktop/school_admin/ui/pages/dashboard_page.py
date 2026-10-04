@@ -84,8 +84,9 @@ class DashboardPage(Page):
             "Répartition des élèves", [("Par niveau", BarChart()), ("Par classe", BarChart())]
         )
         self.trend_card = ChartCard("Évolution des effectifs", [("Effectifs", LineChart())])
+        self.finance_card = ChartCard("Finances", [("Paiements", BarChart()), ("Paies", BarChart())])
         self.activity_card = ActivityCard()
-        self.chart_cards = [self.attendance_card, self.enrollment_card, self.trend_card]
+        self.chart_cards = [self.attendance_card, self.enrollment_card, self.trend_card, self.finance_card]
         self.chart_grid = QGridLayout()
         self.chart_grid.setSpacing(16)
         column.addLayout(self.chart_grid)
@@ -154,6 +155,7 @@ class DashboardPage(Page):
         self.attendance_card.set_data(charts.attendance)
         self.enrollment_card.set_data(charts.by_level, charts.by_class)
         self.trend_card.set_data(charts.enrollment_trend)
+        self.finance_card.set_data(charts.payments, charts.payrolls)
         if charts.activity_error:
             self.activity_card.set_error(charts.activity_error)
         else:

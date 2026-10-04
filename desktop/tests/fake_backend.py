@@ -11,6 +11,8 @@ import uuid
 
 import httpx
 
+from .fake_finance import FinanceFake
+
 PASSWORD = "correct-horse-test"
 
 
@@ -25,9 +27,10 @@ def fail(status, code, message, details=None):
     return httpx.Response(status, json={"success": False, "error": error})
 
 
-class FakeBackend:
+class FakeBackend(FinanceFake):
     def __init__(self, *, roles=("SUPER_ADMIN",)):
         self.roles = list(roles)
+        self.init_finance()
         self.sessions = {}  # access token -> refresh token
         self.refresh_tokens = set()
         self.revoked = set()
@@ -528,6 +531,7 @@ class FakeBackend:
             "subjects": sorted(self.subjects[q["subject"]]["code"] for q in live),
             "active": row["professional_status"] == "ACTIVE" and row["employment_status"] == "ACTIVE",
             "account_activated": False,
+            "employee": f"emp-{row['id']}",
             "active_course_count": 2 if row["id"] in self.teachers_in_use else 0,
             "upcoming_session_count": 0,
         }
@@ -1566,7 +1570,11 @@ class FakeBackend:
             or path in ("admin/dashboard/teachers/", "admin/payroll/teacher-rates/")
         ):
             return self._teachers(request, path, body, admin)
-        if path.startswith("admin/dashboard/") or path == "admin/finance/dashboard/":
+        if path.startswith("finance/") or path.startswith("admin/finance/"):
+            return self._finance(request, path, body, admin)
+        if path.startswith("admin/payroll/"):
+            return self._payroll(request, path, body, admin)
+        if path.startswith("admin/dashboard/"):
             return self._dashboard(request, path, admin)
         if path == "rooms/":
             rows = self._filter(list(self.rooms.values()), request)

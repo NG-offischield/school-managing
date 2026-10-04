@@ -13,6 +13,8 @@ from ..services.catalog import CategoryService, SubjectService
 from ..services.classes import ClassService, ReferenceService
 from ..services.courses import CourseService
 from ..services.dashboard import DashboardService
+from ..services.finance import FinanceService
+from ..services.payroll import PayrollService
 from ..services.planning import PlanningService
 from ..services.structure import LevelService, YearService
 from ..services.students import StudentService
@@ -24,6 +26,8 @@ from .pages.catalog_pages import CategoriesPage, SubjectsPage
 from .pages.classes_page import ClassesPage
 from .pages.courses_page import CoursesPage
 from .pages.dashboard_page import DashboardPage
+from .pages.finance_page import FinancePage
+from .pages.payroll_page import PayrollPage
 from .pages.planning_page import PlanningPage
 from .pages.structure_pages import LevelsPage, YearsPage
 from .pages.students_page import StudentsPage
@@ -47,6 +51,8 @@ class AppController:
         self.teachers = TeacherService(api)
         self.courses = CourseService(api)
         self.planning = PlanningService(api)
+        self.finance = FinanceService(api)
+        self.payroll = PayrollService(api)
         self.login_window = LoginWindow(auth, runner, config)
         self.login_window.logged_in.connect(self.show_shell)
         self.main_window = None
@@ -71,6 +77,7 @@ class AppController:
                 self.subjects,
                 self.references,
                 self.runner,
+                payroll=self.payroll,
                 **options.get("teachers", {}),
             ),
             "planning": lambda: PlanningPage(
@@ -81,6 +88,15 @@ class AppController:
                 self.courses,
                 self.runner,
                 **options.get("planning", {}),
+            ),
+            "finance": lambda: FinancePage(self.finance, self.runner, **options.get("finance", {})),
+            "payroll": lambda: PayrollPage(
+                self.payroll,
+                self.finance,
+                self.references,
+                self.teachers,
+                self.runner,
+                **options.get("payroll", {}),
             ),
             "courses": lambda: CoursesPage(
                 self.courses, self.subjects, self.references, self.runner, **options.get("courses", {})

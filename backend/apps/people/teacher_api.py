@@ -66,6 +66,7 @@ def _ref(obj, *extra):
 
 class TeacherAdminSerializer(serializers.ModelSerializer):
     teacher_number = serializers.CharField(source="employee.employee_number", read_only=True)
+    employee = serializers.UUIDField(source="employee_id", read_only=True)  # payroll / remuneration
     first_name = serializers.CharField(source="employee.membership.user.first_name", read_only=True)
     last_name = serializers.CharField(source="employee.membership.user.last_name", read_only=True)
     email = serializers.CharField(source="employee.membership.user.email", read_only=True)
@@ -83,6 +84,7 @@ class TeacherAdminSerializer(serializers.ModelSerializer):
         model = TeacherProfile
         fields = [
             "id",
+            "employee",
             "teacher_number",
             "first_name",
             "last_name",

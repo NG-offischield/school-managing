@@ -552,7 +552,7 @@ class TeacherRecordDialog(FormDialog):
     """Read-only record; its buttons close it with `action` = "edit" or
     "qualifications" (the page then runs the action)."""
 
-    def __init__(self, teacher, qualifications, rates, parent=None):
+    def __init__(self, teacher, qualifications, rates, parent=None, *, with_remuneration=False):
         super().__init__(f"Fiche de l'enseignant — {teacher.name}", "", parent, save_text="Fermer", width=640)
         self.action = None
         self.cancel_button.hide()
@@ -626,6 +626,10 @@ class TeacherRecordDialog(FormDialog):
             if current
             else QLabel("Aucun taux de vacation défini.", objectName="help")
         )
+        self.remuneration_button = None
+        if with_remuneration:
+            self.remuneration_button = self._action("Rémunération et paies…", "remuneration")
+            self.body.addWidget(self.remuneration_button, 0, Qt.AlignLeft)
         self.add_section("Compte")
         self.body.addWidget(
             QLabel(

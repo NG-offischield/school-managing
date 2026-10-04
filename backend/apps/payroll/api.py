@@ -4,12 +4,12 @@ Administration (PySide6) — ADMIN / SUPER_ADMIN of the school:
     GET/POST /admin/payroll/periods/            GET /admin/payroll/periods/{id}/
     POST     /admin/payroll/periods/{id}/close/
     POST     /admin/payroll/calculate/          {period}  prepare / re-prepare (idempotent)
-    GET      /admin/payroll/                    (?period=, ?status=, ?kind=TEACHER|STAFF)
+    GET      /admin/payroll/                    (?period=, ?status=, ?kind=TEACHER|STAFF, ?employee=)
     GET      /admin/payroll/{id}/               lines of every version, settlements, reconstructible
     POST     /admin/payroll/{id}/approve/ | /pay/ {payout_method, wallet?} | /cancel/ {reason}
     GET/POST /admin/payroll/teacher-rates/      GET/POST /admin/payroll/staff-salaries/
     GET/POST /admin/payroll/adjustments/        corrections
-    GET      /admin/payroll/check-ins/          (?status=PENDING|VALIDATED|REJECTED)
+    GET      /admin/payroll/check-ins/          (?status=PENDING|VALIDATED|REJECTED, ?teacher=)
     POST     /admin/sessions/{id}/validate/     POST /admin/sessions/{id}/reject/ {reason}
     GET      /admin/payroll/remuneration/?employee=&date_from=&date_to=
 
@@ -230,13 +230,16 @@ class AdminPayrollList(AdminMixin, APIView):
         kinds = {"TEACHER": [TeacherPayroll], "STAFF": [StaffPayroll]}.get(
             request.query_params.get("kind"), [TeacherPayroll, StaffPayroll]
         )
-        return Response(
-            [
-                payroll_data(p, admin=True)
-                for model in kinds
-                for p in model.objects.filter(school_filter).select_related("payroll_period")
-            ]
-        )
+        employee = self.uuid_param("employee")
+
+        def rows(model):
+            queryset = model.objects.filter(school_filter).select_related("payroll_period")
+            if employee:
+                owner = "teacher__employee_id" if model is TeacherPayroll else "staff__employee_id"
+                queryset = queryset.filter(**{owner: employee})
+            return queryset.order_by("-payroll_period__start_date", "id")
+
+        return Response([payroll_data(p, admin=True) for model in kinds for p in rows(model)])
 
 
 class AdminPayrollBase(AdminMixin, APIView):
@@ -434,7 +437,10 @@ class AdminCheckIns(AdminMixin, generics.ListAPIView):
 
     def restrict(self, queryset):
         wanted = self.request.query_params.get("status")
-        return queryset.filter(verified_status=wanted) if wanted in VerificationStatus.values else queryset
+        if wanted in VerificationStatus.values:
+            queryset = queryset.filter(verified_status=wanted)
+        teacher = self.uuid_param("teacher")
+        return queryset.filter(teacher_id=teacher) if teacher else queryset
 
 
 class ValidateInput(serializers.Serializer):

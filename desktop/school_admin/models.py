@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
+from .money import ZERO, to_decimal
+
 ADMIN_ROLES = frozenset({"SUPER_ADMIN", "ADMIN"})
 
 
@@ -299,6 +301,8 @@ class DashboardCharts:
     by_level: ChartData = field(default_factory=ChartData)
     by_class: ChartData = field(default_factory=ChartData)
     enrollment_trend: ChartData = field(default_factory=ChartData)
+    payments: ChartData = field(default_factory=ChartData)
+    payrolls: ChartData = field(default_factory=ChartData)
     activity: list = field(default_factory=list)
     activity_error: str | None = None
 
@@ -477,6 +481,7 @@ class Teacher:
     account_activated: bool = False
     active_course_count: int | None = None
     upcoming_session_count: int | None = None
+    employee_id: str = ""  # payroll / remuneration (EmployeeProfile)
 
     @property
     def code(self):  # the list screens name a row by `code`
@@ -519,6 +524,7 @@ class Teacher:
             bool(row.get("account_activated")),
             row.get("active_course_count"),
             row.get("upcoming_session_count"),
+            str(row.get("employee") or ""),
         )
 
 
@@ -892,4 +898,455 @@ class SchoolBreak:
             _datetime(row.get("end_datetime")),
             row.get("break_type") or "HOLIDAY",
             bool(row.get("affects_scheduling", True)),
+        )
+
+
+# --- finance (backend finance/api.py, ADR 0013 / 0022) -----------------------------
+# Amounts are Decimal (from the API's strings): never floats.
+
+PAYMENT_STATUSES = {
+    "SUCCEEDED": "Réussi",
+    "PENDING": "En attente",
+    "DECLINED": "Refusé",
+    "INSUFFICIENT_FUNDS": "Fonds insuffisants",
+    "TIMEOUT": "Délai dépassé",
+    "PROVIDER_ERROR": "Erreur fournisseur",
+    "CANCELLED": "Annulé",
+    "PARTIALLY_REFUNDED": "Partiellement remboursé",
+    "REFUNDED": "Remboursé",
+}
+FAILED_PAYMENTS = frozenset({"DECLINED", "INSUFFICIENT_FUNDS", "TIMEOUT", "PROVIDER_ERROR", "CANCELLED"})
+PAYMENT_METHODS = {"CASH": "Espèces (guichet)", "WALLET": "Portefeuille mobile"}
+INVOICE_STATUSES = {
+    "ISSUED": "Émise",
+    "PARTIALLY_PAID": "Partiellement payée",
+    "PAID": "Payée",
+    "CANCELLED": "Annulée",
+}
+SIMULATION_BEHAVIORS = {
+    "NORMAL": "Normal",
+    "DECLINE": "Refus systématique",
+    "TIMEOUT": "Délai dépassé",
+    "PROVIDER_ERROR": "Erreur fournisseur",
+}
+LEDGER_TYPES = {
+    "PAYMENT": "Paiement",
+    "REFUND": "Remboursement",
+    "FUNDING": "Approvisionnement",
+    "CREDIT": "Crédit",
+    "PAYROLL": "Paie",
+}
+
+
+def _money(value):
+    return to_decimal(value) if value is not None else None
+
+
+@dataclass(frozen=True)
+class FeeType:
+    id: str
+    code: str
+    name: str
+    description: str = ""
+    active: bool = True
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(row["id"], row.get("code", ""), row.get("name", ""), row.get("description") or "", row["active"])
+
+
+@dataclass(frozen=True)
+class Refund:
+    id: str
+    payment_id: str
+    amount: object  # Decimal
+    reason: str
+    status: str
+    completed_at: datetime | None
+    inverse_reference: str = ""
+    payment_reference: str = ""
+    payment_amount: object = None
+    payment_method: str = ""
+    student_name: str = ""
+    currency: str = ""
+
+    @property
+    def code(self):
+        return self.payment_reference or self.inverse_reference
+
+    @property
+    def active(self):
+        return self.status == "COMPLETED"
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            str(row.get("payment") or ""),
+            _money(row.get("amount")),
+            row.get("reason") or "",
+            row.get("status") or "",
+            _datetime(row.get("completed_at")),
+            row.get("inverse_transaction_reference") or "",
+            row.get("payment_reference") or "",
+            _money(row.get("payment_amount")),
+            row.get("payment_method") or "",
+            row.get("student_name") or "",
+            row.get("currency") or "",
+        )
+
+
+@dataclass(frozen=True)
+class Payment:
+    id: str
+    reference: str
+    student_id: str
+    student_name: str
+    amount: object  # Decimal
+    refunded: object  # Decimal
+    currency: str
+    method: str
+    provider: str
+    status: str
+    initiated_at: datetime | None
+    completed_at: datetime | None
+    failure_reason: str = ""
+    provider_reference: str = ""
+    allocations: tuple = ()  # (invoice number, Decimal amount, is a refund)
+    refunds: tuple = ()  # Refund
+    replayed: bool = False
+
+    @property
+    def code(self):
+        return self.reference
+
+    @property
+    def active(self):
+        return self.status in ("SUCCEEDED", "PARTIALLY_REFUNDED")
+
+    @property
+    def failed(self):
+        return self.status in FAILED_PAYMENTS
+
+    @property
+    def status_label(self):
+        return PAYMENT_STATUSES.get(self.status, self.status)
+
+    @property
+    def refundable(self):
+        """What the server would still accept to refund (display only)."""
+        if not self.active or self.amount is None:
+            return ZERO
+        return self.amount - (self.refunded or ZERO)
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            row.get("payment_reference") or "",
+            str(row.get("student") or ""),
+            row.get("student_name") or "",
+            _money(row.get("amount")),
+            _money(row.get("refunded_amount")) or ZERO,
+            row.get("currency") or "",
+            row.get("payment_method") or "",
+            row.get("provider") or "",
+            row.get("status") or "",
+            _datetime(row.get("initiated_at")),
+            _datetime(row.get("completed_at")),
+            row.get("failure_reason") or "",
+            row.get("provider_reference") or "",
+            tuple(
+                (a.get("invoice_number") or "", _money(a.get("amount")), bool(a.get("refund")))
+                for a in row.get("allocations") or ()
+            ),
+            tuple(Refund.from_api(r) for r in row.get("refunds") or ()),
+            bool(row.get("replayed")),
+        )
+
+
+@dataclass(frozen=True)
+class Invoice:
+    id: str
+    number: str
+    student_id: str
+    student_name: str
+    issue_date: date | None
+    due_date: date | None
+    status: str
+    total: object  # Decimal
+    paid: object
+    balance: object
+    currency: str
+    cancelled_reason: str = ""
+    lines: tuple = ()  # (label, Decimal total)
+
+    @property
+    def code(self):
+        return self.number
+
+    @property
+    def active(self):
+        return self.status in ("ISSUED", "PARTIALLY_PAID")
+
+    @property
+    def status_label(self):
+        return INVOICE_STATUSES.get(self.status, self.status)
+
+    def overdue(self, today):
+        return self.active and self.due_date is not None and self.due_date < today
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            row.get("invoice_number") or "",
+            str(row.get("student") or ""),
+            row.get("student_name") or "",
+            _date(row.get("issue_date")),
+            _date(row.get("due_date")),
+            row.get("status") or "",
+            _money(row.get("total_amount")),
+            _money(row.get("amount_paid")),
+            _money(row.get("balance_due")),
+            row.get("currency") or "",
+            row.get("cancelled_reason") or "",
+            tuple(
+                (line.get("description") or line.get("fee_type_code") or "", _money(line.get("total")))
+                for line in row.get("lines") or ()
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class Wallet:
+    id: str
+    owner_id: str
+    owner_name: str
+    provider: str
+    identifier: str
+    balance: object  # Decimal
+    currency: str
+    status: str
+    behavior: str = "NORMAL"
+
+    @property
+    def code(self):
+        return f"{self.provider} {self.masked}"
+
+    @property
+    def active(self):
+        return self.status == "ACTIVE"
+
+    @property
+    def masked(self):
+        """Only the last 4 characters of the account identifier are shown."""
+        tail = self.identifier[-4:]
+        return f"•••• {tail}" if len(self.identifier) > 4 else tail
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            str(row.get("owner") or ""),
+            row.get("owner_name") or "",
+            row.get("provider_code") or "",
+            row.get("wallet_identifier") or "",
+            _money(row.get("balance")),
+            row.get("currency") or "",
+            row.get("status") or "",
+            row.get("simulation_behavior") or "NORMAL",
+        )
+
+
+@dataclass(frozen=True)
+class TreasuryEntry:
+    id: str
+    kind: str
+    direction: str
+    amount: object  # Decimal
+    reference: str
+    balance_after: object
+    at: datetime | None
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            row.get("transaction_type") or "",
+            row.get("direction") or "",
+            _money(row.get("amount")),
+            row.get("reference") or "",
+            _money(row.get("balance_after")),
+            _datetime(row.get("created_at")),
+        )
+
+
+# --- payroll (backend payroll/api.py, ADR 0014 / 0022) ------------------------------
+
+PAYROLL_STATUSES = {"CALCULATED": "Préparée", "APPROVED": "Approuvée", "PAID": "Payée", "CANCELLED": "Annulée"}
+PAYOUT_METHODS = {"CASH": "Espèces / hors système", "WALLET": "Wallet (simulation)"}
+PERIOD_STATUSES = {"OPEN": "Ouverte", "CLOSED": "Clôturée"}
+LINE_KINDS = {
+    "PROGRAMMED": "Séance programmée",
+    "EARNED": "Séance validée (acquise)",
+    "SALARY": "Salaire fixe",
+    "ADJUSTMENT": "Correction",
+}
+EMPLOYEE_KINDS = {"TEACHER": "Enseignant", "STAFF": "Personnel"}
+
+
+@dataclass(frozen=True)
+class PayrollPeriod:
+    id: str
+    year_id: str
+    name: str
+    start: date | None
+    end: date | None
+    status: str
+
+    @property
+    def code(self):
+        return self.name
+
+    @property
+    def active(self):
+        return self.status == "OPEN"
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            str(row.get("academic_year") or ""),
+            row.get("name") or "",
+            _date(row.get("start_date")),
+            _date(row.get("end_date")),
+            row.get("status") or "",
+        )
+
+
+@dataclass(frozen=True)
+class PayrollLine:
+    version: int
+    kind: str
+    session_date: date | None
+    minutes: int | None
+    rate: object  # Decimal
+    amount: object
+    late: bool
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            int(row.get("version") or 1),
+            row.get("kind") or "",
+            _date(row.get("session_date")),
+            row.get("duration_minutes"),
+            _money(row.get("rate")),
+            _money(row.get("amount")),
+            bool(row.get("late")),
+        )
+
+
+@dataclass(frozen=True)
+class Payroll:
+    id: str
+    kind: str
+    employee_id: str
+    employee_name: str
+    period_id: str
+    period_name: str
+    status: str
+    version: int
+    adjustments: object  # Decimal
+    payable: object
+    approved: object
+    currency: str
+    programmed: object = None
+    earned: object = None
+    base_salary: object = None
+    scheduled_count: int = 0
+    completed_count: int = 0
+    payable_count: int = 0
+    approved_at: datetime | None = None
+    paid_at: datetime | None = None
+    payout_method: str = ""
+    payment_reference: str = ""
+    cancelled_reason: str = ""
+    lines: tuple = ()
+    reconstructible: bool | None = None
+
+    @property
+    def code(self):
+        return f"{self.employee_name} · {self.period_name}"
+
+    @property
+    def active(self):
+        return self.status != "CANCELLED"
+
+    @property
+    def status_label(self):
+        return PAYROLL_STATUSES.get(self.status, self.status)
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            row.get("kind") or "",
+            str(row.get("employee") or ""),
+            row.get("employee_name") or "",
+            str(row.get("period") or ""),
+            row.get("period_name") or "",
+            row.get("status") or "",
+            int(row.get("version") or 1),
+            _money(row.get("adjustments_amount")),
+            _money(row.get("payable_amount")),
+            _money(row.get("approved_amount")),
+            row.get("currency") or "",
+            _money(row.get("programmed_amount")),
+            _money(row.get("earned_amount")),
+            _money(row.get("base_salary")),
+            int(row.get("scheduled_sessions_count") or 0),
+            int(row.get("completed_sessions_count") or 0),
+            int(row.get("payable_sessions_count") or 0),
+            _datetime(row.get("approved_at")),
+            _datetime(row.get("paid_at")),
+            row.get("payout_method") or "",
+            row.get("payment_reference") or "",
+            row.get("cancelled_reason") or "",
+            tuple(PayrollLine.from_api(line) for line in row.get("lines") or ()),
+            row.get("reconstructible"),
+        )
+
+
+@dataclass(frozen=True)
+class Adjustment:
+    id: str
+    employee_id: str
+    amount: object  # Decimal, signed
+    reason: str
+    effective_date: date | None
+    source: str
+    settled: bool
+    created_at: datetime | None
+
+    @property
+    def code(self):
+        return self.reason
+
+    @property
+    def active(self):
+        return not self.settled
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            str(row.get("employee") or ""),
+            _money(row.get("amount")),
+            row.get("reason") or "",
+            _date(row.get("effective_date")),
+            row.get("source") or "",
+            bool(row.get("settled_teacher_payroll") or row.get("settled_staff_payroll")),
+            _datetime(row.get("created_at")),
         )

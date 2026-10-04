@@ -33,8 +33,9 @@ class TeachersPage(PagedCatalogPage):
     search_placeholder = "Rechercher par nom, prénom, e-mail ou matricule…"
     status_filters = TEACHER_FILTERS
 
-    def __init__(self, service, categories, subjects, references, runner, parent=None, **kwargs):
+    def __init__(self, service, categories, subjects, references, runner, parent=None, *, payroll=None, **kwargs):
         self.service = service
+        self.payroll = payroll  # read-only remuneration (record)
         self.categories = categories
         self.subjects = subjects
         self.references = references
@@ -154,8 +155,27 @@ class TeachersPage(PagedCatalogPage):
         if kind == "teacher":
             dialog = TeacherDialog(context["categories"], context["subjects"], self, context.get("teacher"))
             return dialog.values() if dialog.exec() == QDialog.Accepted else None
+        if kind == "remuneration":
+            from ..dialogs.payroll_dialogs import TeacherPayDialog
+
+            TeacherPayDialog(
+                context["teacher"],
+                context["summary"],
+                context["payrolls"],
+                context["validated"],
+                context["date_from"],
+                context["date_to"],
+                self,
+            ).exec()
+            return None
         if kind == "record":
-            dialog = TeacherRecordDialog(context["teacher"], context["qualifications"], context["rates"], self)
+            dialog = TeacherRecordDialog(
+                context["teacher"],
+                context["qualifications"],
+                context["rates"],
+                self,
+                with_remuneration=self.payroll is not None and bool(context["teacher"].employee_id),
+            )
             return dialog.action if dialog.exec() == QDialog.Accepted else None
         dialog = QualificationsDialog(
             context["teacher"], self.service, self.runner, context["subjects"], context["levels"], self, ask=ask_reason
@@ -222,12 +242,51 @@ class TeachersPage(PagedCatalogPage):
                 self.edit(teacher)
             elif action == "qualifications":
                 self.manage_qualifications(teacher)
+            elif action == "remuneration":
+                self.show_remuneration(teacher)
 
         self.call(
             lambda: (self.service.get(row.id), self.service.qualifications(row.id), self._rates(row.id)),
             show,
             action="Impossible de charger la fiche de l'enseignant",
         )
+
+    def show_remuneration(self, teacher):
+        """Read-only: the server's remuneration of the teacher for the current
+        school year, their payrolls and validated sessions. The payroll API's
+        own permissions apply (a refusal is shown, never bypassed)."""
+        from datetime import date, timedelta
+
+        from ...api.errors import Forbidden, NotFound
+
+        def load():
+            years = self.references.years()
+            current = next((y for y in years if y.is_current), None)
+            date_from, date_to = (
+                (current.start_date, current.end_date)
+                if current
+                else (date.today() - timedelta(days=365), date.today())
+            )
+            try:
+                summary = self.payroll.remuneration(teacher.employee_id, date_from, date_to)
+            except (Forbidden, NotFound):
+                summary = None
+            payrolls = self.payroll.payrolls(employee_id=teacher.employee_id)
+            return summary, payrolls, self.payroll.validated_sessions(teacher.id), date_from, date_to
+
+        def show(loaded):
+            summary, payrolls, validated, date_from, date_to = loaded
+            self.ask(
+                "remuneration",
+                teacher=teacher,
+                summary=summary,
+                payrolls=payrolls,
+                validated=validated,
+                date_from=date_from,
+                date_to=date_to,
+            )
+
+        self.call(load, show, action="Impossible de charger la rémunération")
 
     def _rates(self, teacher_id):
         """Payroll rates are optional here: a refusal of the payroll module never

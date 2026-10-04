@@ -101,6 +101,41 @@ RULE_MESSAGES = {
     "teacher_incompatible": "Cet enseignant n'est pas autorisé pour cette matière (compatibilité).",
     "teacher_unavailable": "L'enseignant est indisponible sur ce créneau (absence validée).",
     "level_in_use": "Des classes actives d'une année ouverte utilisent ce niveau : il ne peut pas être désactivé.",
+    # finance and payroll (ADR 0022)
+    "idempotency_conflict": (
+        "Cette demande de paiement a déjà servi pour un autre paiement : relancez une nouvelle saisie."
+    ),
+    "idempotency_key_required": "Identifiant de paiement manquant : relancez la saisie.",
+    "invoice_has_payments": "Cette facture a déjà reçu des paiements : remboursez-les avant de l'annuler.",
+    "invoice_cancelled": "Cette facture est annulée.",
+    "invoice_not_payable": "Une des factures choisies n'est plus payable (payée ou annulée).",
+    "invoice_other_student": "Une des factures choisies n'appartient pas à cet élève.",
+    "invoice_empty": "Une facture doit avoir au moins une ligne.",
+    "payment_not_refundable": "Ce paiement ne peut pas être remboursé (échoué ou déjà entièrement remboursé).",
+    "refund_exceeds_payment": "Le montant dépasse ce qui reste remboursable sur ce paiement.",
+    "amount_exceeds_balance": "Le montant dépasse le reste à payer des factures choisies.",
+    "insufficient_balance": "Solde insuffisant pour cette opération.",
+    "wallet_blocked": "Ce portefeuille est bloqué.",
+    "wallet_required": "Choisissez un portefeuille.",
+    "payment_reason_required": "Choisissez au moins une facture ou un motif de paiement actif.",
+    "fee_type_invalid": "Ce motif de frais est invalide ou inactif.",
+    "invalid_amount": "Montant invalide : un nombre positif avec au plus deux décimales.",
+    "invalid_method": "Mode de paiement inconnu.",
+    "period_overlap": "Cette période chevauche une autre période de paie ou reprend son nom.",
+    "period_closed": "Cette période de paie est clôturée : elle ne peut plus être modifiée.",
+    "period_not_settled": "Toutes les paies de la période doivent être payées ou annulées avant la clôture.",
+    "payroll_already_paid": "Cette paie est déjà payée : aucun second paiement n'est possible.",
+    "payroll_already_approved": "Cette paie est déjà approuvée.",
+    "payroll_cancelled": "Cette paie est annulée.",
+    "payroll_not_approved": "Cette paie doit d'abord être approuvée.",
+    "payroll_stale": (
+        "Les données ont changé depuis le calcul (séances, validations, taux ou corrections) : "
+        "recalculez la période avant d'approuver."
+    ),
+    "session_already_paid": "Une séance de cette paie a déjà été payée.",
+    "session_in_approved_payroll": "Cette séance figure dans une paie approuvée : annulez d'abord cette paie.",
+    "rate_overlap": "Un taux plus récent existe déjà.",
+    "rate_locked_by_payroll": "Une paie approuvée ou payée utilise déjà ce taux après cette date.",
 }
 
 

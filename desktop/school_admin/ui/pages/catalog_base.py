@@ -80,6 +80,8 @@ class CatalogPage(Page):
     has_toggle = True  # Désactiver / Réactiver
     default_sort = (0, Qt.AscendingOrder)  # (column, order) when the list opens
     sortable = True  # False when the server orders the rows (paginated lists)
+    narrow_hidden = ()  # secondary columns hidden when the page is narrow (details stay in the record)
+    narrow_width = 960
 
     def __init__(self, runner, parent=None, **kwargs):
         super().__init__(runner, parent, **kwargs)
@@ -181,6 +183,12 @@ class CatalogPage(Page):
         QShortcut(QKeySequence.Find, self, activated=self.search.setFocus)
         QShortcut(QKeySequence(Qt.Key_Return), self.table, activated=lambda: self.open_row())
         self._update_actions()
+
+    def resizeEvent(self, event):
+        narrow = event.size().width() < self.narrow_width
+        for column in self.narrow_hidden:
+            self.table.setColumnHidden(column, narrow)
+        super().resizeEvent(event)
 
     # --- to implement ---------------------------------------------------------
     def stretch_columns(self):

@@ -17,7 +17,10 @@ course (eligible teacher from the server), schedule it with the planning API,
 deactivation refused while scheduled -> planning: generate the week's
 sessions, week view filtered by class, new room + change room, move,
 substitute (or the server's explained refusal), cancel -> timetable PDF
-branded with the SCHOOL (never School Managing) -> previous current year
+branded with the SCHOOL (never School Managing) -> finance: fee type, invoice
+(obligation), simulated wallet payment (succeeded) and a declined one, refund,
+receipt branded with the school -> payroll: correction, period, calculate,
+verify, approve, pay (treasury debit), history -> previous current year
 restored, test year closed -> logout.
 Codes and dates are random so the test can be replayed; it creates a few
 rows. Run it against a TEST backend (it switches the current year, then
@@ -30,6 +33,7 @@ import secrets
 import uuid
 import zlib
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 
 import pytest
 from PySide6.QtCore import QDate
@@ -69,6 +73,19 @@ def live():
     controller.login_window.close()
     api.close()
     assert app is not None
+
+
+def pdf_text(raw):
+    """Text of a PDF (deflated content streams + raw bytes) for branding checks."""
+    assert raw.startswith(b"%PDF")
+    return (
+        b"".join(
+            zlib.decompress(stream)
+            for stream in re.findall(rb"stream\r?\n(.*?)\r?\nendstream", raw, re.S)
+            if stream[:1] == b"x"
+        )
+        + raw
+    )
 
 
 def test_full_vertical_against_the_real_backend(live, tmp_path):
@@ -452,17 +469,142 @@ def test_full_vertical_against_the_real_backend(live, tmp_path):
     # --- Official documents keep the SCHOOL's branding (never School Managing) ---
     raw = live.api.get_bytes(f"reports/schedule.pdf/?school_class={class_id}&date={monday.isoformat()}")
     assert raw.startswith(b"%PDF")
-    text = (
-        b"".join(
-            zlib.decompress(stream)
-            for stream in re.findall(rb"stream\r?\n(.*?)\r?\nendstream", raw, re.S)
-            if stream[:1] == b"x"
-        )
-        + raw
-    )
+    text = pdf_text(raw)
     assert b"School Managing" not in text and b"School\\040Managing" not in text
     school_ascii = dashboard.data.school_name.encode("latin-1", "ignore")
     assert school_ascii[:12] in text, "school name missing from the timetable"
+
+    # --- Finance (desktop): obligation, simulated payments, refund, receipt ---
+    me = live.api.get("auth/me/")
+    membership = next(m["id"] for m in me["memberships"] if m["status"] == "ACTIVE")
+    wallet = live.api.post(
+        "admin/finance/wallets/",
+        {"owner": membership, "provider_code": "FAKE_ORANGE", "wallet_identifier": f"69{suffix}01"},
+    )
+    live.api.post(f"admin/finance/wallets/{wallet['id']}/fund/", {"amount": "100000"})
+    declining = live.api.post(
+        "admin/finance/wallets/",
+        {
+            "owner": membership,
+            "provider_code": "FAKE_MTN",
+            "wallet_identifier": f"67{suffix}02",
+            "simulation_behavior": "DECLINE",
+        },
+    )
+    finance = shell.open("finance")
+    fees = finance.open_tab("fee_types")
+    fees.ask = lambda: {"code": f"F{suffix}", "name": f"Frais E2E {suffix}", "description": ""}
+    fees.add()
+    assert fees.banner.kind == "success", fees.banner.plain_text()
+    fee_id = next(f.id for f in live.finance.fee_types() if f.code == f"F{suffix}")
+    invoices = finance.open_tab("invoices")
+    invoices.ask = lambda kind, **context: {
+        "student_id": student.id,
+        "fee_type_id": fee_id,
+        "description": "Scolarité E2E",
+        "amount": "60000",
+        "due_date": date(first, 10, 31),
+    }
+    invoices.add()
+    assert invoices.banner.plain_text().startswith("Facture "), invoices.banner.plain_text()
+    invoice = invoices.selected()
+    assert (invoice.total, invoice.balance, invoice.status) == (Decimal("60000.00"), Decimal("60000.00"), "ISSUED")
+
+    payments = finance.open_tab("payments")
+    offered = {}
+
+    def pay_with(wallet_id, amount, invoice_ids, fee_type=None):
+        def answer(kind, **context):
+            offered["wallets"] = [w.id for w in context["wallets"]]
+            return {
+                "student_id": student.id,
+                "amount": amount,
+                "method": "WALLET",
+                "idempotency_key": str(uuid.uuid4()),
+                "invoice_ids": invoice_ids,
+                "fee_type_id": fee_type,
+                "wallet_id": wallet_id,
+            }
+
+        payments.ask = answer
+        payments.add()
+        return payments.selected()
+
+    paid = pay_with(wallet["id"], "60000", [invoice.id])
+    assert {wallet["id"], declining["id"]} <= set(offered["wallets"])  # the admin's own wallets
+    assert payments.banner.plain_text().startswith(f"Paiement réussi — {paid.reference}"), payments.banner.plain_text()
+    assert (paid.status, paid.amount) == ("SUCCEEDED", Decimal("60000.00"))
+    refused = pay_with(declining["id"], "5000", [], fee_id)
+    assert refused.status == "DECLINED" and payments.banner.plain_text().startswith("Paiement refusé")
+    assert live.finance.invoice(invoice.id).status == "PAID"
+    payments.ask = lambda kind, **context: {"amount": "10000", "reason": "Test E2E : trop perçu"}
+    payments.refund_payment(live.finance.payment(paid.id))
+    assert payments.banner.plain_text().startswith("Remboursement de"), payments.banner.plain_text()
+    refunds = finance.open_tab("refunds")
+    refunds.search.setText(paid.reference)
+    refunds.reload_first_page()
+    assert [refunds.table.item(r, 1).text() for r in range(refunds.table.rowCount())] == [paid.reference]
+    assert live.finance.payment(paid.id).status == "PARTIALLY_REFUNDED"  # history kept
+    receipt = pdf_text(live.api.get_bytes(f"payments/{paid.id}/receipt.pdf/"))
+    assert b"School Managing" not in receipt and b"School\\040Managing" not in receipt
+    assert school_ascii[:12] in receipt, "school name missing from the receipt"
+
+    # --- Paie (desktop): correction -> period -> calculate -> verify -> approve -> pay ---
+    live.api.post(
+        "admin/payroll/teacher-rates/",
+        {
+            "teacher": teacher.id,
+            "academic_year": new_year.id,
+            "vacation_rate": "5000",
+            "effective_from": date(first, 9, 1).isoformat(),
+        },
+    )
+    employee_id = live.teachers.get(teacher.id).employee_id
+    assert employee_id
+    payroll = shell.open("payroll")
+    adjustments = payroll.open_tab("adjustments")
+    adjustments.ask = lambda employees: {
+        "employee_id": employee_id,
+        "amount": "15000",
+        "reason": "Test E2E : prime",
+        "effective_date": date(first, 10, 15),
+    }
+    adjustments.add()
+    assert adjustments.banner.kind == "success", adjustments.banner.plain_text()
+    periods = payroll.open_tab("periods")
+    periods.ask = lambda kind, **context: (
+        {
+            "year_id": new_year.id,
+            "name": f"Octobre {first} {suffix}",
+            "start": date(first, 10, 1),
+            "end": date(first, 10, 31),
+        }
+        if kind == "period"
+        else True
+    )
+    periods.add()
+    assert periods.banner.kind == "success", periods.banner.plain_text()
+    periods.calculate()
+    assert periods.banner.plain_text().startswith("Calcul terminé"), periods.banner.plain_text()
+    payrolls = payroll.payrolls
+    assert payroll.tabs.currentWidget() is payrolls
+    mine = next(r for r in payrolls.rows if r.employee_id == employee_id)
+    assert (mine.status, mine.payable) == ("CALCULATED", Decimal("15000.00"))
+    detail = live.payroll.payroll(mine.id)
+    assert detail.reconstructible and "ADJUSTMENT" in {line.kind for line in detail.lines}
+    payrolls.select_id(mine.id)
+    payrolls.ask = lambda kind, **context: True if kind == "approve" else {"method": "CASH", "wallet_id": None}
+    payrolls.run_action("approve")
+    assert payrolls.banner.plain_text().endswith("Paie approuvée : 15\u202f000 XAF."), payrolls.banner.plain_text()
+    payrolls.run_action("pay")
+    assert "Paie payée" in payrolls.banner.plain_text(), payrolls.banner.plain_text()
+    settled = live.payroll.payroll(mine.id)
+    assert settled.status == "PAID" and settled.payment_reference.startswith("PAYR-")
+    payrolls.run_action("pay")  # a second payment is refused by the server, and said so
+    assert "aucun second paiement" in payrolls.banner.plain_text()
+    overview = finance.open_tab("overview")
+    references = [overview.table.item(r, 2).text() for r in range(overview.table.rowCount())]
+    assert settled.payment_reference in references and paid.reference in references  # treasury history
 
     # --- Restore the previous current year, then close the test year ---
     years = shell.open("years")

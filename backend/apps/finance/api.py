@@ -2,16 +2,18 @@
 
 Payers and families:
     GET  /finance/students/{id}/obligations/   open invoices + balance of a child
-    GET  /finance/invoices/   /finance/invoices/{id}/      (?student=, ?status=)
+    GET  /finance/invoices/   /finance/invoices/{id}/      (?student=, ?status=, ?search=,
+                                                            ?date_from=, ?date_to= on the issue date)
     POST /finance/payments/                    initiate (Idempotency-Key header or body field)
-    GET  /finance/payments/   /finance/payments/{id}/      history / result (?student=, ?status=)
+    GET  /finance/payments/   /finance/payments/{id}/      history / result (?student=, ?status=,
+                                                            ?payment_method=, ?search=, ?date_from=, ?date_to=)
     GET  /finance/wallets/                     the caller's own wallets
 
 Administration (PySide6):
     GET/POST /admin/finance/fee-types/         GET/POST /admin/finance/fee-schedules/
     POST /admin/finance/invoices/              POST /admin/finance/invoices/generate/
     POST /admin/finance/invoices/{id}/cancel/
-    POST /admin/finance/payments/{id}/refund/
+    POST /admin/finance/payments/{id}/refund/   GET /admin/finance/refunds/ (?search=, ?date_from=, ?date_to=)
     GET/POST /admin/finance/wallets/           POST /admin/finance/wallets/{id}/fund/
     GET  /admin/finance/treasury/              POST /admin/finance/treasury/credit/
     GET  /admin/finance/dashboard/
@@ -85,14 +87,39 @@ class FinanceVisibility(SchoolScopedMixin):
             parent__membership=self.membership(), active=True, identity_verified=True, can_view_financial_data=True
         ).values("student_id")
 
+    search_fields = ()  # text search (?search=), case-insensitive
+    date_field = None  # ?date_from= / ?date_to= (inclusive)
+
     def filter_params(self, queryset):
+        params = self.request.query_params
         student = self.uuid_param("student")
         if student:
             queryset = queryset.filter(student_id=student)
-        status_param = self.request.query_params.get("status")
+        status_param = params.get("status")
         if status_param:
             queryset = queryset.filter(status=status_param)
-        return queryset
+        if params.get("payment_method") and "payment_method" in {f.name for f in queryset.model._meta.fields}:
+            queryset = queryset.filter(payment_method=params["payment_method"])
+        return filter_search_and_dates(queryset, params, self.search_fields, self.date_field)
+
+
+def filter_search_and_dates(queryset, params, search_fields, date_field):
+    """Narrowing only: visibility was applied before (restrict)."""
+    search = (params.get("search") or "").strip()
+    if search and search_fields:
+        condition = Q()
+        for name in search_fields:
+            condition |= Q(**{f"{name}__icontains": search})
+        queryset = queryset.filter(condition)
+    if date_field:
+        field = serializers.DateField()
+        for key, lookup in (("date_from", "gte"), ("date_to", "lte")):
+            if params.get(key):
+                queryset = queryset.filter(**{f"{date_field}__{lookup}": field.to_internal_value(params[key])})
+    return queryset
+
+
+STUDENT_SEARCH = ("student__first_name", "student__last_name", "student__student_number")
 
 
 # =============================================================================
@@ -171,6 +198,26 @@ class RefundSerializer(serializers.ModelSerializer):
         fields = ["id", "payment", "amount", "reason", "status", "completed_at", "inverse_transaction_reference"]
 
 
+class RefundListSerializer(RefundSerializer):
+    """A refund with its original payment (administration list)."""
+
+    payment_reference = serializers.CharField(source="payment.payment_reference", read_only=True)
+    payment_amount = serializers.DecimalField(source="payment.amount", read_only=True, **MONEY)
+    payment_method = serializers.CharField(source="payment.payment_method", read_only=True)
+    student_name = serializers.CharField(source="payment.student.full_name", read_only=True)
+    currency = serializers.CharField(source="payment.currency", read_only=True)
+
+    class Meta(RefundSerializer.Meta):
+        fields = [
+            *RefundSerializer.Meta.fields,
+            "payment_reference",
+            "payment_amount",
+            "payment_method",
+            "student_name",
+            "currency",
+        ]
+
+
 class PaymentSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source="student.full_name", read_only=True)
     allocations = AllocationSerializer(many=True, read_only=True)
@@ -203,11 +250,14 @@ class PaymentSerializer(serializers.ModelSerializer):
 
 
 class WalletSerializer(serializers.ModelSerializer):
+    owner_name = serializers.CharField(source="owner.user.full_name", read_only=True)
+
     class Meta:
         model = Wallet
         fields = [
             "id",
             "owner",
+            "owner_name",
             "wallet_type",
             "provider_code",
             "wallet_identifier",
@@ -271,6 +321,8 @@ class InvoiceVisibility(FinanceVisibility):
         .order_by("due_date", "invoice_number")
     )
     serializer_class = InvoiceSerializer
+    search_fields = ("invoice_number", *STUDENT_SEARCH)
+    date_field = "issue_date"
 
     def restrict(self, queryset):
         if not self.is_admin():
@@ -309,6 +361,8 @@ class PaymentVisibility(FinanceVisibility):
         .order_by("-initiated_at")
     )
     serializer_class = PaymentSerializer
+    search_fields = ("payment_reference", *STUDENT_SEARCH)
+    date_field = "initiated_at__date"
 
     def restrict(self, queryset):
         if not self.is_admin():
@@ -478,6 +532,21 @@ class AdminPaymentRefund(AdminMixin, APIView):
         return Response(RefundSerializer(refund).data, status=status.HTTP_201_CREATED)
 
 
+class AdminRefunds(AdminMixin, generics.ListAPIView):
+    """Every refund of the school, newest first, with its original payment."""
+
+    queryset = PaymentRefund.objects.select_related("payment__student").order_by("-completed_at")
+    serializer_class = RefundListSerializer
+
+    def restrict(self, queryset):
+        return filter_search_and_dates(
+            queryset,
+            self.request.query_params,
+            ("payment__payment_reference", "reason", *(f"payment__{f}" for f in STUDENT_SEARCH)),
+            "completed_at__date",
+        )
+
+
 class WalletInput(serializers.Serializer):
     owner = serializers.UUIDField()
     provider_code = serializers.CharField(max_length=30)
@@ -561,6 +630,7 @@ urlpatterns = [
     path("admin/finance/invoices/generate/", AdminInvoiceGenerate.as_view()),
     path("admin/finance/invoices/<uuid:pk>/cancel/", AdminInvoiceCancel.as_view()),
     path("admin/finance/payments/<uuid:pk>/refund/", AdminPaymentRefund.as_view()),
+    path("admin/finance/refunds/", AdminRefunds.as_view()),
     path("admin/finance/wallets/", AdminWallets.as_view()),
     path("admin/finance/wallets/<uuid:pk>/fund/", AdminWalletFund.as_view()),
     path("admin/finance/treasury/", AdminTreasury.as_view()),

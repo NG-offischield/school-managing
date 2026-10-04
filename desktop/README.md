@@ -54,7 +54,11 @@ Le test de bout en bout contre un vrai backend est optionnel. Il crée :
 - un cours (enseignant proposé par le serveur), planifié par l'API du planning ;
 - le planning de la semaine : séance générée, salle créée puis affectée, séance déplacée,
   remplacement (ou refus expliqué du serveur), annulation ;
-- un emploi du temps PDF, vérifié aux couleurs de l'école (jamais « School Managing »).
+- un emploi du temps PDF, vérifié aux couleurs de l'école (jamais « School Managing ») ;
+- la finance : motif, facture, paiement par wallet simulé (réussi puis refusé), remboursement, reçu PDF
+  aux couleurs de l'école ;
+- la paie : correction, période, calcul, vérification, approbation, paiement (débit de la trésorerie),
+  second paiement refusé.
 
 À lancer contre un backend de **test** :
 
@@ -83,6 +87,9 @@ school_admin/
                        cours (courses.py : enseignants autorisés calculés par le serveur),
                        planning (planning.py : créneaux, séances, salles, indisponibilités,
                        vacances ; conflits décidés et expliqués par le serveur),
+                       finance (finance.py : paiements, factures, remboursements, wallets) et paie
+                       (payroll.py : périodes, calcul, approbation, paiement) — décisions du serveur,
+                       montants en Decimal (money.py), jamais en float,
                        tableau de bord (indicateurs et séries réels de l'API)
   ui/                  écran de connexion, shell (barre latérale, en-tête), pages, dialogues,
                        exécution des appels hors du fil d'affichage, messages d'erreur uniformes
