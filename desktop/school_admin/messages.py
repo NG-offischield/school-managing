@@ -83,10 +83,56 @@ RULE_MESSAGES = {
     "teacher_other_school": "Cet enseignant appartient à une autre école.",
     "subject_other_school": "Cette matière appartient à une autre école.",
     "scale_unavailable": "Ce barème ne peut pas être utilisé.",
+    "planning_conflict": "Ce créneau entre en conflit avec le planning existant.",
+    "already_decided": "Cette demande a déjà été traitée.",
+    "break_type_invalid": "Type d'interruption inconnu.",
+    "course_inactive": "Ce cours est inactif : réactivez-le dans « Cours ».",
+    "invalid_decision": "Décision non valide.",
+    "invalid_range": "Période trop longue : générez au plus 120 jours à la fois.",
+    "invalid_times": "L'heure de fin doit être après l'heure de début.",
+    "invalid_weekday": "Jour de la semaine non valide.",
+    "not_substituted": "Cette séance n'a pas de remplaçant : l'enseignant prévu assure déjà la séance.",
+    "outside_year": "La date est hors de l'année scolaire du cours.",
+    "room_in_use": "Cette salle est encore utilisée par des créneaux ou des séances à venir.",
+    "same_session": "Choisissez deux séances différentes.",
+    "same_teacher": "Ce remplaçant est déjà l'enseignant de la séance.",
+    "session_not_scheduled": "Cette séance n'est plus planifiée (annulée ou réalisée).",
+    "slot_not_published": "Ce créneau n'est plus publié.",
+    "teacher_incompatible": "Cet enseignant n'est pas autorisé pour cette matière (compatibilité).",
+    "teacher_unavailable": "L'enseignant est indisponible sur ce créneau (absence validée).",
     "level_in_use": "Des classes actives d'une année ouverte utilisent ce niveau : il ne peut pas être désactivé.",
 }
 
 
+WEEKDAYS = ["", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+CONFLICT_KINDS = {"CLASS": "classe déjà occupée", "TEACHER": "enseignant déjà occupé", "ROOM": "salle déjà occupée"}
+
+
+def explain_conflicts(conflicts):
+    """The server's conflict list (409 planning_conflict / slot check) in plain
+    French: « classe déjà occupée, salle déjà occupée — lundi 08:00–10:00 »."""
+    lines = []
+    for conflict in conflicts or []:
+        what = ", ".join(CONFLICT_KINDS.get(k, k) for k in conflict.get("kinds", [])) or "conflit"
+        if "weekday" in conflict:
+            when = f"{WEEKDAYS[conflict['weekday']]} {conflict['start_time'][:5]}–{conflict['end_time'][:5]}"
+        elif "scheduled_start" in conflict:
+            start, end = conflict["scheduled_start"], conflict["scheduled_end"]
+            when = f"le {start[8:10]}/{start[5:7]} {start[11:16]}–{end[11:16]}"
+        elif "date" in conflict:
+            when = f"le {conflict['date'][8:10]}/{conflict['date'][5:7]}"
+        else:
+            when = ""
+        lines.append(f"{what} — {when}".strip(" —"))
+    return " ; ".join(lines)
+
+
 def explain(error):
     """Plain message of an ApiError: the rule's explanation if known, else the server message."""
-    return RULE_MESSAGES.get(getattr(error, "rule", None), error.message)
+    rule = getattr(error, "rule", None)
+    if rule == "planning_conflict":
+        context = (error.details or {}).get("context") or {}
+        details = explain_conflicts(context.get("conflicts"))
+        if details:
+            return f"{RULE_MESSAGES[rule]} {details[0].upper()}{details[1:]}."
+    return RULE_MESSAGES.get(rule, error.message)

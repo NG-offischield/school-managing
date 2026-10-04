@@ -18,7 +18,7 @@ from ..api.errors import (
     Unauthorized,
     ValidationFailed,
 )
-from ..messages import RULE_MESSAGES
+from ..messages import RULE_MESSAGES, explain
 
 
 @dataclass(frozen=True)
@@ -60,11 +60,11 @@ def describe(exc, action=None):
         )
     if isinstance(exc, Conflict):
         return Feedback(
-            "warning", action or "Conflit", RULE_MESSAGES.get(exc.rule, exc.message), _detail(exc), reload=True
+            "warning", action or "Conflit", explain(exc), _detail(exc), reload=exc.rule != "planning_conflict"
         )
     if isinstance(exc, ValidationFailed):
         if exc.rule in RULE_MESSAGES:
-            return Feedback("warning", action or "Données invalides", RULE_MESSAGES[exc.rule], _detail(exc))
+            return Feedback("warning", action or "Données invalides", explain(exc), _detail(exc))
         lines = [f"{FIELD_LABELS.get(k, k)} : {' '.join(v)}" for k, v in exc.field_errors().items()]
         text = exc.message if not lines else f"{exc.message} " + " · ".join(lines)
         return Feedback("warning", action or "Données invalides", text, _detail(exc))

@@ -58,6 +58,10 @@ class TeacherService:
         )
         return [Teacher.from_api(row) for row in rows], total
 
+    def all(self, *, status="active"):
+        """Every teacher (default: active) — pickers and filters of other screens."""
+        return [Teacher.from_api(row) for row in self.api.list_all(self.PATH, status=status or None)]
+
     def get(self, teacher_id):
         return Teacher.from_api(self.api.get(f"{self.PATH}{teacher_id}/"))
 

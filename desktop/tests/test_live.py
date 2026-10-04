@@ -14,7 +14,10 @@ with a photo), record, edit, search, filter, change class, withdraw,
 archive -> teachers: add (no password), record, compatibility verdict, add +
 verify a subject, search, edit, deactivate / reactivate -> courses: create a
 course (eligible teacher from the server), schedule it with the planning API,
-deactivation refused while scheduled -> previous current year
+deactivation refused while scheduled -> planning: generate the week's
+sessions, week view filtered by class, new room + change room, move,
+substitute (or the server's explained refusal), cancel -> timetable PDF
+branded with the SCHOOL (never School Managing) -> previous current year
 restored, test year closed -> logout.
 Codes and dates are random so the test can be replayed; it creates a few
 rows. Run it against a TEST backend (it switches the current year, then
@@ -22,9 +25,11 @@ restores it).
 """
 
 import os
+import re
 import secrets
 import uuid
-from datetime import date
+import zlib
+from datetime import date, datetime, timedelta
 
 import pytest
 from PySide6.QtCore import QDate
@@ -35,6 +40,7 @@ from school_admin.api import ApiClient
 from school_admin.auth.session import AuthService
 from school_admin.auth.token_store import MemoryTokenStore
 from school_admin.config import AppConfig
+from school_admin.services.planning import monday_of
 from school_admin.ui.app import AppController
 from school_admin.ui.dialogs.class_dialog import ClassDialog
 from school_admin.ui.dialogs.course_dialogs import CourseDialog
@@ -372,6 +378,91 @@ def test_full_vertical_against_the_real_backend(live, tmp_path):
     courses.confirm = lambda *args, **kwargs: True
     courses.toggle()
     assert courses.banner.kind == "warning" and "planning" in courses.banner.plain_text()  # still scheduled
+
+    # --- Planning (Vie scolaire): the week of the test year, through the screens ---
+    monday = monday_of(date(first, 10, 15))
+    planning = shell.open("planning")
+    week = planning.week
+    week.monday = monday
+    week.ask = lambda kind, **context: {
+        "date_from": monday,
+        "date_to": monday + timedelta(days=6),
+        "class_id": class_id,
+    }
+    week.generate()
+    assert week.banner.plain_text().startswith("1 séance(s) créée(s)"), week.banner.plain_text()
+    week.class_filter.setCurrentIndex(week.class_filter.findData(class_id))
+    assert [s.course_id for s in week.sessions] == [course.id], week.banner.plain_text()
+    session = week.sessions[0]
+    assert (session.date, session.hours, session.teacher_id, session.status) == (
+        monday + timedelta(days=1),
+        "08:00–10:00",
+        teacher.id,
+        "SCHEDULED",
+    )
+    week.select(session.id)
+    assert week.current().id == session.id and week.session_button.isEnabled()
+
+    rooms = planning.open_tab("rooms")
+    rooms.ask = lambda kind, **context: {
+        "code": f"R{suffix}",
+        "name": f"Salle E2E {suffix}",
+        "room_type": "CLASSROOM",
+        "capacity": 30,
+        "bench_count": 15,
+    }
+    rooms.add()
+    assert rooms.banner.plain_text() == f"Salle « R{suffix} » créée avec succès.", rooms.banner.plain_text()
+    room_id = next(r.id for r in live.planning.rooms(search=f"R{suffix}"))
+
+    planning.open_tab("week")
+    week.select(session.id)
+    week.ask = lambda kind, **context: {"room_id": room_id, "reason": "Test E2E : changement de salle"}
+    week.session_action("room")
+    assert week.banner.plain_text() == "Salle de la séance modifiée.", week.banner.plain_text()
+    assert week.current().room_code == f"R{suffix}"
+    thursday = monday + timedelta(days=3)
+    week.ask = lambda kind, **context: {
+        "new_start": datetime.combine(thursday, datetime.min.time()).replace(hour=14),
+        "new_end": datetime.combine(thursday, datetime.min.time()).replace(hour=16),
+        "reason": "Test E2E : déplacement",
+    }
+    week.session_action("move")
+    assert week.banner.plain_text() == "Séance déplacée.", week.banner.plain_text()
+    assert (week.current().date, week.current().hours, week.current().is_moved) == (thursday, "14:00–16:00", True)
+    other = next((t for t in live.teachers.all() if t.id != teacher.id), None)
+    if other is not None:
+        week.ask = lambda kind, **context: {"teacher_id": other.id, "reason": "Test E2E : remplacement"}
+        week.session_action("substitute")
+        if week.banner.property("kind") == "success":
+            assert week.current().teacher_id == other.id and week.current().planned_teacher_id == teacher.id
+            week.ask = lambda kind, **context: {"reason": "Test E2E : retour"}
+            week.session_action("restore")
+            assert week.banner.plain_text() == "Enseignant prévu restauré.", week.banner.plain_text()
+            assert week.current().teacher_id == teacher.id
+        else:  # the server's compatibility verdict, explained, never hidden
+            assert week.banner.plain_text().startswith("Impossible de remplacer l'enseignant — ")
+    week.ask = lambda kind, **context: {"reason": "Test E2E : annulation"}
+    week.session_action("cancel")
+    assert week.banner.plain_text() == "Séance annulée.", week.banner.plain_text()
+    assert week.current().status == "CANCELLED"
+    week.toggle_view()
+    assert week.table.rowCount() == 1 and week.table.item(0, 6).text() == "Annulée"
+
+    # --- Official documents keep the SCHOOL's branding (never School Managing) ---
+    raw = live.api.get_bytes(f"reports/schedule.pdf/?school_class={class_id}&date={monday.isoformat()}")
+    assert raw.startswith(b"%PDF")
+    text = (
+        b"".join(
+            zlib.decompress(stream)
+            for stream in re.findall(rb"stream\r?\n(.*?)\r?\nendstream", raw, re.S)
+            if stream[:1] == b"x"
+        )
+        + raw
+    )
+    assert b"School Managing" not in text and b"School\\040Managing" not in text
+    school_ascii = dashboard.data.school_name.encode("latin-1", "ignore")
+    assert school_ascii[:12] in text, "school name missing from the timetable"
 
     # --- Restore the previous current year, then close the test year ---
     years = shell.open("years")

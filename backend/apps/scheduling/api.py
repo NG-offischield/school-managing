@@ -33,7 +33,7 @@ Administration (PySide6):
     POST  /admin/sessions/swap/
     GET   /admin/unavailability/                     POST /admin/unavailability/{id}/decide/
     GET   /admin/unavailability/{id}/impacted-sessions/
-    POST  /admin/school-breaks/
+    POST  /admin/school-breaks/                      PATCH /admin/school-breaks/{id}/
     GET   /admin/planning/changes/?notification_status=PENDING   (future notification dispatcher)
 
 All writes go through services; ids are resolved in the current school (404
@@ -899,6 +899,24 @@ class AdminBreakCreate(AdminMixin, APIView):
         return Response(BreakSerializer(school_break).data, status=status.HTTP_201_CREATED)
 
 
+class BreakUpdate(serializers.Serializer):
+    name = serializers.CharField(max_length=120, required=False)
+    start_datetime = serializers.DateTimeField(required=False)
+    end_datetime = serializers.DateTimeField(required=False)
+    break_type = serializers.CharField(required=False)
+    affects_scheduling = serializers.BooleanField(required=False)
+
+
+class AdminBreakUpdate(AdminMixin, APIView):
+    def patch(self, request, pk):
+        data = BreakUpdate(data=request.data)
+        data.is_valid(raise_exception=True)
+        school_break = services.update_school_break(
+            scoped(SchoolBreak, pk, request), actor=self.membership(), **data.validated_data
+        )
+        return Response(BreakSerializer(school_break).data)
+
+
 class AdminChangeList(AdminMixin, generics.ListAPIView):
     """?notification_status=PENDING — the feed of the future dispatcher."""
 
@@ -951,5 +969,6 @@ urlpatterns = [
     path("admin/unavailability/<uuid:pk>/decide/", AdminUnavailabilityDecide.as_view()),
     path("admin/unavailability/<uuid:pk>/impacted-sessions/", AdminImpactedSessions.as_view()),
     path("admin/school-breaks/", AdminBreakCreate.as_view(), name="admin-school-breaks"),
+    path("admin/school-breaks/<uuid:pk>/", AdminBreakUpdate.as_view(), name="admin-school-break"),
     path("admin/planning/changes/", AdminChangeList.as_view(), name="admin-planning-changes"),
 ]

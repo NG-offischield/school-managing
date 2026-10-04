@@ -17,11 +17,13 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QPushButton,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
+from .branding import SOFTWARE_NAME, SOFTWARE_TAGLINE, brand_mark, software_icon
 from .navigation import NAVIGATION
 from .pages.placeholder_page import PlaceholderPage
 from .theme import TOKENS, TYPE
@@ -40,7 +42,8 @@ class MainWindow(QMainWindow):
     def __init__(self, identity, page_factories, runner, parent=None):
         super().__init__(parent)
         self.identity = identity
-        self.setWindowTitle(f"Administration — {identity.school_name}")
+        self.setWindowTitle(f"{SOFTWARE_NAME} — {identity.school_name}")
+        self.setWindowIcon(software_icon())
         self.setMinimumSize(1100, 640)
         self.resize(1280, 800)
 
@@ -50,14 +53,20 @@ class MainWindow(QMainWindow):
         side = QVBoxLayout(sidebar)
         side.setContentsMargins(0, 0, 0, 12)
         side.setSpacing(0)
-        side.addWidget(QLabel("Administration", objectName="brand"))
-        side.addWidget(QLabel("Poste de gestion de l'école", objectName="brandSub"))
+        # The SOFTWARE's identity (School Managing); the school's name is in the header.
+        self.brand = brand_mark("compact", 32, object_name="brand")
+        side.addWidget(self.brand)
+        side.addWidget(QLabel(SOFTWARE_TAGLINE, objectName="brandSub"))
         self.nav = QListWidget()
         self.nav.setAccessibleName("Navigation")
         self.nav.setSpacing(1)
         self.nav.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.nav.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         side.addWidget(self.nav)
+        self.about_button = QPushButton(f"À propos de {SOFTWARE_NAME}", objectName="aboutLink")
+        self.about_button.setCursor(Qt.PointingHandCursor)
+        self.about_button.clicked.connect(self.show_about)
+        side.addWidget(self.about_button)
 
         # --- header ---
         header = QFrame(objectName="header")
@@ -120,6 +129,11 @@ class MainWindow(QMainWindow):
         for index, key in enumerate(shortcuts, start=1):
             QShortcut(QKeySequence(f"Ctrl+{index}"), self, activated=lambda k=key: self.open(k))
         self.open("dashboard")
+
+    def show_about(self):
+        from .dialogs.about_dialog import AboutDialog
+
+        AboutDialog(self).exec()
 
     def _build_navigation(self, page_factories, runner):
         section = None

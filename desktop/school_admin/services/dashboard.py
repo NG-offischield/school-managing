@@ -7,6 +7,8 @@ Indicators (cards):
     élèves               GET /students/                                 meta.count
     enseignants          GET /admin/dashboard/teachers/                 active, by_category
     séances (semaine)    GET /sessions/?date_from=&date_to=             meta.count
+    séances (jour)       GET /sessions/?date_from=today&date_to=today   en cours, annulées
+    changements          GET /planning/changes/?date_from=today-6       7 derniers jours
     présence (jour)      GET /admin/attendance/dashboard/?date=today    counts
     encaissements        GET /admin/finance/dashboard/                  net_collected, outstanding
 
@@ -190,10 +192,32 @@ class DashboardService:
                 ),
                 f"du {monday:%d/%m} au {monday + timedelta(days=6):%d/%m}",
             ),
+            self._metric("Séances aujourd'hui", lambda: self._sessions_today(today), f"{today:%d/%m/%Y}"),
+            self._metric(
+                "Changements de planning",
+                lambda: str(
+                    len(self.api.list_all("planning/changes/", date_from=f"{today - timedelta(days=6):%Y-%m-%d}"))
+                ),
+                "7 derniers jours",
+            ),
             self._metric("Présence aujourd'hui", lambda: self._attendance(today), f"{today:%d/%m/%Y}"),
             self._metric("Encaissements", self._finance, "net des remboursements"),
         ]
         return data
+
+    def _sessions_today(self, day):
+        """Today's sessions from the planning API; « en cours » compares the
+        server's own start / end with the current time (display only)."""
+        rows = self.api.list_all("sessions/", date_from=day.isoformat(), date_to=day.isoformat())
+        cancelled = sum(1 for r in rows if r.get("status") == "CANCELLED")
+        running = 0
+        for row in rows:
+            if row.get("status") != "SCHEDULED" or not row.get("scheduled_start"):
+                continue
+            start, end = datetime.fromisoformat(row["scheduled_start"]), datetime.fromisoformat(row["scheduled_end"])
+            if start <= datetime.now(start.tzinfo) < end:
+                running += 1
+        return str(len(rows) - cancelled), f"{running} en cours · {cancelled} annulée(s)"
 
     def _attendance(self, day):
         """Big value = presence rate of the pupils already checked today;

@@ -187,6 +187,8 @@ class Room:
     name: str
     capacity: int | None
     active: bool
+    room_type: str = "CLASSROOM"
+    bench_count: int | None = None
 
     @property
     def label(self):
@@ -195,7 +197,15 @@ class Room:
 
     @classmethod
     def from_api(cls, row):
-        return cls(row["id"], row["code"], row["name"], row.get("capacity"), bool(row.get("active")))
+        return cls(
+            row["id"],
+            row["code"],
+            row["name"],
+            row.get("capacity"),
+            bool(row.get("active")),
+            row.get("room_type") or "CLASSROOM",
+            row.get("bench_count"),
+        )
 
 
 @dataclass(frozen=True)
@@ -660,4 +670,226 @@ class EligibleTeacher:
     def from_api(cls, row):
         return cls(
             row["id"], row.get("number", ""), row.get("name", ""), row.get("category", ""), row.get("reason", "")
+        )
+
+
+# --- planning (ADR 0021) -----------------------------------------------------------
+
+WEEKDAY_NAMES = {1: "Lundi", 2: "Mardi", 3: "Mercredi", 4: "Jeudi", 5: "Vendredi", 6: "Samedi", 7: "Dimanche"}
+ROOM_TYPES = {  # = academics.RoomType on the server
+    "CLASSROOM": "Salle de classe",
+    "LABORATORY": "Laboratoire",
+    "WORKSHOP": "Atelier",
+    "COMPUTER": "Salle informatique",
+    "SPORTS": "Installation sportive",
+    "OTHER": "Autre",
+}
+SESSION_STATUSES = {"SCHEDULED": "Planifiée", "COMPLETED": "Réalisée", "CANCELLED": "Annulée"}
+REQUEST_STATUSES = {
+    "PENDING": "En attente",
+    "APPROVED": "Validée",
+    "REJECTED": "Refusée",
+    "CHANGES_REQUESTED": "Modification proposée",
+    "CANCELLED": "Retirée",
+}
+BREAK_TYPES = {"HOLIDAY": "Vacances", "PUBLIC_HOLIDAY": "Jour férié", "EXAM": "Examens", "OTHER": "Autre"}
+
+
+def _datetime(value):
+    """Server datetime (ISO with the school's offset) — displayed as is: the
+    school's local time, whatever the computer's time zone."""
+    return datetime.fromisoformat(value) if value else None
+
+
+def _ref(row, *names):
+    row = row or {}
+    return tuple(row.get(name) or "" for name in names)
+
+
+@dataclass(frozen=True)
+class Slot:
+    id: str
+    course_id: str
+    subject_code: str
+    subject_name: str
+    class_id: str
+    class_name: str
+    teacher_id: str
+    teacher_name: str
+    room_id: str
+    room_code: str
+    weekday: int
+    start_time: str
+    end_time: str
+    effective_from: date | None
+    effective_to: date | None
+    status: str
+
+    @property
+    def code(self):
+        return f"{self.subject_code} — {self.class_name}"
+
+    @property
+    def active(self):
+        return self.status == "PUBLISHED"
+
+    @property
+    def when(self):
+        return f"{WEEKDAY_NAMES.get(self.weekday, '?')} {self.start_time[:5]}–{self.end_time[:5]}"
+
+    @classmethod
+    def from_api(cls, row):
+        subject_id, subject_code, subject_name = _ref(row.get("subject"), "id", "code", "name")
+        class_id, class_name = _ref(row.get("school_class"), "id", "name")
+        teacher_id, teacher_name = _ref(row.get("teacher"), "id", "name")
+        room_id, room_code = _ref(row.get("room"), "id", "code")
+        return cls(
+            row["id"],
+            str(row.get("course") or ""),
+            subject_code,
+            subject_name,
+            class_id,
+            class_name,
+            teacher_id,
+            teacher_name,
+            room_id,
+            room_code,
+            int(row.get("weekday") or 0),
+            row.get("start_time") or "",
+            row.get("end_time") or "",
+            _date(row.get("effective_from")),
+            _date(row.get("effective_to")),
+            row.get("status") or "",
+        )
+
+
+@dataclass(frozen=True)
+class Session:
+    id: str
+    course_id: str
+    subject_code: str
+    subject_name: str
+    class_id: str
+    class_name: str
+    teacher_id: str
+    teacher_name: str
+    planned_teacher_id: str
+    planned_teacher_name: str
+    room_id: str
+    room_code: str
+    date: date | None
+    start: datetime | None
+    end: datetime | None
+    status: str
+    is_substituted: bool = False
+    is_moved: bool = False
+
+    @property
+    def code(self):
+        return f"{self.subject_code} — {self.class_name}"
+
+    @property
+    def active(self):
+        return self.status == "SCHEDULED"
+
+    @property
+    def status_label(self):
+        label = SESSION_STATUSES.get(self.status, self.status)
+        extras = [x for x, on in (("remplacée", self.is_substituted), ("déplacée", self.is_moved)) if on]
+        return f"{label} ({', '.join(extras)})" if extras and self.status != "CANCELLED" else label
+
+    @property
+    def hours(self):
+        return f"{self.start:%H:%M}–{self.end:%H:%M}" if self.start and self.end else ""
+
+    @classmethod
+    def from_api(cls, row):
+        subject_id, subject_code, subject_name = _ref(row.get("subject"), "id", "code", "name")
+        class_id, class_name = _ref(row.get("school_class"), "id", "name")
+        teacher_id, teacher_name = _ref(row.get("teacher"), "id", "name")
+        planned_id, planned_name = _ref(row.get("planned_teacher"), "id", "name")
+        room_id, room_code = _ref(row.get("room"), "id", "code")
+        return cls(
+            row["id"],
+            str(row.get("course") or ""),
+            subject_code,
+            subject_name,
+            class_id,
+            class_name,
+            teacher_id,
+            teacher_name,
+            planned_id or teacher_id,
+            planned_name or teacher_name,
+            room_id,
+            room_code,
+            _date(row.get("date")),
+            _datetime(row.get("scheduled_start")),
+            _datetime(row.get("scheduled_end")),
+            row.get("status") or "",
+            bool(row.get("is_substituted")),
+            bool(row.get("is_moved")),
+        )
+
+
+@dataclass(frozen=True)
+class UnavailabilityRequest:
+    id: str
+    teacher_id: str
+    date: date | None
+    start_time: str
+    end_time: str
+    reason: str
+    status: str
+    comment: str = ""
+
+    @property
+    def code(self):
+        return f"{self.date:%d/%m/%Y}" if self.date else ""
+
+    @property
+    def active(self):
+        return self.status == "PENDING"
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            str(row.get("teacher") or ""),
+            _date(row.get("date")),
+            row.get("start_time") or "",
+            row.get("end_time") or "",
+            row.get("reason") or "",
+            row.get("status") or "",
+            row.get("decision_comment") or "",
+        )
+
+
+@dataclass(frozen=True)
+class SchoolBreak:
+    id: str
+    year_id: str
+    name: str
+    start: datetime | None
+    end: datetime | None
+    break_type: str
+    affects_scheduling: bool
+
+    @property
+    def code(self):
+        return self.name
+
+    @property
+    def active(self):
+        return self.affects_scheduling
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            str(row.get("academic_year") or ""),
+            row.get("name") or "",
+            _datetime(row.get("start_datetime")),
+            _datetime(row.get("end_datetime")),
+            row.get("break_type") or "HOLIDAY",
+            bool(row.get("affects_scheduling", True)),
         )

@@ -36,6 +36,10 @@ class CourseService:
         )
         return [Course.from_api(row) for row in rows], total
 
+    def all(self, *, status="active", academic_year_id=None):
+        rows = self.api.list_all(self.PATH, status=status or None, academic_year=academic_year_id or None)
+        return [Course.from_api(row) for row in rows]
+
     def get(self, course_id):
         return Course.from_api(self.api.get(f"{self.PATH}{course_id}/"))
 

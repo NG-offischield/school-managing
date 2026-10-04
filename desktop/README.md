@@ -51,7 +51,10 @@ Le test de bout en bout contre un vrai backend est optionnel. Il crée :
 - un niveau et une classe ;
 - un élève (inscrit, avec photo), qui change de classe, est retiré puis archivé ;
 - un enseignant (compte sans mot de passe) avec une matière ajoutée puis validée, désactivé puis réactivé ;
-- un cours (enseignant proposé par le serveur), planifié par l'API du planning.
+- un cours (enseignant proposé par le serveur), planifié par l'API du planning ;
+- le planning de la semaine : séance générée, salle créée puis affectée, séance déplacée,
+  remplacement (ou refus expliqué du serveur), annulation ;
+- un emploi du temps PDF, vérifié aux couleurs de l'école (jamais « School Managing »).
 
 À lancer contre un backend de **test** :
 
@@ -78,10 +81,21 @@ school_admin/
                        listes de référence, élèves (students.py : fiche, inscription, photo),
                        enseignants (teachers.py : fiche, qualifications, verdicts du serveur),
                        cours (courses.py : enseignants autorisés calculés par le serveur),
+                       planning (planning.py : créneaux, séances, salles, indisponibilités,
+                       vacances ; conflits décidés et expliqués par le serveur),
                        tableau de bord (indicateurs et séries réels de l'API)
   ui/                  écran de connexion, shell (barre latérale, en-tête), pages, dialogues,
                        exécution des appels hors du fil d'affichage, messages d'erreur uniformes
 ```
+
+## Identité du logiciel (School Managing)
+
+`school_admin/ui/branding.py` est le **seul** point d'accès au logo du logiciel (connexion, barre
+latérale, titre et icône des fenêtres, « À propos »). Les fichiers officiels se déposent dans
+`school_admin/ui/assets/brand/` (voir le README du dossier) ; tant qu'ils sont absents, le nom
+« School Managing » s'affiche en texte. Ce logo n'apparaît **jamais** sur les documents de l'école
+(bulletins, cartes, reçus, bulletins de paie, emplois du temps…), qui portent uniquement le nom et
+le logo de l'établissement (`SchoolBranding`, registre Documents inchangé).
 
 ## Interface (thème unique)
 

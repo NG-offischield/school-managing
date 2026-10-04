@@ -5,7 +5,7 @@ small screen: it fits, the buttons stay visible and reachable (mouse and
 keyboard), the form scrolls instead of growing, fields have a width that
 matches their data, side-by-side fields stack when the dialog is narrow."""
 
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 from PySide6.QtCore import QSize, Qt
@@ -20,15 +20,33 @@ from school_admin.models import (
     Level,
     Qualification,
     Room,
+    SchoolBreak,
     SchoolClass,
+    Session,
+    Slot,
     Student,
     Subject,
     Teacher,
+    UnavailabilityRequest,
 )
 from school_admin.ui.dialogs.category_dialog import CategoryDialog
 from school_admin.ui.dialogs.class_dialog import ClassDialog
 from school_admin.ui.dialogs.course_dialogs import CourseDialog, CourseRecordDialog
 from school_admin.ui.dialogs.level_dialog import LevelDialog
+from school_admin.ui.dialogs.planning_dialogs import (
+    BreakDialog,
+    DecisionDialog,
+    EndSlotDialog,
+    GenerateDialog,
+    MainRoomDialog,
+    MoveDialog,
+    RescheduleDialog,
+    RoomChangeDialog,
+    RoomDialog,
+    SessionDialog,
+    SlotDialog,
+    SubstituteDialog,
+)
 from school_admin.ui.dialogs.student_dialogs import (
     ChangeClassDialog,
     EnrollDialog,
@@ -97,6 +115,46 @@ COURSE = Course(
     True,
 )
 QUALS = [Qualification("q1", "s1", "MATH", "Mathématiques", "VERIFIED", "ADMIN", "COMPATIBLE", "COMPATIBLE")]
+SLOT = Slot(
+    "sl1",
+    "k1",
+    "MATH",
+    "Mathématiques",
+    "c1",
+    "6e A",
+    "t1",
+    "Mbarga Jean",
+    "r1",
+    "R12",
+    1,
+    "08:00",
+    "10:00",
+    date(2025, 9, 1),
+    None,
+    "PUBLISHED",
+)
+SESSION = Session(
+    "se1",
+    "k1",
+    "MATH",
+    "Mathématiques",
+    "c1",
+    "6e A",
+    "t2",
+    "Ngo Marie",
+    "t1",
+    "Mbarga Jean",
+    "r1",
+    "R12",
+    date(2026, 3, 2),
+    datetime(2026, 3, 2, 8),
+    datetime(2026, 3, 2, 10),
+    "SCHEDULED",
+    True,
+    False,
+)
+REQUEST = UnavailabilityRequest("u1", "t1", date(2026, 3, 2), "08:00", "12:00", "Rendez-vous médical " * 4, "PENDING")
+BREAK = SchoolBreak("b1", "y1", "Vacances de Pâques", datetime(2026, 4, 6), datetime(2026, 4, 20), "HOLIDAY", True)
 
 
 class StubTeachers:
@@ -130,6 +188,18 @@ DIALOGS = {
     "fiche enseignant": lambda: TeacherRecordDialog(TEACHER, QUALS, []),
     "cours (ajout)": lambda: CourseDialog((YEARS, CLASSES, SUBJECTS, []), lambda c, s, done: done(([], []))),
     "fiche cours": lambda: CourseRecordDialog(COURSE),
+    "créneau": lambda: SlotDialog([COURSE], ROOMS, lambda payload, done: done({"conflicts": []})),
+    "fin de créneau": lambda: EndSlotDialog(SLOT),
+    "reprogrammation": lambda: RescheduleDialog(SLOT, ROOMS),
+    "génération": lambda: GenerateDialog(CLASSES, date(2026, 3, 2)),
+    "fiche séance": lambda: SessionDialog(SESSION),
+    "déplacement": lambda: MoveDialog(SESSION),
+    "salle de séance": lambda: RoomChangeDialog(SESSION, ROOMS),
+    "remplacement": lambda: SubstituteDialog(SESSION, [TEACHER]),
+    "salle": lambda: RoomDialog(),
+    "salle principale": lambda: MainRoomDialog(CLASSES, ROOMS),
+    "indisponibilité": lambda: DecisionDialog(REQUEST, "Mbarga Jean", [SESSION] * 6),
+    "interruption": lambda: BreakDialog(YEARS, school_break=BREAK),
     "confirmation": lambda: ConfirmDialog("Désactiver ?", "Texte explicatif " * 20, danger=True),
 }
 SCREENS = [QSize(1366, 768), QSize(1280, 720), QSize(1024, 768), QSize(800, 480)]
@@ -312,4 +382,12 @@ def test_course_form_scrolls_with_buttons_always_visible(qapp):
             break
         QTest.keyClick(dialog.focusWidget(), Qt.Key_Tab)
     assert dialog.focusWidget() is dialog.scale and bar.value() > 0
+    dialog.close()
+
+
+def test_slot_form_scrolls_with_buttons_always_visible(qapp):
+    dialog = SlotDialog([COURSE], ROOMS, lambda payload, done: done({"conflicts": []}))
+    on_screen(dialog, QSize(800, 480))
+    assert inside(dialog.save_button, dialog) and inside(dialog.cancel_button, dialog)
+    assert dialog.start_time.width() <= FIELD_WIDTHS["short"] and dialog.end_time.width() <= FIELD_WIDTHS["short"]
     dialog.close()

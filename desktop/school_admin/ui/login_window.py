@@ -4,6 +4,7 @@ clear errors. The password field is cleared as soon as the request leaves."""
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QCheckBox, QFrame, QLabel, QLineEdit, QVBoxLayout, QWidget
 
+from .branding import SOFTWARE_NAME, brand_mark, software_icon
 from .feedback import describe
 from .widgets import Banner, button
 
@@ -14,7 +15,8 @@ class LoginWindow(QWidget):
     def __init__(self, auth, runner, config, parent=None):
         super().__init__(parent)
         self.auth, self.runner, self.config = auth, runner, config
-        self.setWindowTitle("Administration scolaire — Connexion")
+        self.setWindowTitle(f"{SOFTWARE_NAME} — Connexion")
+        self.setWindowIcon(software_icon())
         self.setObjectName("loginBackground")
         self.setMinimumSize(520, 600)
 
@@ -22,6 +24,8 @@ class LoginWindow(QWidget):
         form = QVBoxLayout(card)
         form.setContentsMargins(32, 30, 32, 28)
         form.setSpacing(6)
+        self.brand = brand_mark("horizontal", 44, object_name="softwareBrandLogin")  # the SOFTWARE's identity
+        form.addWidget(self.brand)
         form.addWidget(QLabel("Administration scolaire", objectName="appTitle"))
         subtitle = QLabel("Connectez-vous avec votre compte administrateur.", objectName="subtitle")
         subtitle.setWordWrap(True)

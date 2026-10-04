@@ -40,6 +40,7 @@ from common.permissions import ADMIN_ROLES, require_role
 
 from .models import (
     CONFLICT_CONSTRAINTS,
+    BreakType,
     ChangeType,
     ExceptionStatus,
     NotificationStatus,
@@ -1115,6 +1116,7 @@ def create_school_break(
     year, *, actor, name, start_datetime, end_datetime, break_type="HOLIDAY", affects_scheduling=True
 ):
     require_role(actor, ADMIN_ROLES, school=year.school)
+    _check_break(start_datetime, end_datetime, break_type)
     school_break = SchoolBreak.objects.create(
         school=year.school,
         academic_year=year,
@@ -1129,6 +1131,45 @@ def create_school_break(
         actor=actor,
         entity=school_break,
         new=_jsonable({"name": name, "start": start_datetime, "end": end_datetime}),
+        layer=AuditLayer.ADMINISTRATIVE,
+    )
+    return school_break
+
+
+BREAK_FIELDS = ("name", "start_datetime", "end_datetime", "break_type", "affects_scheduling")
+
+
+def _check_break(start_datetime, end_datetime, break_type):
+    if end_datetime <= start_datetime:
+        raise ValidationError("The end must be after the start.", code="invalid_dates")
+    if break_type not in BreakType.values:
+        raise ValidationError("Unknown break type.", code="break_type_invalid")
+
+
+@transaction.atomic
+def update_school_break(school_break, *, actor, **changes):
+    """Edit a holiday / interruption (admin desktop "Vacances"). Sessions
+    already generated are not touched: generation skips breaks from now on,
+    and existing sessions are cancelled one by one by the administrator."""
+    require_role(actor, ADMIN_ROLES, school=school_break.school)
+    school_break = SchoolBreak.objects.select_for_update().get(pk=school_break.pk)
+    old = _jsonable({f: getattr(school_break, f) for f in BREAK_FIELDS})
+    for name in BREAK_FIELDS:
+        if name in changes:
+            value = changes[name]
+            if name == "name":
+                value = (value or "").strip()
+                if not value:
+                    raise ValidationError("A name is required.", code="name_required")
+            setattr(school_break, name, value)
+    _check_break(school_break.start_datetime, school_break.end_datetime, school_break.break_type)
+    school_break.save()
+    record_audit(
+        "SCHOOL_BREAK_UPDATED",
+        actor=actor,
+        entity=school_break,
+        old=old,
+        new=_jsonable({f: getattr(school_break, f) for f in BREAK_FIELDS}),
         layer=AuditLayer.ADMINISTRATIVE,
     )
     return school_break

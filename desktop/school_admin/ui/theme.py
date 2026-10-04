@@ -181,6 +181,11 @@ QLabel {{ background: transparent; }}
 /* ---------- sidebar ---------- */
 #sidebar {{ background: {t.sidebar}; border: none; }}
 #brand {{ color: #FFFFFF; font-size: 13pt; font-weight: 600; padding: 18px 18px 2px 18px; }}
+#softwareBrandLogin {{ font-size: {s.app_title}pt; font-weight: 700; color: {t.primary}; }}
+#aboutLink {{ background: transparent; border: none; color: {t.sidebar_muted}; text-align: left;
+    padding: 6px 22px; font-weight: 400; min-height: 24px; }}
+#aboutLink:hover {{ color: #FFFFFF; text-decoration: underline; background: transparent; }}
+#aboutLink:focus {{ color: #FFFFFF; border: 1px solid #FFFFFF; }}
 #brandSub {{ color: {t.sidebar_muted}; font-size: {s.small}pt; padding: 0 18px 14px 18px; }}
 #sidebar QListWidget {{ background: transparent; border: none; outline: none; color: {t.sidebar_text}; }}
 /* no colour on ::item: per-entry colours (muted sections, "Bientôt") must apply */
@@ -209,6 +214,14 @@ QLabel {{ background: transparent; }}
     padding-top: 10px; border-top: 1px solid {t.border}; }}
 #photoFrame {{ background: {t.row_alt}; border: 1px solid {t.border}; border-radius: 8px; color: {t.text_secondary}; }}
 #fieldValue {{ color: {t.text}; }}
+QTabWidget::pane {{ border: none; background: {t.background}; }}
+QTabBar::tab {{ background: transparent; color: {t.text_secondary}; padding: 8px 16px; margin-right: 2px;
+    border: none; border-bottom: 3px solid transparent; font-weight: 600; }}
+QTabBar::tab:selected {{ color: {t.primary}; border-bottom: 3px solid {t.primary}; }}
+QTabBar::tab:hover {{ color: {t.text}; }}
+QTabBar::tab:focus {{ outline: none; }}
+#legendChip {{ border-radius: 4px; padding: 2px 8px; font-size: {s.small}pt; color: {t.text}; }}
+#weekLabel {{ font-size: 12pt; font-weight: 600; color: {t.text}; }}
 #chartTitle {{ font-size: 11pt; font-weight: 600; color: {t.text}; }}
 #chartState {{ color: {t.text_secondary}; padding: 12px; }}
 #chartError {{ color: {t.warning}; padding: 12px; }}
@@ -247,15 +260,17 @@ QPushButton[variant="danger"]:disabled, QPushButton[variant="danger-solid"]:disa
     background: {t.disabled_fill}; color: {t.text_disabled}; border: 1px dashed {t.field_border}; }}
 
 /* ---------- inputs ---------- */
-QLineEdit, QPlainTextEdit, QComboBox, QDateEdit {{ background: {t.field}; color: {t.text};
+QLineEdit, QPlainTextEdit, QComboBox, QDateEdit, QTimeEdit {{ background: {t.field}; color: {t.text};
     border: 1px solid {t.field_border}; border-radius: 6px; padding: 6px 10px; min-height: 22px;
     selection-background-color: {t.primary};
     selection-color: {t.on_primary}; }}
-QLineEdit:hover, QPlainTextEdit:hover, QComboBox:hover, QDateEdit:hover {{ border-color: {t.text_secondary}; }}
-QLineEdit:focus, QPlainTextEdit:focus, QComboBox:focus, QDateEdit:focus {{ border: 2px solid {t.focus};
+QLineEdit:hover, QPlainTextEdit:hover, QComboBox:hover, QDateEdit:hover, QTimeEdit:hover {{
+    border-color: {t.text_secondary}; }}
+QLineEdit:focus, QPlainTextEdit:focus, QComboBox:focus, QDateEdit:focus, QTimeEdit:focus {{ border: 2px solid {t.focus};
     padding: 5px 9px; }}
 QLineEdit:read-only {{ background: {t.field_disabled}; color: {t.text_secondary}; }}
-QLineEdit:disabled, QComboBox:disabled, QPlainTextEdit:disabled, QDateEdit:disabled {{ background: {t.field_disabled};
+QLineEdit:disabled, QComboBox:disabled, QPlainTextEdit:disabled, QDateEdit:disabled,
+QTimeEdit:disabled {{ background: {t.field_disabled};
     color: {t.text_disabled}; }}
 QLineEdit[invalid="true"], QComboBox[invalid="true"] {{ border: 2px solid {t.error}; padding: 5px 9px; }}
 QComboBox, QDateEdit {{ padding-right: 30px; }}

@@ -131,6 +131,16 @@ class FakeBackend:
         # Courses (gradebook/course_api.py): course = subject + teacher + class + year.
         self.courses = {}
         self.courses_scheduled = set()
+        # Planning (scheduling/api.py): empty until seed_planning().
+        self.slots = {}
+        self.teaching_sessions = {}
+        self.unavailability = {}
+        self.breaks = {}
+        self.changes = []
+        self.rooms_in_use = set()
+        self.incompatible_substitutes = set()
+        for room in self.rooms.values():
+            room.update(room_type="CLASSROOM", bench_count=None)
         self.finance = {
             "currency": "XAF",
             "net_collected": "1250000.00",
@@ -644,6 +654,8 @@ class FakeBackend:
                     "qualification_status": existing["status"] if existing else None,
                 }
             )
+        if action == "availability":
+            return self._page([], request)
         if action == "compatibility-rules":
             return ok(
                 [
@@ -829,6 +841,374 @@ class FakeBackend:
             if name in body:
                 course[name] = body[name] if body[name] is not None or name == "grading_scale" else course[name]
         return ok(self._course_out(course))
+
+    # --- planning -----------------------------------------------------------------
+    WEEK = "2026-03-02"  # Monday of the seeded week
+
+    def seed_planning(self):
+        """Teachers, two courses, a Monday slot and the sessions of the week
+        of 2026-03-02 (Mon MATH 6e A 08-10 in R12, Wed FR 5e A 10-12), one
+        pending unavailability request, one break."""
+        self.seed_teachers()
+        self.c_math = self.add_course(self._class("6e A"), self.math, self.tm, "4.00")
+        self.c_fr = self.add_course(self._class("5e A"), self.fr, self.tf, "2.00")
+        self.s_math = self.add_slot(self.c_math, 1, "08:00:00", "10:00:00", "r1")
+        self.s_fr = self.add_slot(self.c_fr, 3, "10:00:00", "12:00:00", "r2")
+        self.generate("2026-03-02", "2026-03-08")
+        rid = str(uuid.uuid4())
+        self.unavailability[rid] = {
+            "id": rid,
+            "teacher": self.tm,
+            "date": "2026-03-02",
+            "start_time": "08:00:00",
+            "end_time": "12:00:00",
+            "reason": "Rendez-vous médical",
+            "status": "PENDING",
+            "decision_comment": None,
+        }
+        self.req = rid
+        bid = str(uuid.uuid4())
+        self.breaks[bid] = {
+            "id": bid,
+            "academic_year": "y1",
+            "name": "Vacances de Pâques",
+            "start_datetime": "2026-04-06T00:00:00+01:00",
+            "end_datetime": "2026-04-19T23:59:00+01:00",
+            "break_type": "HOLIDAY",
+            "affects_scheduling": True,
+        }
+
+    def _class(self, name):
+        return next(c["id"] for c in self.classes.values() if c["name"] == name)
+
+    def add_slot(self, course_id, weekday, start, end, room=None, effective_from="2025-09-01"):
+        course = self.courses[course_id]
+        sid = str(uuid.uuid4())
+        self.slots[sid] = {
+            "id": sid,
+            "course": course_id,
+            "weekday": weekday,
+            "start_time": start,
+            "end_time": end,
+            "room": room,
+            "effective_from": effective_from,
+            "effective_to": None,
+            "status": "PUBLISHED",
+            "_class": course["school_class"],
+            "_teacher": course["teacher"],
+        }
+        return sid
+
+    def generate(self, date_from, date_to, class_id=None):
+        from datetime import date as day_type
+        from datetime import timedelta as delta
+
+        summary = {"created": 0, "existing": 0, "in_break": 0, "conflicts": []}
+        day, last = day_type.fromisoformat(date_from), day_type.fromisoformat(date_to)
+        while day <= last:
+            for slot in self.slots.values():
+                if slot["status"] != "PUBLISHED" or slot["weekday"] != day.isoweekday():
+                    continue
+                if class_id and slot["_class"] != class_id:
+                    continue
+                if slot["effective_to"] and day.isoformat() > slot["effective_to"]:
+                    continue
+                if any(
+                    x["schedule_slot"] == slot["id"] and x["date"] == day.isoformat()
+                    for x in self.teaching_sessions.values()
+                ):
+                    summary["existing"] += 1
+                    continue
+                self.add_session(slot, day.isoformat())
+                summary["created"] += 1
+            day += delta(days=1)
+        return summary
+
+    def add_session(self, slot, day):
+        sid = str(uuid.uuid4())
+        course = self.courses[slot["course"]]
+        self.teaching_sessions[sid] = {
+            "id": sid,
+            "schedule_slot": slot["id"],
+            "course": slot["course"],
+            "_class": course["school_class"],
+            "_subject": course["subject"],
+            "teacher": course["teacher"],
+            "planned_teacher": course["teacher"],
+            "room": slot["room"],
+            "date": day,
+            "scheduled_start": f"{day}T{slot['start_time']}+01:00",
+            "scheduled_end": f"{day}T{slot['end_time']}+01:00",
+            "status": "SCHEDULED",
+            "is_moved": False,
+        }
+        return sid
+
+    def _teacher_ref(self, tid):
+        teacher = self.teachers[tid]
+        return {"id": tid, "name": f"{teacher['first_name']} {teacher['last_name']}"}
+
+    def _room_ref(self, rid):
+        room = self.rooms.get(rid) if rid else None
+        return {"id": room["id"], "code": room["code"], "name": room["name"]} if room else None
+
+    def _slot_out(self, slot):
+        course = self.courses[slot["course"]]
+        subject, klass = self.subjects[course["subject"]], self.classes[course["school_class"]]
+        return {
+            **{k: v for k, v in slot.items() if not k.startswith("_")},
+            "subject": {"id": subject["id"], "code": subject["code"], "name": subject["name"]},
+            "school_class": {"id": klass["id"], "name": klass["name"]},
+            "teacher": self._teacher_ref(slot["_teacher"]),
+            "room": self._room_ref(slot["room"]),
+        }
+
+    def _session_out(self, row):
+        subject, klass = self.subjects[row["_subject"]], self.classes[row["_class"]]
+        return {
+            **{k: v for k, v in row.items() if not k.startswith("_")},
+            "subject": {"id": subject["id"], "code": subject["code"], "name": subject["name"]},
+            "school_class": {"id": klass["id"], "name": klass["name"]},
+            "teacher": self._teacher_ref(row["teacher"]),
+            "planned_teacher": self._teacher_ref(row["planned_teacher"]),
+            "room": self._room_ref(row["room"]),
+            "is_substituted": row["teacher"] != row["planned_teacher"],
+        }
+
+    def _slot_conflicts(self, course_id, weekday, start, end, room, exclude=None):
+        course = self.courses[course_id]
+        conflicts = []
+        for slot in self.slots.values():
+            if slot is exclude or slot["status"] != "PUBLISHED" or slot["weekday"] != weekday:
+                continue
+            if not (slot["start_time"] < end and slot["end_time"] > start):
+                continue
+            kinds = [
+                k
+                for k, same in (
+                    ("CLASS", slot["_class"] == course["school_class"]),
+                    ("TEACHER", slot["_teacher"] == course["teacher"]),
+                    ("ROOM", room is not None and slot["room"] == room),
+                )
+                if same
+            ]
+            if kinds:
+                conflicts.append(
+                    {
+                        "slot": slot["id"],
+                        "kinds": kinds,
+                        "weekday": weekday,
+                        "start_time": slot["start_time"],
+                        "end_time": slot["end_time"],
+                    }
+                )
+        return conflicts
+
+    def _change(self, change_type, **extra):
+        self.changes.insert(
+            0, {"id": str(uuid.uuid4()), "change_type": change_type, "changed_at": "2026-03-02T09:00:00+01:00", **extra}
+        )
+
+    def _planning(self, request, path, body, admin):
+        params = request.url.params
+        parts = path.strip("/").split("/")
+        if path == "school-breaks/":
+            return self._page(list(self.breaks.values()), request)
+        if path == "planning/changes/":
+            return self._page(self.changes, request)
+        if path == "schedules/":
+            rows = [s for s in self.slots.values() if s["status"] == (params.get("status") or "PUBLISHED")]
+            for name, key in (("school_class", "_class"), ("teacher", "_teacher"), ("room", "room")):
+                if params.get(name):
+                    rows = [s for s in rows if s[key] == params[name]]
+            return self._page([self._slot_out(s) for s in rows], request)
+        if path == "sessions/":
+            rows = list(self.teaching_sessions.values())
+            if params.get("date_from"):
+                rows = [r for r in rows if r["date"] >= params["date_from"]]
+            if params.get("date_to"):
+                rows = [r for r in rows if r["date"] <= params["date_to"]]
+            for name, key in (("school_class", "_class"), ("room", "room"), ("subject", "_subject")):
+                if params.get(name):
+                    rows = [r for r in rows if r[key] == params[name]]
+            if params.get("teacher"):
+                rows = [r for r in rows if params["teacher"] in (r["teacher"], r["planned_teacher"])]
+            rows.sort(key=lambda r: r["scheduled_start"])
+            return self._page([self._session_out(r) for r in rows], request)
+        if parts[0] == "sessions" and len(parts) == 2:
+            row = self.teaching_sessions.get(parts[1])
+            return ok(self._session_out(row)) if row else fail(404, "NOT_FOUND", "Séance introuvable.")
+        if not admin:
+            return fail(403, "PERMISSION_DENIED", "Permission refusée.")
+        if path == "admin/rooms/":
+            if any(r["code"].lower() == (body.get("code") or "").lower() for r in self.rooms.values()):
+                return fail(409, "CONFLICT", "Code utilisé.", {"rule": "duplicate_code"})
+            rid = str(uuid.uuid4())
+            self.rooms[rid] = {
+                "id": rid,
+                "active": True,
+                "capacity": None,
+                "bench_count": None,
+                "room_type": "CLASSROOM",
+                **body,
+            }
+            return ok(self.rooms[rid], 201)
+        if parts[:2] == ["admin", "rooms"]:
+            room = self.rooms.get(parts[2])
+            if room is None:
+                return fail(404, "NOT_FOUND", "Salle introuvable.")
+            action = parts[3] if len(parts) > 3 else ""
+            if action == "deactivate":
+                if room["id"] in self.rooms_in_use:
+                    return fail(409, "CONFLICT", "Salle utilisée.", {"rule": "room_in_use"})
+                room["active"] = False
+            elif action == "reactivate":
+                room["active"] = True
+            else:
+                room.update(body)
+            return ok(room)
+        if parts[:2] == ["admin", "classes"]:
+            klass = self.classes.get(parts[2])
+            if klass is None or (body.get("room") and body["room"] not in self.rooms):
+                return fail(404, "NOT_FOUND", "Introuvable.")
+            klass["main_room"] = body.get("room")
+            return ok({"school_class": klass["id"], "main_room": body.get("room")})
+        if path in ("admin/schedules/", "admin/schedules/check/"):
+            if body.get("course") not in self.courses:
+                return fail(404, "NOT_FOUND", "Cours introuvable.")
+            if body["end_time"] <= body["start_time"]:
+                return fail(400, "BUSINESS_RULE_VIOLATION", "Heures.", {"rule": "invalid_times"})
+            room = body.get("room") or self.classes[self.courses[body["course"]]["school_class"]].get("main_room")
+            conflicts = self._slot_conflicts(
+                body["course"], body["weekday"], body["start_time"], body["end_time"], room
+            )
+            if path.endswith("check/"):
+                return ok({"room": room, "conflicts": conflicts, "teacher_declared_unavailable": False})
+            if conflicts:
+                return fail(
+                    409, "CONFLICT", "Conflit.", {"rule": "planning_conflict", "context": {"conflicts": conflicts}}
+                )
+            sid = self.add_slot(body["course"], body["weekday"], body["start_time"], body["end_time"], room)
+            self._change("SLOT_CREATED", schedule_slot=sid)
+            return ok(self._slot_out(self.slots[sid]), 201)
+        if parts[:2] == ["admin", "schedules"]:
+            slot = self.slots.get(parts[2])
+            if slot is None:
+                return fail(404, "NOT_FOUND", "Créneau introuvable.")
+            if not (body.get("reason") or "").strip():
+                return fail(400, "BUSINESS_RULE_VIOLATION", "Motif.", {"rule": "reason_required"})
+            if parts[3] == "end":
+                slot["effective_to"] = body["last_date"]
+                self._change("SLOT_ENDED", schedule_slot=slot["id"])
+                return ok(self._slot_out(slot))
+            conflicts = self._slot_conflicts(
+                slot["course"],
+                body["weekday"],
+                body["start_time"],
+                body["end_time"],
+                body.get("room") or slot["room"],
+                exclude=slot,
+            )
+            if conflicts:
+                return fail(
+                    409, "CONFLICT", "Conflit.", {"rule": "planning_conflict", "context": {"conflicts": conflicts}}
+                )
+            slot["effective_to"] = body["from_date"]
+            sid = self.add_slot(
+                slot["course"],
+                body["weekday"],
+                body["start_time"],
+                body["end_time"],
+                body.get("room") or slot["room"],
+                effective_from=body["from_date"],
+            )
+            return ok(self._slot_out(self.slots[sid]), 201)
+        if path == "admin/sessions/generate/":
+            return ok(self.generate(body["date_from"], body["date_to"], body.get("school_class")))
+        if parts[:2] == ["admin", "sessions"]:
+            row = self.teaching_sessions.get(parts[2])
+            if row is None:
+                return fail(404, "NOT_FOUND", "Séance introuvable.")
+            if not (body.get("reason") or "").strip():
+                return fail(400, "BUSINESS_RULE_VIOLATION", "Motif.", {"rule": "reason_required"})
+            if row["status"] != "SCHEDULED":
+                return fail(400, "BUSINESS_RULE_VIOLATION", "Plus planifiée.", {"rule": "session_not_scheduled"})
+            action = parts[3]
+            if action == "cancel":
+                row["status"] = "CANCELLED"
+            elif action == "move":
+                start, end = body["new_start"], body["new_end"]
+                clash = [
+                    x
+                    for x in self.teaching_sessions.values()
+                    if x is not row
+                    and x["status"] == "SCHEDULED"
+                    and x["_class"] == row["_class"]
+                    and x["scheduled_start"][:16] < end[:16]
+                    and x["scheduled_end"][:16] > start[:16]
+                ]
+                if clash:
+                    context = {
+                        "conflicts": [
+                            {
+                                "session": x["id"],
+                                "kinds": ["CLASS"],
+                                "scheduled_start": x["scheduled_start"],
+                                "scheduled_end": x["scheduled_end"],
+                            }
+                            for x in clash
+                        ]
+                    }
+                    return fail(409, "CONFLICT", "Conflit.", {"rule": "planning_conflict", "context": context})
+                row.update(
+                    date=start[:10],
+                    scheduled_start=f"{start[:19]}+01:00",
+                    scheduled_end=f"{end[:19]}+01:00",
+                    is_moved=True,
+                )
+            elif action == "room":
+                row["room"] = body.get("room")
+            elif action == "substitute":
+                if body["teacher"] in self.incompatible_substitutes:
+                    return fail(400, "BUSINESS_RULE_VIOLATION", "Incompatible.", {"rule": "teacher_incompatible"})
+                row["teacher"] = body["teacher"]
+            elif action == "restore-teacher":
+                if row["teacher"] == row["planned_teacher"]:
+                    return fail(400, "BUSINESS_RULE_VIOLATION", "Pas de remplaçant.", {"rule": "not_substituted"})
+                row["teacher"] = row["planned_teacher"]
+            self._change(f"SESSION_{action.upper()}", session=row["id"])
+            return ok(self._session_out(row))
+        if path == "admin/unavailability/":
+            rows = [r for r in self.unavailability.values() if r["status"] == (params.get("status") or "PENDING")]
+            return self._page(rows, request)
+        if parts[:2] == ["admin", "unavailability"]:
+            row = self.unavailability.get(parts[2])
+            if row is None:
+                return fail(404, "NOT_FOUND", "Demande introuvable.")
+            impacted = [
+                self._session_out(x)
+                for x in self.teaching_sessions.values()
+                if x["teacher"] == row["teacher"] and x["date"] == row["date"] and x["status"] == "SCHEDULED"
+            ]
+            if parts[3] == "impacted-sessions":
+                return ok(impacted)
+            if row["status"] not in ("PENDING", "CHANGES_REQUESTED"):
+                return fail(409, "CONFLICT", "Déjà traitée.", {"rule": "already_decided"})
+            row.update(status=body["decision"], decision_comment=body.get("comment"))
+            return ok({"request": row, "impacted_sessions": impacted if body["decision"] == "APPROVED" else []})
+        if path == "admin/school-breaks/":
+            bid = str(uuid.uuid4())
+            self.breaks[bid] = {"id": bid, **body}
+            return ok(self.breaks[bid], 201)
+        if parts[:2] == ["admin", "school-breaks"]:
+            row = self.breaks.get(parts[2])
+            if row is None:
+                return fail(404, "NOT_FOUND", "Interruption introuvable.")
+            if body.get("end_datetime", row["end_datetime"]) <= body.get("start_datetime", row["start_datetime"]):
+                return fail(400, "BUSINESS_RULE_VIOLATION", "Dates.", {"rule": "invalid_dates"})
+            row.update(body)
+            return ok(row)
+        return None
 
     def _teacher_write(self, teacher, body):
         fields = ("first_name", "last_name", "email", "employee_number", "pedagogical_category", "primary_subject")
@@ -1164,6 +1544,20 @@ class FakeBackend:
             return ok({"id": "s1", "code": "TEST01", "name": "École Test", "city": "Douala"})
         if path.startswith("levels/"):
             return self._levels(request, path, body, admin)
+        planning = (
+            "school-breaks/",
+            "planning/changes/",
+            "schedules/",
+            "sessions/",
+            "admin/rooms/",
+            "admin/classes/",
+            "admin/schedules/",
+            "admin/sessions/",
+            "admin/unavailability/",
+            "admin/school-breaks/",
+        )
+        if any(path.startswith(prefix) for prefix in planning):
+            return self._planning(request, path, body, admin)
         if path.startswith("courses/") or path == "grading-scales/":
             return self._courses(request, path, body, admin)
         if (
@@ -1175,9 +1569,7 @@ class FakeBackend:
         if path.startswith("admin/dashboard/") or path == "admin/finance/dashboard/":
             return self._dashboard(request, path, admin)
         if path == "rooms/":
-            rows = list(self.rooms.values())
-            if request.url.params.get("active") == "true":
-                rows = [r for r in rows if r["active"]]
+            rows = self._filter(list(self.rooms.values()), request)
             return self._page(rows, request)
         if path.startswith("classes/"):
             return self._classes(request, path, body, admin)
@@ -1185,9 +1577,6 @@ class FakeBackend:
             return self._years(request, path, body, admin)
         if path.startswith("students/") or path.startswith("enrollments/"):
             return self._students(request, path, body, admin)
-        if path == "sessions/":
-            sizes = {"sessions/": 37}
-            return self._page([{"id": str(i)} for i in range(sizes[path])], request)
         if path == "admin/attendance/dashboard/":
             return fail(400, "BUSINESS_RULE_VIOLATION", "Aucune politique de présence.", {"rule": "no_policy"})
         if path == "pedagogical-categories/":

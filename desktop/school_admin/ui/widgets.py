@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
     QScrollArea,
+    QTimeEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -109,6 +110,22 @@ class DateField(QDateEdit):
 
     def focusNextPrevChild(self, next_child):
         return QWidget.focusNextPrevChild(self, next_child)
+
+
+class TimeField(QTimeEdit):
+    """QTimeEdit with the same Tab behaviour as DateField."""
+
+    keyPressEvent = DateField.keyPressEvent
+    focusNextPrevChild = DateField.focusNextPrevChild
+
+
+def time_field(value=None):
+    """Time input HH:MM (school's local time)."""
+    widget = TimeField()
+    widget.setDisplayFormat("HH:mm")
+    if value is not None:
+        widget.setTime(value)
+    return widget
 
 
 def date_field():

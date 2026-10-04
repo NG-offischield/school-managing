@@ -13,15 +13,18 @@ from ..services.catalog import CategoryService, SubjectService
 from ..services.classes import ClassService, ReferenceService
 from ..services.courses import CourseService
 from ..services.dashboard import DashboardService
+from ..services.planning import PlanningService
 from ..services.structure import LevelService, YearService
 from ..services.students import StudentService
 from ..services.teachers import TeacherService
+from .branding import SOFTWARE_NAME, software_icon
 from .login_window import LoginWindow
 from .main_window import MainWindow
 from .pages.catalog_pages import CategoriesPage, SubjectsPage
 from .pages.classes_page import ClassesPage
 from .pages.courses_page import CoursesPage
 from .pages.dashboard_page import DashboardPage
+from .pages.planning_page import PlanningPage
 from .pages.structure_pages import LevelsPage, YearsPage
 from .pages.students_page import StudentsPage
 from .pages.teachers_page import TeachersPage
@@ -43,6 +46,7 @@ class AppController:
         self.students = StudentService(api)
         self.teachers = TeacherService(api)
         self.courses = CourseService(api)
+        self.planning = PlanningService(api)
         self.login_window = LoginWindow(auth, runner, config)
         self.login_window.logged_in.connect(self.show_shell)
         self.main_window = None
@@ -68,6 +72,15 @@ class AppController:
                 self.references,
                 self.runner,
                 **options.get("teachers", {}),
+            ),
+            "planning": lambda: PlanningPage(
+                self.planning,
+                self.references,
+                self.teachers,
+                self.subjects,
+                self.courses,
+                self.runner,
+                **options.get("planning", {}),
             ),
             "courses": lambda: CoursesPage(
                 self.courses, self.subjects, self.references, self.runner, **options.get("courses", {})
@@ -107,7 +120,8 @@ class AppController:
 
 def main(argv=None):
     app = QApplication(argv if argv is not None else sys.argv)
-    app.setApplicationName("Administration scolaire")
+    app.setApplicationName(SOFTWARE_NAME)
+    app.setWindowIcon(software_icon())
     apply_theme(app)
     config = load_config()
     api = ApiClient(config.api_url, timeout=config.timeout, language=config.language)
