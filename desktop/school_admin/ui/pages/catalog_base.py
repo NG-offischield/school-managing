@@ -79,6 +79,7 @@ class CatalogPage(Page):
     status_filters = STATUS_FILTERS
     has_toggle = True  # Désactiver / Réactiver
     default_sort = (0, Qt.AscendingOrder)  # (column, order) when the list opens
+    sortable = True  # False when the server orders the rows (paginated lists)
 
     def __init__(self, runner, parent=None, **kwargs):
         super().__init__(runner, parent, **kwargs)
@@ -100,7 +101,14 @@ class CatalogPage(Page):
         actions = QHBoxLayout()
         actions.setSpacing(8)
         self.toggle_button.setVisible(self.has_toggle)
-        buttons = (self.refresh_button, self.edit_button, self.toggle_button, *self.extra_actions(), self.add_button)
+        buttons = (
+            self.refresh_button,
+            *self.leading_actions(),
+            self.edit_button,
+            self.toggle_button,
+            *self.extra_actions(),
+            self.add_button,
+        )
         for widget in buttons:
             actions.addWidget(widget)
         head.addLayout(actions)
@@ -141,7 +149,7 @@ class CatalogPage(Page):
         self.table.setWordWrap(False)
         # Ascending by the first column (Qt defaults to DESCENDING once sorting is on).
         self.table.horizontalHeader().setSortIndicator(*self.default_sort)
-        self.table.setSortingEnabled(True)
+        self.table.setSortingEnabled(self.sortable)
         self.table.verticalHeader().setVisible(False)
         self.table.verticalHeader().setDefaultSectionSize(40)
         header = self.table.horizontalHeader()
@@ -167,11 +175,11 @@ class CatalogPage(Page):
         self.toggle_button.clicked.connect(self.toggle)
         self.refresh_button.clicked.connect(self.reload)
         self.table.itemSelectionChanged.connect(self._update_actions)
-        self.table.doubleClicked.connect(lambda _: self.edit())
+        self.table.doubleClicked.connect(lambda _: self.open_row())
         QShortcut(QKeySequence.New, self, activated=lambda: self.add_button.isEnabled() and self.add())
         QShortcut(QKeySequence.Refresh, self, activated=self.reload)
         QShortcut(QKeySequence.Find, self, activated=self.search.setFocus)
-        QShortcut(QKeySequence(Qt.Key_Return), self.table, activated=self.edit)
+        QShortcut(QKeySequence(Qt.Key_Return), self.table, activated=lambda: self.open_row())
         self._update_actions()
 
     # --- to implement ---------------------------------------------------------
@@ -180,6 +188,14 @@ class CatalogPage(Page):
 
     def add_filters(self, layout):
         pass
+
+    def open_row(self):
+        """Double-click / Entrée on a row (default: edit it)."""
+        self.edit()
+
+    def leading_actions(self):
+        """Buttons placed right after « Actualiser » (e.g. « Fiche »)."""
+        return []
 
     def extra_actions(self):
         """Buttons placed before « Ajouter » (created here, wired by the page)."""
@@ -247,7 +263,7 @@ class CatalogPage(Page):
                 if value and self.columns[c] != STATUS_COLUMN_TITLE:
                     item.setToolTip(value)
                 self.table.setItem(r, c, item)
-        self.table.setSortingEnabled(True)
+        self.table.setSortingEnabled(self.sortable)
         count = len(rows)
         self.count_label.setText(f"{count} {self.noun if count < 2 else self.plural}")
         filtered = self.is_filtered()

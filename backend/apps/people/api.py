@@ -187,31 +187,7 @@ class StudentVisibilityMixin(SchoolScopedMixin):
 # -----------------------------------------------------------------------------
 
 
-class StudentList(StudentVisibilityMixin, generics.ListAPIView):
-    queryset = Student.objects.all()
-    serializer_class = StudentSerializer
-
-    def restrict(self, queryset):
-        return self.visible_students(queryset)
-
-
-class StudentDetail(StudentVisibilityMixin, generics.RetrieveAPIView):
-    queryset = Student.objects.all()
-    serializer_class = StudentSerializer
-
-    def restrict(self, queryset):
-        return self.visible_students(queryset)
-
-
-class StudentEnrollmentList(StudentVisibilityMixin, generics.ListAPIView):
-    """GET /students/{id}/enrollments/ — the year-by-year history."""
-
-    queryset = StudentEnrollment.objects.select_related("academic_year", "school_class")
-    serializer_class = EnrollmentSerializer
-
-    def restrict(self, queryset):
-        students = self.visible_students(scope_to_current_school(Student.objects.all(), self.request))
-        return queryset.filter(student_id=self.kwargs["pk"], student__in=students)
+# Student list / detail / enrollments (reads and admin writes): student_api.py.
 
 
 class ParentChildrenList(SchoolScopedMixin, generics.ListAPIView):
@@ -274,9 +250,6 @@ class StaffList(SchoolScopedMixin, generics.ListAPIView):
 
 
 urlpatterns = [
-    path("students/", StudentList.as_view(), name="students"),
-    path("students/<uuid:pk>/", StudentDetail.as_view(), name="student"),
-    path("students/<uuid:pk>/enrollments/", StudentEnrollmentList.as_view(), name="student-enrollments"),
     path("parents/children/", ParentChildrenList.as_view(), name="parent-children"),
     path("teachers/", TeacherList.as_view(), name="teachers"),
     path("teachers/<uuid:pk>/", TeacherDetail.as_view(), name="teacher"),

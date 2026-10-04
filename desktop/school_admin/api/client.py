@@ -41,20 +41,24 @@ class ApiClient:
 
     # --- core ------------------------------------------------------------------
 
-    def request(self, method, path, *, json=None, params=None, auth=True, _retry=True):
+    def request(self, method, path, *, json=None, params=None, files=None, raw=False, auth=True, _retry=True):
+        """`files`: multipart upload; `raw=True`: return the response bytes
+        (images) instead of the unwrapped envelope."""
         headers = {}
         if auth:
             if not self.access_token:
                 raise Unauthorized()
             headers["Authorization"] = f"Bearer {self.access_token}"
         try:
-            response = self._http.request(method, path, json=json, params=params, headers=headers)
+            response = self._http.request(method, path, json=json, params=params, files=files, headers=headers)
         except httpx.TimeoutException:
             raise RequestTimeout() from None
         except httpx.TransportError:
             raise NetworkError() from None
         if response.status_code == 401 and auth and _retry and self._try_refresh():
-            return self.request(method, path, json=json, params=params, auth=auth, _retry=False)
+            return self.request(method, path, json=json, params=params, files=files, raw=raw, auth=auth, _retry=False)
+        if raw and response.status_code < 400:
+            return response.content
         try:
             body = response.json() if response.content else {}
         except ValueError:
@@ -84,6 +88,23 @@ class ApiClient:
 
     def patch(self, path, payload):
         return self.request("PATCH", path, json=payload)[0]
+
+    def delete(self, path):
+        return self.request("DELETE", path)[0]
+
+    def page(self, path, *, page=1, page_size=50, **params):
+        """One page of a paginated list: (rows, total count)."""
+        params = {k: v for k, v in params.items() if v is not None}
+        data, meta = self.request("GET", path, params={**params, "page": page, "page_size": page_size})
+        return data or [], meta.get("count", len(data or []))
+
+    def upload(self, path, field, content, *, filename, content_type):
+        """Multipart POST of `content` (bytes). Only the bytes and a neutral
+        file name leave the computer — never a local path."""
+        return self.request("POST", path, files={field: (filename, content, content_type)})[0]
+
+    def get_bytes(self, path):
+        return self.request("GET", path, raw=True)
 
     def list_all(self, path, **params):
         """Every row of a paginated list (follows `meta.next`)."""

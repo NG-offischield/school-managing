@@ -37,6 +37,7 @@ class FakeBackend:
         self.forced = {}  # (method, path) -> response, to inject errors
         self.offline = False
         self.login_bodies = []
+        self.photo_uploads = []  # raw multipart bodies received (privacy checks)
         # Academic structure: years (current, closed, planned), levels, rooms, classes.
         self.years = [
             {
@@ -108,6 +109,18 @@ class FakeBackend:
                 {"month": "2025-11", "enrolled": 120},
             ],
         }
+        # Students (people/student_api.py): two enrolled this year, one not
+        # enrolled, one archived.
+        self.students = {}
+        self.student_enrollments = {}
+        self.student_history = {}
+        self.photos = {}
+        six_a = next(c["id"] for c in self.classes.values() if c["name"] == "6e A")
+        five_a = next(c["id"] for c in self.classes.values() if c["name"] == "5e A")
+        self.awa = self.add_student("MAT-001", "Ndiaye", "Awa", "F", class_id=six_a)
+        self.bruno = self.add_student("MAT-002", "Ekane", "Bruno", "M", class_id=five_a)
+        self.chloe = self.add_student("MAT-003", "Fotso", "Chloé", "F")
+        self.dan = self.add_student("MAT-004", "Mbia", "Dan", "M", status="ARCHIVED")
         self.finance = {
             "currency": "XAF",
             "net_collected": "1250000.00",
@@ -151,6 +164,250 @@ class FakeBackend:
             "active": active,
         }
         return lid
+
+    def add_student(self, number, last, first, sex, *, class_id=None, status="ACTIVE", year="y1"):
+        sid = str(uuid.uuid4())
+        self.students[sid] = {
+            "id": sid,
+            "student_number": number,
+            "registration_number": f"INS-{number}",
+            "first_name": first,
+            "last_name": last,
+            "date_of_birth": "2013-02-01",
+            "sex": sex,
+            "birth_place": "Douala",
+            "address": None,
+            "height_cm": None,
+            "status": status,
+            "archived_at": "2026-01-10T09:00:00+00:00" if status == "ARCHIVED" else None,
+        }
+        self.student_history[sid] = [self._event("STUDENT_CREATED", "")]
+        if class_id:
+            self.add_enrollment(sid, class_id)
+        return sid
+
+    def add_enrollment(self, student_id, class_id, status="ACTIVE"):
+        eid = str(uuid.uuid4())
+        school_class = self.classes[class_id]
+        self.student_enrollments[eid] = {
+            "id": eid,
+            "student": student_id,
+            "academic_year": school_class["academic_year"],
+            "school_class": class_id,
+            "enrollment_date": "2025-09-02",
+            "end_date": None,
+            "status": status,
+            "promotion_status": "PENDING",
+            "decision_date": None,
+        }
+        return eid
+
+    @staticmethod
+    def _event(action, summary):
+        return {
+            "id": str(uuid.uuid4()),
+            "at": "2026-03-04T08:30:00+00:00",
+            "action": action,
+            "summary": summary,
+            "actor": "Ada Admin",
+        }
+
+    def _enrollment_out(self, row):
+        school_class = self.classes[row["school_class"]]
+        level = self.levels[school_class["level"]]
+        return {
+            **row,
+            "academic_year_name": self.year(row["academic_year"])["name"],
+            "class_name": school_class["name"],
+            "level": level["id"],
+            "level_code": level["code"],
+            "level_name": level["name"],
+        }
+
+    def _student_out(self, row, year_id=None):
+        year_id = year_id or next((y["id"] for y in self.years if y["is_current"]), None)
+        enrollment = next(
+            (
+                e
+                for e in self.student_enrollments.values()
+                if e["student"] == row["id"] and e["academic_year"] == year_id
+            ),
+            None,
+        )
+        out = {**row, "has_photo": row["id"] in self.photos}
+        out["enrollment"] = self._enrollment_out(enrollment) if enrollment else None
+        return out
+
+    def _students(self, request, path, body, admin):
+        method, params = request.method, request.url.params
+        parts = path.strip("/").split("/")
+        if path == "students/" and method == "GET":
+            year = params.get("academic_year")
+            rows = [self._student_out(r, year) for r in self.students.values()]
+            search = (params.get("search") or "").lower()
+            if search:
+                rows = [
+                    r
+                    for r in rows
+                    if any(search in (r[f] or "").lower() for f in ("last_name", "first_name", "student_number"))
+                ]
+            if params.get("status"):
+                rows = [r for r in rows if r["status"] == params["status"]]
+            if params.get("level"):
+                rows = [r for r in rows if r["enrollment"] and r["enrollment"]["level"] == params["level"]]
+            if params.get("school_class"):
+                rows = [
+                    r for r in rows if r["enrollment"] and r["enrollment"]["school_class"] == params["school_class"]
+                ]
+            wanted = params.get("enrollment_status")
+            if wanted == "NONE":
+                rows = [r for r in rows if r["enrollment"] is None]
+            elif wanted:
+                rows = [r for r in rows if r["enrollment"] and r["enrollment"]["status"] == wanted]
+            elif year:
+                rows = [r for r in rows if r["enrollment"]]
+            return self._page(sorted(rows, key=lambda r: (r["last_name"], r["first_name"])), request)
+        if method != "GET" and not admin:
+            return fail(403, "PERMISSION_DENIED", "Permission refusée.")
+        if path == "students/" and method == "POST":
+            return self._student_write(None, body)
+        if parts[0] == "enrollments":
+            enrollment = self.student_enrollments.get(parts[1])
+            if enrollment is None:
+                return fail(404, "NOT_FOUND", "Inscription introuvable.")
+            return self._enrollment_action(enrollment, parts[2], body)
+        student = self.students.get(parts[1])
+        if student is None:
+            return fail(404, "NOT_FOUND", "Élève introuvable.")
+        action = parts[2] if len(parts) > 2 else ""
+        history = self.student_history[student["id"]]
+        if action == "" and method == "GET":
+            return ok(self._student_out(student))
+        if action == "" and method == "PATCH":
+            return self._student_write(student, body)
+        if action == "archive":
+            if any(
+                e["student"] == student["id"] and e["status"] == "ACTIVE" for e in self.student_enrollments.values()
+            ):
+                return fail(409, "CONFLICT", "Inscription active.", {"rule": "active_enrollment"})
+            student.update(status="ARCHIVED", archived_at="2026-03-04T08:30:00+00:00")
+            history.insert(0, self._event("STUDENT_ARCHIVED", ""))
+            return ok(self._student_out(student))
+        if action == "reactivate":
+            student.update(status="ACTIVE", archived_at=None)
+            history.insert(0, self._event("STUDENT_REACTIVATED", ""))
+            return ok(self._student_out(student))
+        if action == "history":
+            return ok(history)
+        if action == "enrollments" and method == "GET":
+            rows = [self._enrollment_out(e) for e in self.student_enrollments.values() if e["student"] == student["id"]]
+            return self._page(rows, request)
+        if action == "enrollments" and method == "POST":
+            if student["status"] != "ACTIVE":
+                return fail(400, "BUSINESS_RULE_VIOLATION", "Élève inactif.", {"rule": "student_not_active"})
+            school_class = self.classes.get(body.get("school_class"))
+            if school_class is None:
+                return fail(404, "NOT_FOUND", "Classe introuvable.")
+            if any(
+                e["student"] == student["id"] and e["academic_year"] == school_class["academic_year"]
+                for e in self.student_enrollments.values()
+            ):
+                return fail(409, "CONFLICT", "Déjà inscrit.", {"rule": "already_enrolled"})
+            if self._full(school_class):
+                return fail(409, "CONFLICT", "Classe pleine.", {"rule": "class_full"})
+            eid = self.add_enrollment(student["id"], school_class["id"])
+            history.insert(0, self._event("STUDENT_ENROLLED", school_class["name"]))
+            return ok(self._enrollment_out(self.student_enrollments[eid]), status=201)
+        if action == "photo":
+            if method == "GET":
+                if student["id"] not in self.photos:
+                    return fail(404, "NOT_FOUND", "Pas de photo.")
+                return httpx.Response(200, content=self.photos[student["id"]], headers={"Content-Type": "image/jpeg"})
+            if method == "DELETE":
+                self.photos.pop(student["id"], None)
+                return ok(self._student_out(student))
+            content = self._uploaded(request)
+            if not (content.startswith(b"\x89PNG") or content.startswith(b"\xff\xd8")):
+                return fail(400, "BUSINESS_RULE_VIOLATION", "Image illisible.", {"rule": "photo_invalid"})
+            self.photo_uploads.append(request.content)
+            self.photos[student["id"]] = content
+            history.insert(0, self._event("STUDENT_PHOTO_SET", ""))
+            return ok(self._student_out(student))
+        return None
+
+    @staticmethod
+    def _uploaded(request):
+        """Bytes of the single file of a multipart body."""
+        raw = request.content
+        start = raw.index(b"\r\n\r\n") + 4
+        end = raw.rindex(b"\r\n--")
+        return raw[start:end]
+
+    def _full(self, school_class, moving=None):
+        if not school_class.get("capacity"):
+            return False
+        taken = [
+            e
+            for e in self.student_enrollments.values()
+            if e["school_class"] == school_class["id"] and e["status"] != "WITHDRAWN" and e is not moving
+        ]
+        return len(taken) >= school_class["capacity"]
+
+    def _student_write(self, student, body):
+        fields = ("student_number", "registration_number", "first_name", "last_name", "date_of_birth", "sex")
+        if student is None:
+            missing = {f: ["Ce champ est obligatoire."] for f in fields if not body.get(f)}
+            if missing:
+                return fail(400, "VALIDATION_ERROR", "Données invalides.", missing)
+        elif student["status"] == "ARCHIVED":
+            return fail(400, "BUSINESS_RULE_VIOLATION", "Élève archivé.", {"rule": "student_archived"})
+        for name, rule in (
+            ("student_number", "duplicate_student_number"),
+            ("registration_number", "duplicate_registration_number"),
+        ):
+            value = (body.get(name) or "").lower()
+            if value and any(s[name].lower() == value and s is not student for s in self.students.values()):
+                return fail(409, "CONFLICT", "Numéro déjà utilisé.", {"rule": rule})
+        editable = (*fields, "birth_place", "address", "height_cm")
+        if student is None:
+            enrollment = body.get("enrollment")
+            school_class = self.classes.get(enrollment["school_class"]) if enrollment else None
+            if enrollment and school_class is None:
+                return fail(404, "NOT_FOUND", "Classe introuvable.")
+            if school_class is not None and self._full(school_class):
+                return fail(409, "CONFLICT", "Classe pleine.", {"rule": "class_full"})
+            sid = self.add_student(body["student_number"], body["last_name"], body["first_name"], body["sex"])
+            student = self.students[sid]
+            student.update({k: v for k, v in body.items() if k in editable})
+            if school_class is not None:
+                self.add_enrollment(sid, school_class["id"])
+                self.student_history[sid].insert(0, self._event("STUDENT_ENROLLED", school_class["name"]))
+            return ok(self._student_out(student), status=201)
+        student.update({k: v for k, v in body.items() if k in editable})
+        self.student_history[student["id"]].insert(0, self._event("STUDENT_UPDATED", ", ".join(sorted(body))))
+        return ok(self._student_out(student))
+
+    def _enrollment_action(self, enrollment, action, body):
+        if enrollment["status"] != "ACTIVE":
+            return fail(409, "CONFLICT", "Inscription close.", {"rule": "enrollment_closed"})
+        history = self.student_history[enrollment["student"]]
+        if action == "withdraw":
+            enrollment.update(status="WITHDRAWN", end_date=body.get("end_date") or "2026-03-04")
+            history.insert(0, self._event("STUDENT_WITHDRAWN", self.classes[enrollment["school_class"]]["name"]))
+            return ok(self._enrollment_out(enrollment))
+        school_class = self.classes.get(body.get("school_class"))
+        if school_class is None:
+            return fail(404, "NOT_FOUND", "Classe introuvable.")
+        if school_class["academic_year"] != enrollment["academic_year"]:
+            return fail(400, "BUSINESS_RULE_VIOLATION", "Autre année.", {"rule": "class_other_year"})
+        if school_class["id"] == enrollment["school_class"]:
+            return fail(409, "CONFLICT", "Même classe.", {"rule": "same_class"})
+        if self._full(school_class, moving=enrollment):
+            return fail(409, "CONFLICT", "Classe pleine.", {"rule": "class_full"})
+        old = self.classes[enrollment["school_class"]]["name"]
+        enrollment["school_class"] = school_class["id"]
+        history.insert(0, self._event("STUDENT_CLASS_CHANGED", f"{old} → {school_class['name']}"))
+        return ok(self._enrollment_out(enrollment))
 
     def log(self, action, label):
         self.activity.insert(
@@ -392,7 +649,8 @@ class FakeBackend:
             raise httpx.ConnectError("offline", request=request)
         if (request.method, path) in self.forced:
             return self.forced[(request.method, path)]
-        body = json.loads(request.content) if request.content else {}
+        is_json = request.headers.get("content-type", "").startswith("application/json")
+        body = json.loads(request.content) if request.content and is_json else {}
         if path == "auth/login/":
             self.login_bodies.append(body)
             if body.get("identifier") == "admin" and body.get("password") == PASSWORD:
@@ -451,8 +709,10 @@ class FakeBackend:
             return self._classes(request, path, body, admin)
         if path.startswith("academic-years/"):
             return self._years(request, path, body, admin)
-        if path in ("students/", "teachers/", "sessions/"):
-            sizes = {"students/": 120, "teachers/": 9, "sessions/": 37}
+        if path.startswith("students/") or path.startswith("enrollments/"):
+            return self._students(request, path, body, admin)
+        if path in ("teachers/", "sessions/"):
+            sizes = {"teachers/": 9, "sessions/": 37}
             return self._page([{"id": str(i)} for i in range(sizes[path])], request)
         if path == "admin/attendance/dashboard/":
             return fail(400, "BUSINESS_RULE_VIOLATION", "Aucune politique de présence.", {"rule": "no_policy"})

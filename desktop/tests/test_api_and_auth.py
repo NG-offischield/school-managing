@@ -112,7 +112,9 @@ def test_pagination_follows_every_page(logged_in, api, backend):
     for i in range(130):
         backend.add_category(f"C{i:03d}", f"Catégorie {i}")
     assert len(api.list_all("pedagogical-categories/")) == 130
-    assert api.count("students/") == 120
+    assert api.count("teachers/") == 9  # meta.count, without downloading the rows
+    rows, total = api.page("students/", page=2, page_size=3)  # one server page at a time
+    assert (len(rows), total) == (1, 4)
 
 
 def test_configuration_sources(tmp_path):

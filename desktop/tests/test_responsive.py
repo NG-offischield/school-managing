@@ -12,10 +12,16 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QDialog, QLabel
 
-from school_admin.models import AcademicYear, Category, Level, Room
+from school_admin.models import AcademicYear, Category, Enrollment, Level, Room, SchoolClass, Student
 from school_admin.ui.dialogs.category_dialog import CategoryDialog
 from school_admin.ui.dialogs.class_dialog import ClassDialog
 from school_admin.ui.dialogs.level_dialog import LevelDialog
+from school_admin.ui.dialogs.student_dialogs import (
+    ChangeClassDialog,
+    EnrollDialog,
+    StudentDialog,
+    StudentRecordDialog,
+)
 from school_admin.ui.dialogs.subject_dialog import SubjectDialog
 from school_admin.ui.dialogs.year_dialog import YearDialog
 from school_admin.ui.widgets import FIELD_WIDTHS, SCREEN_MARGIN, ConfirmDialog
@@ -25,12 +31,21 @@ LEVELS = [Level("l6", "6E", "Sixième", 1, True)]
 ROOMS = [Room("r1", "R12", "Salle 12 du bâtiment principal (rez-de-chaussée)", 40, True)]
 CATEGORIES = [Category("c1", "SCI", "Scientifique", "", True)]
 
+CLASSES = [SchoolClass("c1", "6e A", "l6", "", "y1", "", 40, None, "", False, True)]
+STUDENT = Student("s1", "MAT-1", "INS-1", "Awa", "Ndiaye", date(2013, 2, 1), "F", "ACTIVE", "Douala", "Akwa", 140)
+ENROLLMENT = Enrollment("e1", "y1", "2025-2026", "c1", "6e A", "l6", "6E", "Sixième", "ACTIVE", date(2025, 9, 2))
+
 DIALOGS = {
     "catégorie": lambda: CategoryDialog(),
     "matière": lambda: SubjectDialog(CATEGORIES),
     "classe": lambda: ClassDialog(YEARS, LEVELS, ROOMS),
     "année": lambda: YearDialog(suggested=(date(2026, 9, 1), date(2027, 7, 31))),
     "niveau": lambda: LevelDialog(),
+    "élève (ajout)": lambda: StudentDialog((YEARS, LEVELS, CLASSES)),
+    "élève (modification)": lambda: StudentDialog(None, student=STUDENT),
+    "inscription": lambda: EnrollDialog((YEARS, LEVELS, CLASSES), student=STUDENT),
+    "changement de classe": lambda: ChangeClassDialog(([], LEVELS, CLASSES), enrollment=ENROLLMENT),
+    "fiche élève": lambda: StudentRecordDialog(STUDENT, [ENROLLMENT], []),
     "confirmation": lambda: ConfirmDialog("Désactiver ?", "Texte explicatif " * 20, danger=True),
 }
 SCREENS = [QSize(1366, 768), QSize(1280, 720), QSize(1024, 768), QSize(800, 480)]
@@ -58,6 +73,8 @@ def test_dialog_fits_and_keeps_its_buttons(qapp, name, screen):
     dialog = on_screen(DIALOGS[name](), screen)
     assert dialog.width() <= screen.width() - SCREEN_MARGIN and dialog.height() <= screen.height() - SCREEN_MARGIN
     for action in (dialog.cancel_button, dialog.save_button):
+        if action.isHidden():  # the record has only « Fermer »
+            continue
         assert action.isVisible() and inside(action, dialog), f"{action.text()} hors de la fenêtre"
         assert action.width() >= action.minimumSizeHint().width()
     assert inside(dialog.footer, dialog)
@@ -150,3 +167,27 @@ def test_long_list_items_do_not_widen_the_form(qapp):
     assert dialog.main_room.toolTip().startswith("R12 — Salle polyvalente")  # full text on hover
     assert dialog.main_room.view().minimumWidth() > dialog.main_room.width()  # open list shows it whole
     dialog.close()
+
+
+@pytest.mark.parametrize("screen", [QSize(1366, 768), QSize(1280, 720)], ids=["1366x768", "1280x720"])
+def test_long_student_form_scrolls_with_buttons_always_visible(qapp, screen):
+    dialog = on_screen(StudentDialog((YEARS, LEVELS, CLASSES)), screen)
+    bar = dialog.scroll.verticalScrollBar()
+    assert dialog.height() <= screen.height() - SCREEN_MARGIN
+    assert bar.isVisible() and bar.maximum() > 0  # the FORM scrolls, not the window
+    assert inside(dialog.save_button, dialog) and inside(dialog.cancel_button, dialog)
+    for field in (dialog.student_number, dialog.registration_number, dialog.date_of_birth, dialog.height_cm):
+        assert field.width() <= FIELD_WIDTHS["short"]  # short data, short field
+    for field in (dialog.last_name, dialog.first_name):
+        assert field.width() <= FIELD_WIDTHS["medium"]
+    dialog.activateWindow()
+    dialog.student_number.setFocus()
+    for _ in range(30):  # Tab down to the class list at the bottom of the form
+        if dialog.focusWidget() is dialog.enroll:
+            break
+        QTest.keyClick(dialog.focusWidget(), Qt.Key_Tab)
+    assert dialog.focusWidget() is dialog.enroll and bar.value() > 0
+    viewport = dialog.scroll.viewport()
+    assert viewport.rect().contains(dialog.enroll.mapTo(viewport, dialog.enroll.rect().center()))
+    QTest.keyClick(dialog, Qt.Key_Escape)
+    assert dialog.result() == QDialog.Rejected

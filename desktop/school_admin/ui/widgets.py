@@ -95,9 +95,25 @@ FIELD_WIDTHS = {"short": 170, "medium": 320, "long": None}
 SCREEN_MARGIN = 48
 
 
+class DateField(QDateEdit):
+    """QDateEdit where Tab / Maj+Tab go to the next / previous FIELD, like
+    every other input (Qt's default moves between day, month and year, and
+    stays stuck on an empty date). Inside the field: arrows, typing, or the
+    calendar."""
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key_Tab, Qt.Key_Backtab) and not event.modifiers() & ~Qt.ShiftModifier:
+            QWidget.focusNextPrevChild(self, event.key() == Qt.Key_Tab)
+            return
+        super().keyPressEvent(event)
+
+    def focusNextPrevChild(self, next_child):
+        return QWidget.focusNextPrevChild(self, next_child)
+
+
 def date_field():
     """Date input with a calendar popup, French format."""
-    widget = QDateEdit(calendarPopup=True)
+    widget = DateField(calendarPopup=True)
     widget.setDisplayFormat("dd/MM/yyyy")
     return widget
 
@@ -235,6 +251,7 @@ class FormDialog(QDialog):
 
         self.labels = {}
         self.rows = []
+        self._row_break = False
         self.status = QLabel("", objectName="help")
         self.status.setWordWrap(True)
         self.cancel_button = button("Annuler", "secondary")
@@ -267,11 +284,24 @@ class FormDialog(QDialog):
             hint = QLabel(help_text, objectName="help")
             hint.setWordWrap(True)
             column.addWidget(hint)
-        if not (beside and self.rows):
+        if not (beside and self.rows and not self._row_break):
             self.rows.append(FieldRow())
             self.body.addWidget(self.rows[-1])
+        self._row_break = False
         self.rows[-1].add(block)
         return widget
+
+    def add_section(self, title, note=""):
+        """Section heading inside a long form (IDENTITÉ, SCOLARITÉ…): a
+        title and an optional short note, separated from the fields above."""
+        heading = QLabel(title.upper(), objectName="sectionTitle")
+        self.body.addWidget(heading)
+        if note:
+            hint = QLabel(note, objectName="help")
+            hint.setWordWrap(True)
+            self.body.addWidget(hint)
+        self._row_break = True  # the next field starts a new row
+        return heading
 
     def finish(self, *, required_note=True):
         """Call once the fields are added: footer (note, status, buttons)."""

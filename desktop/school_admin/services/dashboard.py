@@ -179,7 +179,7 @@ class DashboardService:
                 lambda: str(self.api.count("classes/", academic_year=current["id"] if current else None)),
                 "de l'année active" if current else "toutes années",
             ),
-            self._metric("Élèves", lambda: str(self.api.count("students/"))),
+            self._metric("Élèves", lambda: str(self.api.count("students/", status="ACTIVE")), "actifs"),
             self._metric("Enseignants", lambda: str(self.api.count("teachers/"))),
             self._metric(
                 "Séances cette semaine",

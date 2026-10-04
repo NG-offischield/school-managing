@@ -33,6 +33,12 @@ class ReferenceService:
     def rooms(self):
         return [Room.from_api(row) for row in self.api.list_all("rooms/", active="true")]
 
+    def classes(self, *, academic_year_id=None):
+        """Active classes (all years, or one year): the student forms filter
+        them by the chosen year and level."""
+        rows = self.api.list_all("classes/", active="true", academic_year=academic_year_id or None)
+        return sorted((SchoolClass.from_api(row) for row in rows), key=lambda c: c.name)
+
 
 class ClassService:
     PATH = "classes/"

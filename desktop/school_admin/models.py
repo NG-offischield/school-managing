@@ -291,3 +291,122 @@ class DashboardCharts:
     enrollment_trend: ChartData = field(default_factory=ChartData)
     activity: list = field(default_factory=list)
     activity_error: str | None = None
+
+
+# --- students (ADR 0018) -----------------------------------------------------------
+
+SEXES = {"F": "Féminin", "M": "Masculin"}
+STUDENT_STATUSES = {
+    "ACTIVE": "Actif",
+    "SUSPENDED": "Suspendu",
+    "LEFT": "Parti",
+    "GRADUATED": "Diplômé",
+    "ARCHIVED": "Archivé",
+}
+ENROLLMENT_STATUSES = {"ACTIVE": "En cours", "COMPLETED": "Terminée", "WITHDRAWN": "Retirée"}
+
+
+@dataclass(frozen=True)
+class Enrollment:
+    """A student in a class for one academic year."""
+
+    id: str
+    year_id: str
+    year_name: str
+    class_id: str
+    class_name: str
+    level_id: str
+    level_code: str
+    level_name: str
+    status: str
+    enrollment_date: date | None = None
+    end_date: date | None = None
+
+    @property
+    def status_label(self):
+        return ENROLLMENT_STATUSES.get(self.status, self.status)
+
+    @property
+    def active(self):
+        return self.status == "ACTIVE"
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            str(row.get("academic_year") or ""),
+            row.get("academic_year_name") or "",
+            str(row.get("school_class") or ""),
+            row.get("class_name") or "",
+            str(row.get("level") or ""),
+            row.get("level_code") or "",
+            row.get("level_name") or "",
+            row.get("status") or "",
+            _date(row.get("enrollment_date")),
+            _date(row.get("end_date")),
+        )
+
+
+@dataclass(frozen=True)
+class Student:
+    id: str
+    student_number: str
+    registration_number: str
+    first_name: str
+    last_name: str
+    date_of_birth: date | None
+    sex: str
+    status: str
+    birth_place: str = ""
+    address: str = ""
+    height_cm: int | None = None
+    has_photo: bool = False
+    enrollment: Enrollment | None = None  # of the selected (default: current) year
+
+    # The list screens name a row by `code`.
+    @property
+    def code(self):
+        return self.student_number
+
+    @property
+    def name(self):
+        return f"{self.last_name} {self.first_name}".strip()
+
+    @property
+    def active(self):
+        return self.status == "ACTIVE"
+
+    @property
+    def status_label(self):
+        return STUDENT_STATUSES.get(self.status, self.status)
+
+    @property
+    def sex_label(self):
+        return SEXES.get(self.sex, self.sex)
+
+    @classmethod
+    def from_api(cls, row):
+        enrollment = row.get("enrollment")
+        return cls(
+            row["id"],
+            row.get("student_number", ""),
+            row.get("registration_number", ""),
+            row.get("first_name", ""),
+            row.get("last_name", ""),
+            _date(row.get("date_of_birth")),
+            row.get("sex", ""),
+            row.get("status", ""),
+            row.get("birth_place") or "",
+            row.get("address") or "",
+            row.get("height_cm"),
+            bool(row.get("has_photo")),
+            Enrollment.from_api(enrollment) if enrollment else None,
+        )
+
+
+@dataclass(frozen=True)
+class HistoryEntry:
+    at: datetime | None
+    action: str
+    summary: str
+    actor: str

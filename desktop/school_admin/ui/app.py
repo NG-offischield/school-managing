@@ -13,12 +13,14 @@ from ..services.catalog import CategoryService, SubjectService
 from ..services.classes import ClassService, ReferenceService
 from ..services.dashboard import DashboardService
 from ..services.structure import LevelService, YearService
+from ..services.students import StudentService
 from .login_window import LoginWindow
 from .main_window import MainWindow
 from .pages.catalog_pages import CategoriesPage, SubjectsPage
 from .pages.classes_page import ClassesPage
 from .pages.dashboard_page import DashboardPage
 from .pages.structure_pages import LevelsPage, YearsPage
+from .pages.students_page import StudentsPage
 from .tasks import TaskRunner
 from .theme import apply_theme
 
@@ -34,6 +36,7 @@ class AppController:
         self.references = ReferenceService(api)
         self.years = YearService(api)
         self.levels = LevelService(api)
+        self.students = StudentService(api)
         self.login_window = LoginWindow(auth, runner, config)
         self.login_window.logged_in.connect(self.show_shell)
         self.main_window = None
@@ -49,6 +52,9 @@ class AppController:
                 self.subjects, self.categories, self.runner, **options.get("subjects", {})
             ),
             "classes": lambda: ClassesPage(self.classes, self.references, self.runner, **options.get("classes", {})),
+            "students": lambda: StudentsPage(
+                self.students, self.references, self.runner, **options.get("students", {})
+            ),
         }
 
     def start(self):

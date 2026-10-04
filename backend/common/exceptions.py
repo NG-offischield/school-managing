@@ -37,6 +37,14 @@ CONFLICT_RULES = {
     "year_has_active_enrollments",
     "year_content_outside_dates",
     "level_in_use",
+    # students (ADR 0018)
+    "duplicate_student_number",
+    "duplicate_registration_number",
+    "already_enrolled",
+    "class_full",
+    "active_enrollment",
+    "enrollment_closed",
+    "same_class",
     "category_in_use",
     "subject_in_use",
     # planning (ADR 0012)

@@ -9,7 +9,9 @@ Runs the vertical through the real screens (headless): login -> dashboard ->
 categories -> add category -> subjects -> add subject with that category ->
 years -> add a year, make it current -> levels -> add a level ->
 classes -> add a class in that year and level, edit / deactivate / reactivate
--> dashboard charts -> level still used (409) -> previous current year
+-> dashboard charts -> level still used (409) -> students: add (enrolled,
+with a photo), record, edit, search, filter, change class, withdraw,
+archive -> previous current year
 restored, test year closed -> logout.
 Codes and dates are random so the test can be replayed; it creates a few
 rows. Run it against a TEST backend (it switches the current year, then
@@ -22,6 +24,8 @@ import uuid
 from datetime import date
 
 import pytest
+from PySide6.QtCore import QDate
+from PySide6.QtGui import QColor, QImage
 from PySide6.QtWidgets import QApplication
 
 from school_admin.api import ApiClient
@@ -30,6 +34,7 @@ from school_admin.auth.token_store import MemoryTokenStore
 from school_admin.config import AppConfig
 from school_admin.ui.app import AppController
 from school_admin.ui.dialogs.class_dialog import ClassDialog
+from school_admin.ui.dialogs.student_dialogs import ChangeClassDialog, StudentDialog
 from school_admin.ui.dialogs.subject_dialog import SubjectDialog
 from school_admin.ui.tasks import ImmediateRunner
 
@@ -55,7 +60,7 @@ def live():
     assert app is not None
 
 
-def test_full_vertical_against_the_real_backend(live):
+def test_full_vertical_against_the_real_backend(live, tmp_path):
     suffix = uuid.uuid4().hex[:5].upper()
     window = live.login_window
     window.identifier.setText(USER)
@@ -185,6 +190,80 @@ def test_full_vertical_against_the_real_backend(live):
     levels.table.selectRow(codes.index(f"N{suffix}"))
     levels.toggle()
     assert levels.banner.kind == "warning" and "ne peut pas être désactivé" in levels.banner.plain_text()
+
+    # --- Élèves: create (enrolled in the test class, with a photo), record,
+    #     edit, search, filter, change class, withdraw, archive ---
+    second = live.classes.create(
+        name=f"D{suffix}", level_id=live.levels.list(search=f"N{suffix}")[0].id, academic_year_id=new_year.id
+    )
+    students = shell.open("students")
+    assert students.year_filter.currentData() == new_year.id
+
+    def fill_student(kind, **context):
+        if kind == "student" and context.get("student") is None:
+            years, levels, classes_ = context["references"]
+            dialog = StudentDialog((years, levels, classes_), choose_file=lambda _parent: str(photo_path))
+            dialog.student_number.setText(f"E2E-{suffix}")
+            dialog.registration_number.setText(f"INS-E2E-{suffix}")
+            dialog.last_name.setText(f"Testeur{suffix}")
+            dialog.first_name.setText("Élève")
+            dialog.sex.setCurrentIndex(dialog.sex.findData("F"))
+            dialog.date_of_birth.setDate(QDate(2013, 3, 14))
+            dialog.pick_photo()
+            dialog.enroll.setChecked(True)
+            dialog.picker.year.setCurrentIndex(dialog.picker.year.findData(new_year.id))
+            dialog.picker.level.setCurrentIndex(dialog.picker.level.findText(f"Niveau E2E {suffix} (N{suffix})"))
+            dialog.picker.school_class.setCurrentIndex(dialog.picker.school_class.findData(class_id))
+            assert dialog.save_enabled, dialog.status.text()
+            return {**dialog.values(), "photo_change": dialog.photo_change}
+        if kind == "student":
+            dialog = StudentDialog(None, student=context["student"], photo=context.get("photo"))
+            dialog.birth_place.setText("Douala")
+            return {**dialog.values(), "photo_change": dialog.photo_change}
+        if kind == "record":
+            return record_actions.pop(0) if record_actions else None
+        if kind == "change_class":
+            dialog = ChangeClassDialog(context["references"], enrollment=context["enrollment"])
+            dialog.picker.school_class.setCurrentIndex(dialog.picker.school_class.findData(second.id))
+            return dialog.values()
+        return None
+
+    image = QImage(240, 300, QImage.Format_RGB32)
+    image.fill(QColor("#1D4ED8"))
+    photo_path = tmp_path / "photo élève.png"
+    image.save(str(photo_path))
+    class_id = next(c.id for c in live.references.classes(academic_year_id=new_year.id) if c.name == f"C{suffix} bis")
+    record_actions = []
+    students.ask = fill_student
+    students.add()
+    assert students.banner.kind == "success", students.banner.plain_text()
+    student = students.selected()
+    assert student.enrollment.class_name == f"C{suffix} bis" and student.has_photo
+    assert live.students.photo(student.id).startswith(b"\xff\xd8")  # re-encoded JPEG from the server
+    students.edit()
+    assert students.banner.kind == "success", students.banner.plain_text()
+    assert live.students.get(student.id).birth_place == "Douala"
+    students.search.setText(f"testeur{suffix}")
+    students.reload_first_page()
+    assert [students.table.item(r, 0).text() for r in range(students.table.rowCount())] == [f"E2E-{suffix}"]
+    students.class_filter.setCurrentIndex(students.class_filter.findData(class_id))
+    assert students.table.rowCount() == 1
+    students.table.selectRow(0)
+    record_actions = ["change_class"]
+    students.open_record()
+    assert students.banner.kind == "success", students.banner.plain_text()
+    students.class_filter.setCurrentIndex(0)
+    students.table.selectRow(0)
+    assert students.selected().enrollment.class_name == f"D{suffix}"
+    history = [h.action for h in live.students.history(student.id)]
+    assert "STUDENT_CLASS_CHANGED" in history and "STUDENT_ENROLLED" in history
+    students.confirm = lambda *args, **kwargs: True
+    record_actions = ["withdraw"]
+    students.open_record()
+    assert students.banner.kind == "success", students.banner.plain_text()
+    students.table.selectRow(0)
+    students.toggle_archive()
+    assert students.banner.plain_text().endswith("archivé avec succès."), students.banner.plain_text()
 
     # --- Restore the previous current year, then close the test year ---
     years = shell.open("years")

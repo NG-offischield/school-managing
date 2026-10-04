@@ -205,6 +205,10 @@ QLabel {{ background: transparent; }}
 #cardValue {{ font-size: {s.metric}pt; font-weight: 600; color: {t.text}; }}
 #cardError {{ font-size: 13pt; font-weight: 600; color: {t.warning}; }}
 #emptyState {{ color: {t.text_secondary}; padding: 24px; }}
+#sectionTitle {{ font-size: {s.section}pt; font-weight: 600; color: {t.text_secondary}; letter-spacing: 1px;
+    padding-top: 10px; border-top: 1px solid {t.border}; }}
+#photoFrame {{ background: {t.row_alt}; border: 1px solid {t.border}; border-radius: 8px; color: {t.text_secondary}; }}
+#fieldValue {{ color: {t.text}; }}
 #chartTitle {{ font-size: 11pt; font-weight: 600; color: {t.text}; }}
 #chartState {{ color: {t.text_secondary}; padding: 12px; }}
 #chartError {{ color: {t.warning}; padding: 12px; }}

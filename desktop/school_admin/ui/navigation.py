@@ -20,7 +20,7 @@ NAVIGATION = [
     NavEntry("categories", "Catégories pédagogiques", "Gestion académique"),
     NavEntry("subjects", "Matières", "Gestion académique"),
     NavEntry("classes", "Classes", "Gestion académique"),
-    NavEntry("students", "Élèves", "Personnes", False, "Dossiers élèves, inscriptions, liens parents."),
+    NavEntry("students", "Élèves", "Gestion académique"),
     NavEntry("teachers", "Enseignants", "Personnes", False, "Enseignants, qualifications, compatibilités."),
     NavEntry("planning", "Planning", "Vie scolaire", False, "Emplois du temps, séances, remplacements."),
     NavEntry("attendance", "Présences", "Vie scolaire", False, "Présences, retards, convocations, QR."),

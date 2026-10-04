@@ -48,7 +48,8 @@ Le test de bout en bout contre un vrai backend est optionnel. Il crée :
 
 - une catégorie et une matière ;
 - une année lointaine (rendue courante, puis l'ancienne courante est rétablie et l'année de test clôturée) ;
-- un niveau et une classe.
+- un niveau et une classe ;
+- un élève (inscrit, avec photo), qui change de classe, est retiré puis archivé.
 
 À lancer contre un backend de **test** :
 
@@ -72,7 +73,8 @@ school_admin/
   models.py            objets de données (Identity, Category, Subject, AcademicYear, Level, SchoolClass,
                        Metric, ChartData…)
   services/            catalogue (catégories, matières), années et niveaux (structure.py), classes et
-                       listes de référence, tableau de bord (indicateurs et séries réels de l'API)
+                       listes de référence, élèves (students.py : fiche, inscription, photo),
+                       tableau de bord (indicateurs et séries réels de l'API)
   ui/                  écran de connexion, shell (barre latérale, en-tête), pages, dialogues,
                        exécution des appels hors du fil d'affichage, messages d'erreur uniformes
 ```
