@@ -1,7 +1,7 @@
 """Read-only endpoints of the academic structure (spec §6.4, §6.6).
 
 Who can read: every ACTIVE member of the school. These are catalogues
-(years, periods, levels, categories, subjects, classes) that every role
+(years, periods, levels, scales; classes: class_api.py) that every role
 needs to display its own screens; they contain no personal data. Writes go
 through services (admin desktop phase).
 """
@@ -11,7 +11,7 @@ from rest_framework import generics, serializers
 
 from common.views import SchoolScopedMixin
 
-from .models import AcademicPeriod, AcademicYear, GradingScale, Level, SchoolClass
+from .models import AcademicPeriod, AcademicYear, GradingScale, Level
 
 
 class AcademicYearSerializer(serializers.ModelSerializer):
@@ -40,14 +40,6 @@ class LevelSerializer(serializers.ModelSerializer):
     class Meta:
         model = Level
         fields = ["id", "code", "name", "cycle", "order_index", "first_character", "active"]
-
-
-class SchoolClassSerializer(serializers.ModelSerializer):
-    level_code = serializers.CharField(source="level.code", read_only=True)
-
-    class Meta:
-        model = SchoolClass
-        fields = ["id", "name", "level", "level_code", "academic_year", "capacity", "active"]
 
 
 class GradingScaleSerializer(serializers.ModelSerializer):
@@ -87,22 +79,10 @@ class LevelList(SchoolScopedMixin, generics.ListAPIView):
     serializer_class = LevelSerializer
 
 
-class SchoolClassList(SchoolScopedMixin, generics.ListAPIView):
-    """Optional filter: ?academic_year=<uuid>."""
-
-    queryset = SchoolClass.objects.select_related("level")
-    serializer_class = SchoolClassSerializer
-
-    def restrict(self, queryset):
-        year = self.uuid_param("academic_year")
-        return queryset.filter(academic_year_id=year) if year else queryset
-
-
 urlpatterns = [
     path("academic-years/", AcademicYearList.as_view(), name="academic-years"),
     path("academic-years/<uuid:pk>/", AcademicYearDetail.as_view(), name="academic-year"),
     path("academic-periods/", AcademicPeriodList.as_view(), name="academic-periods"),
     path("levels/", LevelList.as_view(), name="levels"),
-    path("classes/", SchoolClassList.as_view(), name="classes"),
     path("grading-scales/", GradingScaleList.as_view(), name="grading-scales"),
 ]

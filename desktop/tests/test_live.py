@@ -7,7 +7,8 @@ Required environment (never committed):
 
 Runs the vertical through the real screens (headless): login -> dashboard ->
 categories -> add category -> subjects -> add subject with that category ->
-logout. Codes are random so the test can be replayed; it creates two rows.
+classes -> add / edit / deactivate / reactivate a class -> logout.
+Codes are random so the test can be replayed; it creates a few rows.
 """
 
 import os
@@ -21,6 +22,7 @@ from school_admin.auth.session import AuthService
 from school_admin.auth.token_store import MemoryTokenStore
 from school_admin.config import AppConfig
 from school_admin.ui.app import AppController
+from school_admin.ui.dialogs.class_dialog import ClassDialog
 from school_admin.ui.dialogs.subject_dialog import SubjectDialog
 from school_admin.ui.tasks import ImmediateRunner
 
@@ -88,6 +90,43 @@ def test_full_vertical_against_the_real_backend(live):
         subjects.table.item(r, 0).text(): subjects.table.item(r, 2).text() for r in range(subjects.table.rowCount())
     }
     assert rows[f"S{suffix}"] == f"E2E{suffix} — Catégorie E2E {suffix}"
+
+    # --- Classes (needs an open academic year, an active level and an active room) ---
+    classes = shell.open("classes")
+
+    def fill_class(references, school_class=None):
+        years, levels, rooms = references
+        assert years and levels, "the backend needs an open academic year and an active level"
+        dialog = ClassDialog(years, levels, rooms, school_class=school_class)
+        if school_class is None:
+            dialog.name.setText(f"C{suffix}")
+            assert not dialog.save_enabled  # no level yet
+            dialog.level.setCurrentIndex(1)
+            dialog.main_room.setCurrentIndex(1 if rooms else 0)
+            dialog.capacity.setText("30")
+        else:
+            dialog.name.setText(f"C{suffix} bis")
+        assert dialog.save_enabled
+        return dialog.values()
+
+    classes.open_dialog = fill_class
+    classes.add()
+    assert classes.banner.kind == "success", classes.banner.plain_text()
+    names = [classes.table.item(r, 0).text() for r in range(classes.table.rowCount())]
+    assert f"C{suffix}" in names
+    classes.table.selectRow(names.index(f"C{suffix}"))
+    classes.edit()
+    assert classes.banner.kind == "success", classes.banner.plain_text()
+    classes.confirm = lambda *args, **kwargs: True
+    names = [classes.table.item(r, 0).text() for r in range(classes.table.rowCount())]
+    classes.table.selectRow(names.index(f"C{suffix} bis"))
+    classes.toggle()
+    assert classes.banner.plain_text() == f"Classe « C{suffix} bis » désactivée avec succès."
+    classes.status.setCurrentIndex(1)  # Inactives
+    names = [classes.table.item(r, 0).text() for r in range(classes.table.rowCount())]
+    classes.table.selectRow(names.index(f"C{suffix} bis"))
+    classes.toggle()
+    assert classes.banner.plain_text() == f"Classe « C{suffix} bis » réactivée avec succès."
 
     shell.logout_button.click()
     assert live.main_window is None and live.api.access_token is None

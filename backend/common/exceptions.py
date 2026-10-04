@@ -27,6 +27,9 @@ logger = logging.getLogger(__name__)
 CONFLICT_RULES = {
     "stale_grade",
     "duplicate_code",
+    "duplicate_class_name",
+    "class_in_use",
+    "class_year_immutable",
     "category_in_use",
     "subject_in_use",
     # planning (ADR 0012)

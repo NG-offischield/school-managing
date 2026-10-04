@@ -99,6 +99,25 @@ def main(out, sizes):
         ),
         out / "06-confirm.png",
     )
+    from school_admin.ui.dialogs.class_dialog import ClassDialog
+
+    classes = shell.open("classes")
+    references = (
+        controller.references.years(open_only=True),
+        controller.references.levels(),
+        controller.references.rooms(),
+    )
+    class_dialog = ClassDialog(*references)
+    save(class_dialog, out / "08-class-dialog-empty.png")
+    class_dialog.name.setText(f"6e {suffix}")
+    class_dialog.level.setCurrentIndex(1)
+    class_dialog.main_room.setCurrentIndex(1 if references[2] else 0)
+    class_dialog.capacity.setText("40")
+    save(class_dialog, out / "08-class-dialog-filled.png")
+    classes.open_dialog = lambda refs, school_class=None: class_dialog.values()
+    classes.add()
+    save(shell, out / "09-classes.png")
+    subjects = shell.open("subjects")
     subjects.open_dialog = lambda cats, subject=None: {
         "code": f"M{suffix}",
         "name": "Mathématiques appliquées",

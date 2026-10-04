@@ -22,6 +22,7 @@ from .models import (
     AcademicYearStatus,
     GradingScale,
     PedagogicalCategory,
+    SchoolClass,
     Subject,
     SubjectType,
 )
@@ -301,3 +302,150 @@ def set_subject_active(subject, active, *, actor):
         action = "SUBJECT_ACTIVATED" if active else "SUBJECT_DEACTIVATED"
         _audit(action, actor, subject, old=old, new=snapshot(subject, SUBJECT_FIELDS))
     return subject
+
+
+# =============================================================================
+# Classes (admin desktop: Gestion académique → Classes)
+# =============================================================================
+# A class is identified by its NAME inside its school and academic year
+# (spec §4.4, UNIQUE(school, name, academic_year) in PostgreSQL); there is no
+# separate code. The year is fixed at creation: enrollments, courses and
+# sessions hang on (class, year), so moving a class to another year would
+# break them. The main room is delegated to the planning service, which
+# owns the room rules (same school, active, capacity vs enrolled pupils).
+
+CLASS_FIELDS = ["name", "level", "academic_year", "capacity", "main_room", "active", "public_visible"]
+OPEN_YEAR_STATUSES = (AcademicYearStatus.PLANNED, AcademicYearStatus.ACTIVE)
+
+
+def _class_name(name):
+    name = (name or "").strip()
+    if not name:
+        raise ValidationError("A class name is required.", code="name_required")
+    return name
+
+
+def _check_level(school, level):
+    if level is None:
+        raise ValidationError("A class must belong to a level.", code="level_required")
+    if level.school_id != school.pk:
+        # The API never gets here (out-of-school ids are 404): defence in depth.
+        raise ValidationError("The level belongs to another school.", code="level_other_school")
+    if not level.active:
+        raise ValidationError("This level is inactive.", code="level_inactive")
+
+
+def _check_year(school, year):
+    if year is None:
+        raise ValidationError("A class must belong to an academic year.", code="academic_year_required")
+    if year.school_id != school.pk:
+        raise ValidationError("The academic year belongs to another school.", code="academic_year_other_school")
+    if year.status not in OPEN_YEAR_STATUSES:
+        raise ValidationError("This academic year is closed.", code="year_closed")
+
+
+def _check_capacity(capacity):
+    if capacity is not None and capacity <= 0:
+        raise ValidationError("The capacity must be positive.", code="invalid_capacity")
+
+
+def _unique_class_name(school, year, name, exclude=None):
+    duplicates = SchoolClass.objects.filter(school=school, academic_year=year, name__iexact=name)
+    if exclude is not None:
+        duplicates = duplicates.exclude(pk=exclude.pk)
+    if duplicates.exists():
+        raise ValidationError(
+            f"A class named {name} already exists for this academic year.", code="duplicate_class_name"
+        )
+
+
+def _set_main_room(school_class, room, actor):
+    # Lazy import: scheduling depends on academics, not the other way round.
+    from apps.scheduling.services import set_class_main_room
+
+    return set_class_main_room(school_class, room, actor=actor)
+
+
+@transaction.atomic
+def create_class(school, *, actor, name, level, academic_year, capacity=None, main_room=None, public_visible=False):
+    require_role(actor, ADMIN_ROLES, school=school)
+    name = _class_name(name)
+    _check_level(school, level)
+    _check_year(school, academic_year)
+    _check_capacity(capacity)
+    _unique_class_name(school, academic_year, name)
+    school_class = SchoolClass.objects.create(
+        school=school,
+        name=name,
+        level=level,
+        academic_year=academic_year,
+        capacity=capacity,
+        public_visible=public_visible,
+    )
+    if main_room is not None:
+        school_class = _set_main_room(school_class, main_room, actor)
+    _audit("CLASS_CREATED", actor, school_class, new=snapshot(school_class, CLASS_FIELDS))
+    return school_class
+
+
+@transaction.atomic
+def update_class(school_class, *, actor, **changes):
+    """Editable: name, level, capacity, main_room, public_visible. The academic
+    year is fixed at creation (409 class_year_immutable)."""
+    require_role(actor, ADMIN_ROLES, school=school_class.school)
+    school_class = SchoolClass.objects.select_for_update().get(pk=school_class.pk)
+    school = school_class.school
+    if "academic_year" in changes and changes["academic_year"] != school_class.academic_year:
+        raise ValidationError("The academic year of a class cannot be changed.", code="class_year_immutable")
+    if school_class.academic_year.status not in OPEN_YEAR_STATUSES:
+        raise ValidationError("This academic year is closed.", code="year_closed")
+    old = snapshot(school_class, CLASS_FIELDS)
+    if "name" in changes:
+        name = _class_name(changes["name"])
+        _unique_class_name(school, school_class.academic_year, name, exclude=school_class)
+        school_class.name = name
+    if "level" in changes and changes["level"] != school_class.level:
+        _check_level(school, changes["level"])
+        school_class.level = changes["level"]
+    if "capacity" in changes:
+        _check_capacity(changes["capacity"])
+        school_class.capacity = changes["capacity"]
+    if "public_visible" in changes:
+        school_class.public_visible = bool(changes["public_visible"])
+    school_class.save()
+    if "main_room" in changes and changes["main_room"] != school_class.main_room:
+        school_class = _set_main_room(school_class, changes["main_room"], actor)
+    _audit("CLASS_UPDATED", actor, school_class, old=old, new=snapshot(school_class, CLASS_FIELDS))
+    return school_class
+
+
+@transaction.atomic
+def set_class_active(school_class, active, *, actor):
+    """Deactivate / reactivate. Deactivation is refused (409 class_in_use)
+    while pupils are actively enrolled or an active course still runs in the
+    class (planning and grades rely on an active class). Reactivation needs
+    an open year and an active level."""
+    require_role(actor, ADMIN_ROLES, school=school_class.school)
+    school_class = SchoolClass.objects.select_for_update().get(pk=school_class.pk)
+    if not active:
+        from apps.people.models import EnrollmentStatus
+
+        if school_class.enrollments.filter(status=EnrollmentStatus.ACTIVE).exists():
+            raise ValidationError("Pupils are still enrolled in this class.", code="class_in_use")
+        if school_class.courses.filter(active=True).exists():
+            raise ValidationError("Active courses still run in this class.", code="class_in_use")
+    else:
+        _check_year(school_class.school, school_class.academic_year)
+        _check_level(school_class.school, school_class.level)
+    if school_class.active != active:
+        old = snapshot(school_class, CLASS_FIELDS)
+        school_class.active = active
+        school_class.save(update_fields=["active", "updated_at"])
+        _audit(
+            "CLASS_ACTIVATED" if active else "CLASS_DEACTIVATED",
+            actor,
+            school_class,
+            old=old,
+            new=snapshot(school_class, CLASS_FIELDS),
+        )
+    return school_class

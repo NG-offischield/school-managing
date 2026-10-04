@@ -10,10 +10,12 @@ from ..auth.session import AuthService
 from ..auth.token_store import KeyringTokenStore
 from ..config import load_config
 from ..services.catalog import CategoryService, SubjectService
+from ..services.classes import ClassService, ReferenceService
 from ..services.dashboard import DashboardService
 from .login_window import LoginWindow
 from .main_window import MainWindow
 from .pages.catalog_pages import CategoriesPage, SubjectsPage
+from .pages.classes_page import ClassesPage
 from .pages.dashboard_page import DashboardPage
 from .tasks import TaskRunner
 from .theme import apply_theme
@@ -26,6 +28,8 @@ class AppController:
         self.categories = CategoryService(api)
         self.subjects = SubjectService(api)
         self.dashboard = DashboardService(api)
+        self.classes = ClassService(api)
+        self.references = ReferenceService(api)
         self.login_window = LoginWindow(auth, runner, config)
         self.login_window.logged_in.connect(self.show_shell)
         self.main_window = None
@@ -38,6 +42,7 @@ class AppController:
             "subjects": lambda: SubjectsPage(
                 self.subjects, self.categories, self.runner, **options.get("subjects", {})
             ),
+            "classes": lambda: ClassesPage(self.classes, self.references, self.runner, **options.get("classes", {})),
         }
 
     def start(self):

@@ -51,6 +51,7 @@ class CatalogPage(Page):
     columns = []
     noun = ""  # "catégorie", "matière"
     feminine = True
+    search_placeholder = "Rechercher par code ou nom…"
 
     def __init__(self, runner, parent=None, **kwargs):
         super().__init__(runner, parent, **kwargs)
@@ -63,31 +64,37 @@ class CatalogPage(Page):
         subtitle.setWordWrap(True)
         titles.addWidget(subtitle)
         head.addLayout(titles, 1)
-        self.count_label = QLabel("", objectName="countLabel")
-        head.addWidget(self.count_label, 0, Qt.AlignBottom)
+        # Actions sit on the title row (right): the filter row below keeps the
+        # whole width, so several filters fit at 1366x768 without overlapping.
+        self.refresh_button = button("Actualiser", tooltip="Recharger la liste (F5)")
+        self.edit_button = button("Modifier")
+        self.toggle_button = button("Désactiver", "danger")
+        self.add_button = button("Ajouter", "primary", tooltip=f"Ajouter une {self.noun} (Ctrl+N)")
+        actions = QHBoxLayout()
+        actions.setSpacing(8)
+        for widget in (self.refresh_button, self.edit_button, self.toggle_button, self.add_button):
+            actions.addWidget(widget)
+        head.addLayout(actions)
+        head.setAlignment(actions, Qt.AlignTop)
         self.layout_.addLayout(head)
 
         tools = QHBoxLayout()
         tools.setSpacing(8)
-        self.search = QLineEdit(placeholderText="Rechercher par code ou nom…", clearButtonEnabled=True)
+        self.search = QLineEdit(placeholderText=self.search_placeholder, clearButtonEnabled=True)
         self.search.setAccessibleName("Rechercher")
-        self.search.setMinimumWidth(240)
+        self.search.setMinimumWidth(220)
         self.status = QComboBox()
         self.status.setAccessibleName("Filtrer par statut")
         self.status.setToolTip("Filtrer par statut")
         for label, value in STATUS_FILTERS:
             self.status.addItem(label, value)
         self.status.setMinimumWidth(130)
-        tools.addWidget(self.search, 2)
+        tools.addWidget(self.search, 1)
         tools.addWidget(self.status)
         self.add_filters(tools)
-        tools.addStretch(1)
-        self.refresh_button = button("Actualiser", tooltip="Recharger la liste (F5)")
-        self.edit_button = button("Modifier")
-        self.toggle_button = button("Désactiver", "danger")
-        self.add_button = button("Ajouter", "primary", tooltip=f"Ajouter une {self.noun} (Ctrl+N)")
-        for widget in (self.refresh_button, self.edit_button, self.toggle_button, self.add_button):
-            tools.addWidget(widget)
+        self.count_label = QLabel("", objectName="countLabel")
+        tools.addSpacing(8)
+        tools.addWidget(self.count_label)
         self.layout_.addLayout(tools)
         self.layout_.addWidget(self.banner)
 
@@ -100,6 +107,8 @@ class CatalogPage(Page):
         self.table.setAlternatingRowColors(True)
         self.table.setShowGrid(False)
         self.table.setWordWrap(False)
+        # Ascending by the first column (Qt defaults to DESCENDING once sorting is on).
+        self.table.horizontalHeader().setSortIndicator(0, Qt.AscendingOrder)
         self.table.setSortingEnabled(True)
         self.table.verticalHeader().setVisible(False)
         self.table.verticalHeader().setDefaultSectionSize(40)
@@ -146,6 +155,14 @@ class CatalogPage(Page):
     def cells(self, row):
         raise NotImplementedError
 
+    def is_filtered(self):
+        """Does a filter hide rows? (wording of the empty state)"""
+        return bool(self.search.text().strip()) or self.status.currentData() is not True
+
+    def describe_row(self, row):
+        """How a row is named in confirmations."""
+        return f"{row.code} — {row.name}"
+
     @property
     def plural(self):
         return f"{self.noun}s"
@@ -168,7 +185,7 @@ class CatalogPage(Page):
         self.table.setSortingEnabled(True)
         count = len(rows)
         self.count_label.setText(f"{count} {self.noun if count < 2 else self.plural}")
-        filtered = bool(self.search.text().strip()) or self.status.currentData() is not True
+        filtered = self.is_filtered()
         self.empty.setText(
             f"Aucune {self.noun} ne correspond à ces critères."
             if filtered
@@ -221,7 +238,7 @@ class CatalogPage(Page):
             return
         if row.active:
             text = (
-                f"« {row.code} — {row.name} » ne sera plus proposée dans les nouvelles saisies. "
+                f"« {self.describe_row(row)} » ne sera plus proposée dans les nouvelles saisies. "
                 f"Son historique est conservé et vous pourrez la réactiver.\n\n"
                 f"Le serveur refusera la désactivation si elle est encore utilisée."
             )

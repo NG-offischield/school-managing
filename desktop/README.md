@@ -64,7 +64,7 @@ school_admin/
   auth/                connexion / rafraîchissement / déconnexion via /auth/* (jetons du backend),
                        identifiant d'installation, coffre du système pour « rester connecté »
   models.py            objets de données (Identity, Category, Subject, Metric)
-  services/            catalogue (catégories, matières), tableau de bord (indicateurs réels de l'API)
+  services/            catalogue (catégories, matières), classes + listes de référence (années, niveaux, salles), tableau de bord (indicateurs réels de l'API)
   ui/                  écran de connexion, shell (barre latérale, en-tête), pages, dialogues,
                        exécution des appels hors du fil d'affichage, messages d'erreur uniformes
 ```

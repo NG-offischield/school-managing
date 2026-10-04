@@ -216,3 +216,11 @@ def test_logout_returns_to_login_and_revokes(controller, backend, api):
     shell.logout_button.click()
     assert controller.main_window is None and api.access_token is None
     assert backend.revoked and "déconnecté" in controller.login_window.banner.plain_text()
+
+
+def test_lists_are_sorted_ascending_by_default(controller, backend):
+    for code in ("ZOO", "ART", "MID"):
+        backend.add_category(code, code.title())
+    page = login(controller).open("categories")
+    assert codes(page) == ["ART", "MID", "ZOO"]
+    assert page.table.horizontalHeader().sortIndicatorOrder() == Qt.AscendingOrder

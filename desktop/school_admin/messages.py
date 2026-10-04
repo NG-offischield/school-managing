@@ -11,6 +11,15 @@ RULE_MESSAGES = {
     "code_immutable": "Le code ne peut pas être modifié après la création.",
     "code_required": "Le code est obligatoire.",
     "no_current_year": "Aucune année scolaire courante n'est définie.",
+    "duplicate_class_name": "Une classe porte déjà ce nom pour cette année scolaire : choisissez-en un autre.",
+    "class_in_use": "Cette classe a encore des élèves inscrits ou des cours actifs : elle ne peut pas être désactivée.",
+    "class_year_immutable": "L'année scolaire d'une classe ne peut pas être modifiée après sa création.",
+    "year_closed": "Cette année scolaire est clôturée : ses classes ne peuvent plus être modifiées.",
+    "level_inactive": "Ce niveau est inactif : choisissez un niveau actif.",
+    "level_required": "Choisissez un niveau.",
+    "room_inactive": "Cette salle est inactive : choisissez une salle active.",
+    "room_capacity_exceeded": "La salle est trop petite pour les élèves inscrits dans la classe.",
+    "name_required": "Le nom est obligatoire.",
 }
 
 
