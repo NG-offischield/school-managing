@@ -65,6 +65,8 @@ INSTALLED_APPS = [
     "apps.payroll",
     "apps.communication",
     "apps.documents",
+    # Demonstration dataset (manage.py seed_demo): no model, no URL.
+    "apps.demo",
 ]
 
 MIDDLEWARE = [
