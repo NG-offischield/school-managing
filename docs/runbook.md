@@ -44,9 +44,9 @@ docker compose exec web python manage.py migrate
 
 ## Sauvegarde de la base
 
-```bash
-docker compose exec db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > backup.sql
-```
+Voir [database-runbook.md](database-runbook.md) §5 : dump au format personnalisé écrit dans le conteneur puis copié (`docker compose cp`), vérification et restauration dans une nouvelle base. Sous PowerShell 5.1, ne pas rediriger `pg_dump` avec `>` : la sortie est réencodée en UTF-16 et le dump devient illisible.
+
+Consultation de la base (psql, requêtes de lecture, ce qu'il ne faut pas faire en SQL) : même document.
 
 ## Points d'attention Windows
 
