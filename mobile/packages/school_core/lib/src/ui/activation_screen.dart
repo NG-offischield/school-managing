@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:school_core/school_core.dart';
+import '../api/api_error.dart';
+import '../auth/auth_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/widgets.dart';
 
 /// Activation of an account created by the administration (ADR 0024):
 ///   1. code  -> POST /auth/activation/check/   (who / which school / login)

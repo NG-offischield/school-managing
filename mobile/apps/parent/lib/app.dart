@@ -5,7 +5,7 @@ import 'package:school_core/school_core.dart';
 
 import 'data/parent_repository.dart';
 import 'data/pdf_store.dart';
-import 'presentation/auth/login_screen.dart';
+import 'presentation/auth/register_screen.dart';
 import 'presentation/auth/pending_screen.dart';
 import 'presentation/home/home_shell.dart';
 
@@ -27,6 +27,7 @@ class ParentApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider<AuthService>.value(value: auth),
         Provider<ParentRepository>.value(value: repository),
+        Provider<CommunicationRepository>.value(value: repository),
         Provider<PdfStore>.value(value: pdfStore),
       ],
       child: MaterialApp(
@@ -87,7 +88,18 @@ class _AuthGateState extends State<AuthGate> {
     final realtime = widget.realtime;
     return switch (auth.status) {
       AuthStatus.restoring => const SplashScreen(),
-      AuthStatus.signedOut => const LoginScreen(),
+      AuthStatus.signedOut => SignInScreen(
+        subtitle: 'Espace parent',
+        roleLabel: 'parent',
+        alternative: SignInAlternative(
+          hint: 'Nouveau parent ? Créez votre compte : l\'établissement le validera.',
+          label: 'Créer mon compte',
+          icon: Icons.person_add_alt_1_outlined,
+          key: const Key('login.register'),
+          open: (context) =>
+              Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const RegisterScreen())),
+        ),
+      ),
       AuthStatus.pending => const PendingScreen(),
       AuthStatus.signedIn => HomeShell(key: ValueKey(auth.identity?.userId), realtime: realtime),
     };

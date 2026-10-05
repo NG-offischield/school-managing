@@ -2,11 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:school_core/school_core.dart';
-
-import '../../data/teacher_repository.dart';
-import '../common.dart';
-import '../home/home_shell.dart';
+import '../api/api_error.dart';
+import '../auth/auth_service.dart';
+import '../data/communication.dart';
+import '../theme/app_theme.dart';
+import '../widgets/widgets.dart';
+import 'live_state.dart';
 
 /// One conversation: history, live messages (WebSocket subscribe + resync),
 /// send with a client_id kept across a network failure (no duplicate).
@@ -58,7 +59,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   void _load() {
-    final repo = context.read<TeacherRepository>();
+    final repo = context.read<CommunicationRepository>();
     setState(() {
       _future = repo.messages(widget.conversation.id, myName: _myName).then((rows) {
         _messages = rows;
@@ -82,7 +83,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       _error = null;
     });
     try {
-      final sent = await context.read<TeacherRepository>().send(
+      final sent = await context.read<CommunicationRepository>().send(
         widget.conversation.id,
         body,
         clientId: clientId,

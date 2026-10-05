@@ -5,7 +5,6 @@ import 'package:school_core/school_core.dart';
 import '../../data/teacher_repository.dart';
 import '../../models/models.dart';
 import '../common.dart';
-import '../home/home_shell.dart';
 import '../planning/session_screen.dart';
 
 class DashboardData {

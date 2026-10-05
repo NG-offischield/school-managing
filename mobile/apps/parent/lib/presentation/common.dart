@@ -1,19 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:school_core/school_core.dart';
 
 import '../data/parent_repository.dart';
 import '../models/models.dart';
-import 'home/home_shell.dart';
-
-final hm = DateFormat('HH:mm', 'fr_FR');
-final dayLong = DateFormat('EEEE d MMMM', 'fr_FR');
-final dayShort = DateFormat('EEE d MMM', 'fr_FR');
-final dateOnly = DateFormat('dd/MM/yyyy', 'fr_FR');
-final dateTime = DateFormat('dd/MM/yyyy HH:mm', 'fr_FR');
-
-String capitalize(String text) => text.isEmpty ? text : '${text[0].toUpperCase()}${text.substring(1)}';
 
 /// The children the SERVER lets this parent see (verified links only) and
 /// the one currently selected. The list is never extended locally.
@@ -174,27 +164,10 @@ class InfoRow extends StatelessWidget {
   }
 }
 
-void showMessage(BuildContext context, String text) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(text)));
-}
-
-/// Opens [screen] above the shell while keeping the shell's state (live
-/// connection, selected child): routes are pushed on the app's navigator,
-/// outside the shell's providers, so they are provided again here.
-Future<T?> openScreen<T>(BuildContext context, Widget screen) {
-  final live = context.read<LiveState>();
-  final scope = context.read<ChildScope>();
-  return Navigator.of(context).push<T>(
-    MaterialPageRoute(
-      builder: (_) => MultiProvider(
-        providers: [
-          ChangeNotifierProvider<LiveState>.value(value: live),
-          ChangeNotifierProvider<ChildScope>.value(value: scope),
-        ],
-        child: screen,
-      ),
-    ),
-  );
-}
+/// Opens [screen] above the shell, keeping the live state (school_core) and
+/// the selected child.
+Future<T?> openScreen<T>(BuildContext context, Widget screen) => openAbove<T>(
+  context,
+  screen,
+  extra: (context) => [ChangeNotifierProvider<ChildScope>.value(value: context.read<ChildScope>())],
+);

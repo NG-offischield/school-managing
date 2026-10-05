@@ -1,6 +1,6 @@
 # Applications mobiles (Flutter)
 
-Enseignant et Parent aujourd'hui ; Gardien et Personnel ensuite. Elles parlent **uniquement** à
+Enseignant, Parent, Gardien et Personnel. Elles parlent **uniquement** à
 l'API Django (REST + WebSocket) : aucun accès PostgreSQL, aucune donnée métier locale faisant autorité,
 aucune authentification locale (ADR 0025).
 
@@ -10,9 +10,12 @@ mobile/
                           erreurs typées, renouvellement du jeton), session (connexion, refresh,
                           déconnexion, activation), stockage sécurisé du seul refresh token,
                           temps réel (ws/v1/realtime/), thème, composants et module de
-                          communication commun (notifications, conversations, réclamations)
+                          communication commun selon le rôle, connexion / activation, portail QR
+                          (scan, mes passages), calendrier ; testing.dart pour les tests
   apps/teacher/           application enseignant (data/, models/, presentation/)
   apps/parent/            application parent (même organisation ; ADR 0026)
+  apps/guardian/          application gardien (portail, mes passages, notifications ; ADR 0027)
+  apps/staff/             application personnel (planning, portail, messages, rémunération ; ADR 0027)
   tools/                  préparation d'un parcours réel sur une base de TEST
 ```
 
@@ -73,3 +76,22 @@ Parcours réel sur une base de **test** :
    `PARENT_LIVE_URL=http://127.0.0.1:8001/api/v1/ PARENT_LIVE='<json>' PARENT_LIVE_ADMIN=e2eadmin PARENT_LIVE_ADMIN_PASSWORD=<généré pour l'exécution> flutter test test/live_test.dart`
 
 Le mot de passe du parent est généré pendant le test et n'est écrit nulle part.
+
+## Applications gardien et personnel
+
+Les comptes sont créés par l'établissement et activés par la personne avec un code (ADR 0024). Le portail
+utilise le protocole QR existant : le jeton est saisi ou envoyé par un lecteur QR « clavier ». Le serveur
+décide de ce que chaque rôle voit :
+- le gardien voit le statut de solvabilité, jamais de montant ;
+- le personnel ne le voit pas.
+
+Les gardiens n'ont pas de messagerie (spec §8). Il n'existe pas encore d'API de présence du personnel.
+
+Parcours réels sur la base de **test** :
+
+1. Lancer le conteneur de test sur le port 8001.
+2. Préparer les données :
+   `docker exec -e E2E_USER=e2eadmin <conteneur> python manage.py shell -c "exec(open('tools/e2e_field_fixture.py').read())"`.
+   Le script affiche une ligne JSON.
+3. Lancer `flutter test test/live_test.dart` dans `apps/guardian` puis dans `apps/staff`, avec les variables
+   `FIELD_LIVE_URL`, `FIELD_LIVE` (le JSON), `FIELD_LIVE_ADMIN` et `FIELD_LIVE_ADMIN_PASSWORD`.

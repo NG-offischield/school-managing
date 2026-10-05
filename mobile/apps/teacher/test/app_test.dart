@@ -187,7 +187,7 @@ void main() {
     await tester.tap(find.widgetWithText(Tab, 'Réclamations'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.text('Aucune réclamation ne vous concerne.'), findsOneWidget);
+    expect(find.text('Aucune réclamation.'), findsOneWidget);
   });
 
   testWidgets('expired session goes back to login; logout; network errors are explained', (tester) async {

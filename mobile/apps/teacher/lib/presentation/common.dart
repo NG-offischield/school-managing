@@ -1,15 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:school_core/school_core.dart';
 
 import '../models/models.dart';
-
-final hm = DateFormat('HH:mm', 'fr_FR');
-final dayLong = DateFormat('EEEE d MMMM', 'fr_FR');
-final dayShort = DateFormat('EEE d MMM', 'fr_FR');
-final dateTime = DateFormat('dd/MM/yyyy HH:mm', 'fr_FR');
-
-String capitalize(String text) => text.isEmpty ? text : '${text[0].toUpperCase()}${text.substring(1)}';
 
 String hours(TeachingSession s) =>
     s.start == null || s.end == null ? '' : '${hm.format(s.start!)} – ${hm.format(s.end!)}';

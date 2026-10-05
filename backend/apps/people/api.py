@@ -155,13 +155,19 @@ class StaffSerializer(serializers.ModelSerializer):
     last_name = serializers.CharField(source="employee.membership.user.last_name", read_only=True)
     employee_number = serializers.CharField(source="employee.employee_number", read_only=True)
     functions = serializers.SerializerMethodField()
+    # Readable names of the same functions (staff app, ADR 0027).
+    function_labels = serializers.SerializerMethodField()
 
     class Meta:
         model = StaffProfile
-        fields = ["id", "staff_number", "employee_number", "first_name", "last_name", "functions"]
+        fields = ["id", "staff_number", "employee_number", "first_name", "last_name", "functions", "function_labels"]
 
     def get_functions(self, obj):
         return sorted(a.function.code for a in obj.function_assignments.all() if a.active)
+
+    def get_function_labels(self, obj):
+        active = sorted((a.function for a in obj.function_assignments.all() if a.active), key=lambda f: f.code)
+        return [{"code": f.code, "name": f.name} for f in active]
 
 
 # -----------------------------------------------------------------------------

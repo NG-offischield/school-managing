@@ -2,51 +2,77 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:school_core/school_core.dart';
-
-import '../../data/parent_repository.dart';
-import '../common.dart';
-import '../home/home_shell.dart';
+import '../api/api_error.dart';
+import '../data/communication.dart';
+import '../theme/app_theme.dart';
+import '../widgets/widgets.dart';
+import 'composers.dart';
 import 'conversation_screen.dart';
-import 'new_message_screens.dart';
+import 'live_state.dart';
 
 /// Notifications, messages and complaints of the parent (existing
 /// communication API; new notifications arrive live through the WebSocket).
+/// Opens a composer and returns what it created (or null).
+typedef Composer<T> = Future<T?> Function(BuildContext context);
+
+/// Notifications, and — only for the roles the server lets use them —
+/// messages and complaints (spec §8: guardians have no messaging; complaints
+/// are filed by parents and teachers). The server re-checks every action.
 class CommunicationScreen extends StatelessWidget {
-  const CommunicationScreen({super.key});
+  const CommunicationScreen({
+    super.key,
+    this.messaging = true,
+    this.complaints = true,
+    this.composeConversation,
+    this.composeComplaint,
+  });
+
+  final bool messaging;
+  final bool complaints;
+
+  /// New conversation; default: a message to the administration.
+  final Composer<Conversation>? composeConversation;
+
+  /// New complaint; default: a complaint without pupil.
+  final Composer<Complaint>? composeComplaint;
 
   @override
   Widget build(BuildContext context) {
-    final connection = context.watch<LiveState>().connection;
+    final tabs = <(String, Widget)>[
+      ('Notifications', const NotificationsTab()),
+      if (messaging)
+        (
+          'Messages',
+          ConversationsTab(
+            compose: composeConversation ?? (c) => openAbove<Conversation>(c, const AdminMessageScreen()),
+          ),
+        ),
+      if (complaints)
+        (
+          'Réclamations',
+          ComplaintsTab(compose: composeComplaint ?? (c) => openAbove<Complaint>(c, const ComplaintComposer())),
+        ),
+    ];
+    if (tabs.length == 1) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Notifications'), actions: const [LiveIndicator()]),
+        body: tabs.single.$2,
+      );
+    }
     return DefaultTabController(
-      length: 3,
+      length: tabs.length,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Communication'),
-          actions: [
-            if (connection == RealtimeState.online)
-              const Padding(
-                padding: EdgeInsets.only(right: 14),
-                child: Tooltip(message: 'Temps réel connecté', child: Icon(Icons.wifi_tethering, size: 20)),
-              )
-            else if (connection == RealtimeState.offline)
-              const Padding(
-                padding: EdgeInsets.only(right: 14),
-                child: Tooltip(message: 'Hors ligne : reconnexion automatique', child: Icon(Icons.wifi_off, size: 20)),
-              ),
-          ],
-          bottom: const TabBar(
+          actions: const [LiveIndicator()],
+          bottom: TabBar(
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white70,
             indicatorColor: Colors.white,
-            tabs: [
-              Tab(text: 'Notifications'),
-              Tab(text: 'Messages'),
-              Tab(text: 'Réclamations'),
-            ],
+            tabs: [for (final (label, _) in tabs) Tab(text: label)],
           ),
         ),
-        body: const TabBarView(children: [NotificationsTab(), ConversationsTab(), ComplaintsTab()]),
+        body: TabBarView(children: [for (final (_, body) in tabs) body]),
       ),
     );
   }
@@ -82,12 +108,12 @@ class _NotificationsTabState extends State<NotificationsTab> {
 
   void _load() {
     setState(() {
-      _future = context.read<ParentRepository>().notifications().then((rows) => _rows = rows)..ignore();
+      _future = context.read<CommunicationRepository>().notifications().then((rows) => _rows = rows)..ignore();
     });
   }
 
   Future<void> _open(AppNotification notification) async {
-    final repo = context.read<ParentRepository>();
+    final repo = context.read<CommunicationRepository>();
     final live = context.read<LiveState>();
     if (!notification.read) {
       try {
@@ -124,7 +150,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
 
   Future<void> _markAll() async {
     try {
-      await context.read<ParentRepository>().markAllRead();
+      await context.read<CommunicationRepository>().markAllRead();
       if (!mounted) return;
       context.read<LiveState>().setUnread(0);
       setState(() => _rows = [for (final n in _rows) n.markedRead()]);
@@ -175,7 +201,9 @@ class _NotificationsTabState extends State<NotificationsTab> {
 }
 
 class ConversationsTab extends StatefulWidget {
-  const ConversationsTab({super.key});
+  const ConversationsTab({super.key, required this.compose});
+
+  final Composer<Conversation> compose;
 
   @override
   State<ConversationsTab> createState() => _ConversationsTabState();
@@ -191,14 +219,14 @@ class _ConversationsTabState extends State<ConversationsTab> {
   }
 
   void _load() => setState(() {
-    _future = context.read<ParentRepository>().conversations()..ignore();
+    _future = context.read<CommunicationRepository>().conversations()..ignore();
   });
 
   Future<void> _new() async {
-    final created = await openScreen<Conversation>(context, const NewConversationScreen());
+    final created = await widget.compose(context);
     if (created == null || !mounted) return;
     _load();
-    await openScreen<void>(context, ConversationScreen(conversation: created));
+    await openAbove<void>(context, ConversationScreen(conversation: created));
     if (mounted) _load();
   }
 
@@ -242,7 +270,7 @@ class _ConversationsTabState extends State<ConversationsTab> {
                     ),
                     trailing: c.unread > 0 ? Badge(label: Text('${c.unread}')) : const Icon(Icons.chevron_right),
                     onTap: () async {
-                      await openScreen<void>(context, ConversationScreen(conversation: c));
+                      await openAbove<void>(context, ConversationScreen(conversation: c));
                       _load();
                     },
                   ),
@@ -256,7 +284,9 @@ class _ConversationsTabState extends State<ConversationsTab> {
 }
 
 class ComplaintsTab extends StatefulWidget {
-  const ComplaintsTab({super.key});
+  const ComplaintsTab({super.key, required this.compose});
+
+  final Composer<Complaint> compose;
 
   @override
   State<ComplaintsTab> createState() => _ComplaintsTabState();
@@ -272,7 +302,7 @@ class _ComplaintsTabState extends State<ComplaintsTab> {
   }
 
   void _load() => setState(() {
-    _future = context.read<ParentRepository>().complaints()..ignore();
+    _future = context.read<CommunicationRepository>().complaints()..ignore();
   });
 
   Tone _tone(String status) => switch (status) {
@@ -283,7 +313,7 @@ class _ComplaintsTabState extends State<ComplaintsTab> {
   };
 
   Future<void> _new() async {
-    final created = await openScreen<Complaint>(context, const NewComplaintScreen());
+    final created = await widget.compose(context);
     if (created != null && mounted) {
       showMessage(context, 'Réclamation transmise à l\'établissement.');
       _load();

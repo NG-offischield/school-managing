@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:school_core/school_core.dart';
 
 import 'data/teacher_repository.dart';
-import 'presentation/auth/login_screen.dart';
 import 'presentation/home/home_shell.dart';
 
 /// Root: session state decides the screen (splash -> login -> home).
@@ -23,6 +22,7 @@ class TeacherApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider<AuthService>.value(value: auth),
         Provider<TeacherRepository>.value(value: repository),
+        Provider<CommunicationRepository>.value(value: repository),
       ],
       child: MaterialApp(
         title: 'School Managing — Enseignant',
@@ -51,7 +51,12 @@ class AuthGate extends StatelessWidget {
     final auth = context.watch<AuthService>();
     return switch (auth.status) {
       AuthStatus.restoring => const SplashScreen(),
-      AuthStatus.signedOut || AuthStatus.pending => const LoginScreen(), // no pending accounts here
+      AuthStatus.signedOut || AuthStatus.pending => SignInScreen(
+        // no pending accounts here
+        subtitle: 'Espace enseignant',
+        roleLabel: 'enseignant',
+        alternative: SignInAlternative.activation(),
+      ),
       AuthStatus.signedIn => HomeShell(key: ValueKey(auth.identity?.userId), realtime: realtime),
     };
   }

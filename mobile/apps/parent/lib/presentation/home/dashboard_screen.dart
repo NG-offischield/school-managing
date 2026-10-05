@@ -8,7 +8,6 @@ import '../children/link_requests_screen.dart';
 import '../common.dart';
 import '../documents/documents_screen.dart';
 import '../profile/profile_screen.dart';
-import 'home_shell.dart';
 
 /// Accueil: the children the server lets me see (class, year, schooling),
 /// what is new (notifications, convocations) and the main shortcuts.

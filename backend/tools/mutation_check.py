@@ -1,5 +1,5 @@
 """Mutation check of the administration verticals (ADR 0018 to ADR 0020) and of
-the account activation (ADR 0024) and the parent workflow (ADR 0026).
+the account activation (ADR 0024), the parent workflow (ADR 0026) and the guardian / staff apps (ADR 0027).
 
 Each mutation removes ONE protection from the code (school filtering,
 year/class control, permission check, compatibility control), runs the
@@ -12,6 +12,7 @@ always restored.
     docker compose run --rm -T web python tools/mutation_check.py courses
     docker compose run --rm -T web python tools/mutation_check.py activation
     docker compose run --rm -T web python tools/mutation_check.py parents
+    docker compose run --rm -T web python tools/mutation_check.py field
 
 Exit code 0 only if every mutation is killed.
 """
@@ -327,12 +328,67 @@ PARENTS = [
     ),
 ]
 
+FIELD = [
+    # --- isolation (guardian / staff apps, ADR 0027) ---------------------------
+    (
+        "isolation: a guardian sees every scan of the school",
+        "apps/attendance/api.py",
+        "        queryset = queryset.filter(scanned_by=self.membership())\n",
+        "",
+    ),
+    (
+        "isolation: a staff member sees the whole staff list",
+        "apps/people/api.py",
+        "    def restrict(self, queryset):\n        if self.is_admin():\n            return queryset\n"
+        "        return queryset.filter(employee__membership=self.membership())\n",
+        "    def restrict(self, queryset):\n        return queryset\n",
+    ),
+    (
+        "isolation: payroll/me returns colleagues' payrolls",
+        "apps/payroll/api.py",
+        "            return Q(school=membership.school, status__in=VISIBLE_TO_EMPLOYEE, **{owner: membership})",
+        "            return Q(school=membership.school, status__in=VISIBLE_TO_EMPLOYEE)",
+    ),
+    (
+        "school isolation: tenant scoping of every read endpoint removed",
+        "common/views.py",
+        "        return self.restrict(scope_to_current_school(self.queryset.all(), self.request))",
+        "        return self.restrict(self.queryset.all())",
+    ),
+    # --- permissions -----------------------------------------------------------
+    (
+        "permission: staff see the pupils' solvency at the gate",
+        "apps/attendance/api.py",
+        'SOLVENCY_VIEWER_ROLES = frozenset({"GUARDIAN", *ADMIN_ROLES})',
+        'SOLVENCY_VIEWER_ROLES = frozenset({"GUARDIAN", "STAFF", *ADMIN_ROLES})',
+    ),
+    (
+        "permission: any member may scan QR codes",
+        "apps/attendance/services.py",
+        "    if not membership_has_role(actor, SCANNER_ROLES):\n",
+        "    if False:\n",
+    ),
+    (
+        "permission: an inactive guardian may still scan",
+        "apps/attendance/services.py",
+        '    if guardian is not None and guardian.status != "ACTIVE":\n',
+        "    if False:\n",
+    ),
+    (
+        "permission: guardians may use messaging (spec §8)",
+        "apps/communication/access.py",
+        'MESSAGING_ROLES = frozenset({"TEACHER", "PARENT", "STAFF", *ADMIN_ROLES})',
+        'MESSAGING_ROLES = frozenset({"TEACHER", "PARENT", "STAFF", "GUARDIAN", *ADMIN_ROLES})',
+    ),
+]
+
 SUITES = {
     "students": (["tests/test_students_admin_api.py"], STUDENTS),
     "teachers": (["tests/test_teachers_admin_api.py"], TEACHERS),
     "courses": (["tests/test_courses_admin_api.py"], COURSES),
     "activation": (["tests/test_account_activation.py"], ACTIVATION),
     "parents": (["tests/test_parent_workflow.py"], PARENTS),
+    "field": (["tests/test_guardian_staff_api.py"], FIELD),
 }
 
 

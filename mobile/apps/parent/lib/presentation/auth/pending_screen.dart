@@ -4,7 +4,6 @@ import 'package:school_core/school_core.dart';
 
 import '../../data/parent_repository.dart';
 import '../../models/models.dart';
-import '../common.dart';
 
 /// Signed in, but the account still waits for the school (membership
 /// PENDING): only the registration state is shown — the server grants

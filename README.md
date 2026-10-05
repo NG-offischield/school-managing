@@ -13,7 +13,7 @@ Les écarts validés par rapport à la spec sont tracés dans [docs/adr/](docs/a
 | Base de données | PostgreSQL 17 | conteneur `db` |
 | Temps réel / cache / limitation de débit | Redis 7 | conteneur `redis` |
 | Client administrateur | Python + PySide6 (bureau) | `desktop/` |
-| Enseignant / Parent / Gardien / Personnel | Flutter | `mobile/` *(enseignant et parent ; gardien et personnel ensuite)* |
+| Enseignant / Parent / Gardien / Personnel | Flutter | `mobile/` *(enseignant, parent, gardien, personnel)* |
 | Site public | Django Templates | `backend/` *(phase ultérieure)* |
 
 Le backend est la seule autorité pour les permissions, les calculs, la finance et les règles métier. Les clients ne parlent jamais directement à PostgreSQL ou Redis.
@@ -60,4 +60,5 @@ Voir [docs/runbook.md](docs/runbook.md) pour l'exploitation courante.
 - [x] Cycle de vie des comptes : codes d'activation à usage unique (hachés, expirants, révocables), premier mot de passe choisi par la personne, suspension / réactivation (ADR 0024)
 - [x] Mobile Flutter : socle partagé `school_core` et application enseignant (activation, connexion, tableau de bord, planning, séance, communication ; `mobile/`, ADR 0025)
 - [x] Parents : inscription validée par l'école, rattachement vérifié (pièce d'identité contrôlée à l'école — empreinte HMAC seulement —, désignation par l'élève, parrainage d'un second parent par code à usage unique), page Parents du poste, application Flutter parent (accueil, présences, planning, finance selon les droits, bulletins, messages ; ADR 0026)
+- [x] Gardien et Personnel : applications Flutter (portail QR existant, mes passages, notifications, planning, messages vers l'administration, rémunération) sur un socle `school_core` commun aux quatre applications (connexion, activation, temps réel, communication selon le rôle, portail ; ADR 0027)
 - [ ] Phases suivantes — autres écrans du poste d'administration, présence par séance (fiches d'appel), envoi FCM, site public, client Flutter

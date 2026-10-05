@@ -1,21 +1,62 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:school_core/school_core.dart';
 
+import '../api/api_error.dart';
+import '../auth/auth_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/widgets.dart';
 import 'activation_screen.dart';
 
-/// Identifier + password -> /auth/login/. The password lives only in the
-/// text field while typing; it is never stored.
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, this.identifier});
+/// Second way in, under the sign-in form: account activation (accounts
+/// created by the school) or self-registration (parents). The screen it
+/// opens returns the login identifier to prefill, or null.
+class SignInAlternative {
+  const SignInAlternative({
+    required this.hint,
+    required this.label,
+    required this.icon,
+    required this.key,
+    required this.open,
+  });
 
+  /// Activation of an account created by the school (ADR 0024).
+  factory SignInAlternative.activation() => SignInAlternative(
+    hint: 'Première connexion ? L\'administration vous a remis un code d\'activation.',
+    label: 'Activer mon compte',
+    icon: Icons.key_outlined,
+    key: const Key('login.activate'),
+    open: (context) => Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const ActivationScreen())),
+  );
+
+  final String hint;
+  final String label;
+  final IconData icon;
+  final Key key;
+  final Future<String?> Function(BuildContext context) open;
+}
+
+/// Identifier + password -> /auth/login/ (the one authentication of every
+/// app). The password lives only in the text field while typing; it is never
+/// stored. `roleLabel` explains a refused account of another role.
+class SignInScreen extends StatefulWidget {
+  const SignInScreen({
+    super.key,
+    required this.subtitle,
+    required this.roleLabel,
+    required this.alternative,
+    this.identifier,
+  });
+
+  final String subtitle;
+  final String roleLabel;
+  final SignInAlternative alternative;
   final String? identifier;
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<SignInScreen> createState() => _SignInScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _SignInScreenState extends State<SignInScreen> {
   late final _identifier = TextEditingController(text: widget.identifier);
   final _password = TextEditingController();
   bool _hidden = true;
@@ -41,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await auth.login(_identifier.text, _password.text);
     } on WrongRoleException {
-      _error = 'Ce compte n\'est pas un compte enseignant : utilisez l\'application prévue pour votre rôle.';
+      _error = 'Ce compte n\'est pas un compte ${widget.roleLabel} : utilisez l\'application prévue pour votre rôle.';
     } on ApiException catch (error) {
       _error = error.userMessage;
     } finally {
@@ -50,8 +91,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _activate() async {
-    final login = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const ActivationScreen()));
+  Future<void> _alternative() async {
+    final login = await widget.alternative.open(context);
     if (login != null && mounted) {
       setState(() {
         _identifier.text = login;
@@ -63,6 +104,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final notice = context.watch<AuthService>().notice;
+    final alternative = widget.alternative;
     return Scaffold(
       body: SafeArea(
         child: LayoutBuilder(
@@ -77,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const SoftwareBrand(subtitle: 'Espace enseignant'),
+                        SoftwareBrand(subtitle: widget.subtitle),
                         const SizedBox(height: 32),
                         if (notice != null && _error == null) ...[
                           MessageBanner(notice, tone: Tone.info),
@@ -133,17 +175,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 18),
                         const Divider(),
                         const SizedBox(height: 8),
-                        const Text(
-                          'Première connexion ? L\'administration vous a remis un code d\'activation.',
+                        Text(
+                          alternative.hint,
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Tokens.textSecondary),
+                          style: const TextStyle(color: Tokens.textSecondary),
                         ),
                         const SizedBox(height: 10),
                         OutlinedButton.icon(
-                          key: const Key('login.activate'),
-                          onPressed: _busy ? null : _activate,
-                          icon: const Icon(Icons.key_outlined),
-                          label: const Text('Activer mon compte'),
+                          key: alternative.key,
+                          onPressed: _busy ? null : _alternative,
+                          icon: Icon(alternative.icon),
+                          label: Text(alternative.label),
                         ),
                       ],
                     ),

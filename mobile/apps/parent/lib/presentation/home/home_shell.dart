@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:school_core/school_core.dart';
@@ -7,7 +5,7 @@ import 'package:school_core/school_core.dart';
 import '../../data/parent_repository.dart';
 import '../attendance/attendance_screen.dart';
 import '../common.dart';
-import '../communication/communication_screen.dart';
+import '../communication/new_message_screens.dart';
 import '../finance/finance_screen.dart';
 import '../planning/planning_screen.dart';
 import 'dashboard_screen.dart';
@@ -24,36 +22,10 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class LiveState extends ChangeNotifier {
-  int unread = 0;
-  RealtimeState connection = RealtimeState.stopped;
-  final notifications = StreamController<Map<String, dynamic>>.broadcast();
-  final messages = StreamController<Map<String, dynamic>>.broadcast();
-  RealtimeClient? client;
-
-  void setUnread(int value) {
-    unread = value;
-    notifyListeners();
-  }
-
-  void setConnection(RealtimeState value) {
-    connection = value;
-    notifyListeners();
-  }
-
-  @override
-  void dispose() {
-    notifications.close();
-    messages.close();
-    super.dispose();
-  }
-}
-
 class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _tab = 0;
-  final _live = LiveState();
+  final _live = LiveState(); // school_core: shared by every app
   late final ChildScope _children;
-  final _subscriptions = <StreamSubscription<dynamic>>[];
 
   @override
   void initState() {
@@ -61,39 +33,17 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _children = ChildScope(context.read<ParentRepository>())..load();
     final factory = widget.realtime;
-    if (factory != null) {
-      final auth = context.read<AuthService>();
-      final client = factory();
-      _live.client = client;
-      _subscriptions
-        ..add(client.states.listen(_live.setConnection))
-        ..add(client.unreadNotifications.listen(_live.setUnread))
-        ..add(
-          client.notifications.listen((n) {
-            _live.notifications.add(n);
-            if (n['is_read'] != true) _live.setUnread(_live.unread + 1);
-          }),
-        )
-        ..add(client.messages.listen(_live.messages.add))
-        ..add(client.sessionExpired.listen((_) => auth.expire()));
-      client.start();
-    }
+    if (factory != null) _live.attach(factory(), context.read<AuthService>());
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Back in the foreground: reconnect at once (the resync fetches what was missed).
-    final client = _live.client;
-    if (state == AppLifecycleState.resumed && client != null && client.state != RealtimeState.online) client.start();
+    if (state == AppLifecycleState.resumed) _live.resume();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    for (final s in _subscriptions) {
-      s.cancel();
-    }
-    _live.client?.dispose();
     _live.dispose();
     _children.dispose();
     super.dispose();
@@ -116,7 +66,16 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             const AttendanceScreen(),
             const PlanningScreen(),
             const FinanceScreen(),
-            const CommunicationScreen(),
+            CommunicationScreen(
+              composeConversation: (context) => openScreen<Conversation>(context, const NewConversationScreen()),
+              composeComplaint: (context) {
+                final child = context.read<ChildScope>().selected;
+                return openScreen<Complaint>(
+                  context,
+                  ComplaintComposer(studentId: child?.id, studentLabel: child?.name),
+                );
+              },
+            ),
           ],
         ),
         bottomNavigationBar: Consumer<LiveState>(
