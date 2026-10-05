@@ -1,5 +1,6 @@
-/// Shared infrastructure of the School Managing mobile apps (teacher, parent;
-/// guardian and staff later): API client and errors, session and
+/// Shared infrastructure of the School Managing mobile apps (teacher, parent,
+/// guardian, staff): backend address (API_URL / WS_URL), Android 17 local
+/// network permission, API client and errors, session and
 /// secure token storage, activation, real time, theme, components and the
 /// communication module every role shares.
 /// No business rule: the Django API is the source of truth.
@@ -10,6 +11,8 @@ export 'src/api/api_error.dart';
 export 'src/auth/auth_service.dart';
 export 'src/auth/identity.dart';
 export 'src/auth/token_store.dart';
+export 'src/config/app_config.dart';
+export 'src/config/local_network.dart';
 export 'src/data/communication.dart';
 export 'src/data/school_calendar.dart';
 export 'src/messages.dart';

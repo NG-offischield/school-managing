@@ -1,6 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- The app only talks to the School Managing API (REST + WebSocket). -->
-    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Permissions come from school_core (packages/school_core/android): INTERNET, and
+         ACCESS_LOCAL_NETWORK for Android 17. No other permission: no camera, storage
+         (PDFs go to the app's private folder) or notification permission is used. -->
     <application
         android:label="School Managing Enseignant"
         android:allowBackup="false"

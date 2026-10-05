@@ -103,7 +103,9 @@ class _SignInScreenState extends State<SignInScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final notice = context.watch<AuthService>().notice;
+    final auth = context.watch<AuthService>();
+    final notice = auth.notice;
+    final server = Uri.parse(auth.api.baseUrl);
     final alternative = widget.alternative;
     return Scaffold(
       body: SafeArea(
@@ -186,6 +188,14 @@ class _SignInScreenState extends State<SignInScreen> {
                           onPressed: _busy ? null : _alternative,
                           icon: Icon(alternative.icon),
                           label: Text(alternative.label),
+                        ),
+                        const SizedBox(height: 18),
+                        // Which backend this build talks to: the first thing to check on a LAN setup.
+                        Text(
+                          'Serveur : ${server.hasPort ? '${server.host}:${server.port}' : server.host}',
+                          key: const Key('login.server'),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Tokens.textSecondary, fontSize: 12),
                         ),
                       ],
                     ),

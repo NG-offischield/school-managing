@@ -28,3 +28,9 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
 flutter:
+  # Android side (Kotlin): the Android 17 local-network permission, shared by the four apps.
+  plugin:
+    platforms:
+      android:
+        package: cm.schoolmanaging.school_core
+        pluginClass: SchoolCorePlugin

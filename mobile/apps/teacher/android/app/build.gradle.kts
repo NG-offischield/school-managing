@@ -6,9 +6,6 @@ plugins {
 
 android {
     namespace = "cm.schoolmanaging.school_teacher"
-    compileSdk = flutter.compileSdkVersion
-    // Only NDK 29.0.13599879 is fully installed on the development machine.
-    ndkVersion = "29.0.13599879"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -18,10 +15,7 @@ android {
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "cm.schoolmanaging.school_teacher"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        // minSdk / targetSdk / compileSdk / NDK: mobile/gradle/school-android.gradle (shared).
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
         // You can force using the value of versionCode by specifying the `-P force-version-code-ignoring-abi=true`
@@ -48,3 +42,6 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+// Android 10 (API 29) -> Android 17 (API 37), shared by the four apps.
+apply(from = "../../../../gradle/school-android.gradle")

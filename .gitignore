@@ -24,6 +24,8 @@ backend/staticfiles/
 # --- Flutter / Dart ----------------------------------------------------------
 mobile/**/.dart_tool/
 mobile/**/build/
+# Address of the PC on the CURRENT local network (mobile/tools/configure_lan.ps1): machine-specific.
+mobile/config/lan.json
 
 # --- IDE / OS ----------------------------------------------------------------
 .idea/

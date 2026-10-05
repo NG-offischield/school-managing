@@ -1,0 +1,12 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Shared by the four apps (merged into each APK). -->
+
+    <!-- REST + WebSocket to the School Managing API. Enough on Android 10–16 (API 29–36). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Android 17 (API 37) local network protection: apps targeting API 37 need this RUNTIME
+         permission (group NEARBY_DEVICES) to reach the PC running Django on the school's Wi-Fi.
+         Unknown to API 29–36 devices, which ignore it; it is only requested at runtime on API 37+
+         and only when the API address is a private LAN address (school_core LocalNetworkGate). -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+</manifest>

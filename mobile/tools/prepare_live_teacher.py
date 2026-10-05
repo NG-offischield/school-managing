@@ -89,8 +89,11 @@ def main():
 
     planning = PlanningService(api)
     tomorrow = today + timedelta(days=1)
+    # A's weekly slot today must not overlap the exceptional session below (one hour ago -> +30 min),
+    # whatever the time the script runs: 7-9 h in the afternoon, 18-20 h in the morning.
+    hour_now = datetime.now(timezone(timedelta(hours=1))).hour
     for course, day, hour in (
-        (course_a, today, 14),
+        (course_a, today, 7 if hour_now >= 11 else 18),
         (course_a, tomorrow, 8),
         (course_b, tomorrow, 10),
         (course_b, today, 16),

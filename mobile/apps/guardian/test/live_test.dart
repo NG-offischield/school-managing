@@ -87,7 +87,7 @@ void main() {
       expect(await _caught(api.get('admin/scans/')), isA<ForbiddenException>());
 
       // 7. Live WebSocket.
-      final realtime = RealtimeClient(api, socketUri(url), refresh: auth.refreshSession);
+      final realtime = RealtimeClient(api, AppConfig.parse(apiUrl: url).socket, refresh: auth.refreshSession);
       final online = realtime.states.firstWhere((s) => s == RealtimeState.online).timeout(const Duration(seconds: 10));
       realtime.start();
       expect(await online, RealtimeState.online);

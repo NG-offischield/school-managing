@@ -1,0 +1,26 @@
+// Android levels shared by the four School Managing apps (teacher, parent, guardian, staff).
+// Applied at the end of each mobile/apps/<app>/android/app/build.gradle.kts:
+//     apply(from = "../../../../gradle/school-android.gradle")
+// ONE place to change them; school_core's own module (packages/school_core/android) uses the same.
+//
+//   minSdk     29  Android 10 — oldest supported device
+//   targetSdk  37  Android 17 — current behaviour (local network protection: ACCESS_LOCAL_NETWORK)
+//   compileSdk 37  Android 17 APIs visible at compile time; every API newer than 29 is guarded
+//                  at runtime by Build.VERSION.SDK_INT (see SchoolCorePlugin.kt)
+// Checked by packages/school_core/test/android_config_test.dart.
+
+ext.schoolMinSdk = 29
+ext.schoolTargetSdk = 37
+ext.schoolCompileSdk = 37
+// Only NDK 29.0.13599879 is fully installed on the development machine (16 KB pages ready).
+ext.schoolNdkVersion = "29.0.13599879"
+
+android {
+    compileSdk = schoolCompileSdk
+    ndkVersion = schoolNdkVersion
+
+    defaultConfig {
+        minSdk = schoolMinSdk
+        targetSdk = schoolTargetSdk
+    }
+}

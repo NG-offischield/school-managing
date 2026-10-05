@@ -94,7 +94,7 @@ void main() {
       expect(await repo.unreadCount(), unread - 1);
 
       // 6. Live WebSocket (existing ws/v1/realtime/).
-      final realtime = RealtimeClient(api, socketUri(url), refresh: auth.refreshSession);
+      final realtime = RealtimeClient(api, AppConfig.parse(apiUrl: url).socket, refresh: auth.refreshSession);
       final online = realtime.states.firstWhere((s) => s == RealtimeState.online).timeout(const Duration(seconds: 10));
       realtime.start();
       expect(await online, RealtimeState.online);

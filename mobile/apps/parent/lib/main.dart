@@ -6,15 +6,20 @@ import 'app.dart';
 import 'data/parent_repository.dart';
 import 'data/pdf_store.dart';
 
-/// Backend address, given at build time (never hard-coded credentials):
-///   flutter run --dart-define=API_URL=http://127.0.0.1:8000/api/v1/   (USB + adb reverse)
-/// Default: the host machine as seen from the Android emulator.
-const apiUrl = String.fromEnvironment('API_URL', defaultValue: 'http://10.0.2.2:8000/api/v1/');
-
+/// Backend address, given at build time — never written in the sources
+/// (school_core AppConfig, docs/reseau-local.md):
+///   flutter run --dart-define-from-file=../../config/lan.json
+///   `flutter run --dart-define=API_URL=http://<IPv4 du PC>:8000/api/v1/`   (optional WS_URL)
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('fr_FR');
-  final api = ApiClient(baseUrl: apiUrl);
+  final AppConfig config;
+  try {
+    config = AppConfig.fromEnvironment();
+  } on AppConfigException catch (error) {
+    return runApp(ConfigErrorApp(error.message));
+  }
+  final api = ApiClient(baseUrl: config.apiUrl);
   final auth = AuthService(
     api,
     SecureTokenStore(prefix: 'school_managing.parent'),
@@ -23,12 +28,15 @@ Future<void> main() async {
     device: const DeviceInfo(name: 'Application parent'),
   );
   runApp(
-    ParentApp(
-      auth: auth,
-      repository: ParentRepository(api),
-      pdfStore: const DevicePdfStore(),
-      realtime: () => RealtimeClient(api, socketUri(apiUrl), refresh: auth.refreshSession),
+    LocalNetworkGate(
+      config: config,
+      onReady: auth.restore, // no request before Android 17 lets the app reach the LAN
+      child: ParentApp(
+        auth: auth,
+        repository: ParentRepository(api),
+        pdfStore: const DevicePdfStore(),
+        realtime: () => RealtimeClient(api, config.socket, refresh: auth.refreshSession),
+      ),
     ),
   );
-  await auth.restore();
 }
