@@ -58,4 +58,5 @@ Voir [docs/runbook.md](docs/runbook.md) pour l'exploitation courante.
 - [x] Documents officiels PDF : bulletins, reçus, bulletins de paie, relevés et registres de présence, carte d'élève (QR annuel existant), emploi du temps ; officiel / provisoire, versions, branding de l'école, stockage privé, traces (ADR 0016)
 - [x] Poste d'administration PySide6 : connexion, shell, tableau de bord avec graphiques, années scolaires, niveaux, catégories pédagogiques, matières, classes, élèves, enseignants, cours, planning, finance, paie, communication, documents (`desktop/`, voir desktop/README.md, ADR 0017 à 0023)
 - [x] Cycle de vie des comptes : codes d'activation à usage unique (hachés, expirants, révocables), premier mot de passe choisi par la personne, suspension / réactivation (ADR 0024)
+- [x] Mobile Flutter : socle partagé `school_core` et application enseignant (activation, connexion, tableau de bord, planning, séance, communication ; `mobile/`, ADR 0025)
 - [ ] Phases suivantes — autres écrans du poste d'administration, présence par séance (fiches d'appel), envoi FCM, site public, client Flutter

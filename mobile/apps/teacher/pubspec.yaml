@@ -1,0 +1,26 @@
+name: school_teacher
+description: School Managing — application enseignant (Flutter). Client de l'API Django uniquement.
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  school_core:
+    path: ../../packages/school_core
+  provider: ^6.1.5
+  intl: ^0.20.2
+  http: ^1.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
