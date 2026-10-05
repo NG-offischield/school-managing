@@ -53,9 +53,9 @@ class RelationshipType(models.TextChoices):
 
 
 class VerificationMethod(models.TextChoices):
-    """How a parent–student link was verified (the full CNI / 2FA workflow
-    of spec §6.5 — ParentStudentLinkRequest, IdentityVerification — comes in
-    a later phase; these values already name its outcomes)."""
+    """How a parent–student link was verified. ID_DOCUMENT and SPONSOR_2FA are
+    the outcomes of the link-request workflow of spec §6.5
+    (ParentStudentLinkRequest + IdentityVerification, ADR 0026)."""
 
     ADMIN_IN_PERSON = "ADMIN_IN_PERSON", "Vérification en personne par l'administration"
     ID_DOCUMENT = "ID_DOCUMENT", "Pièce d'identité"

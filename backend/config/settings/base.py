@@ -264,6 +264,8 @@ REST_FRAMEWORK = {
         "auth-refresh": "30/min",
         # Activation codes: brute force is pointless (~100 bits) but still throttled (ADR 0024).
         "auth-activation": "10/min",
+        # Public parent registration (ADR 0026).
+        "auth-registration": "5/min",
         # Gate scanning: a busy gate scans many pupils per minute (ADR 0011).
         "qr-scan": "240/min",
     },

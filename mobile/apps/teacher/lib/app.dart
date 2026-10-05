@@ -51,7 +51,7 @@ class AuthGate extends StatelessWidget {
     final auth = context.watch<AuthService>();
     return switch (auth.status) {
       AuthStatus.restoring => const SplashScreen(),
-      AuthStatus.signedOut => const LoginScreen(),
+      AuthStatus.signedOut || AuthStatus.pending => const LoginScreen(), // no pending accounts here
       AuthStatus.signedIn => HomeShell(key: ValueKey(auth.identity?.userId), realtime: realtime),
     };
   }

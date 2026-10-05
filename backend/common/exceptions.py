@@ -106,6 +106,18 @@ CONFLICT_RULES = {
     "account_disabled",
     "account_not_disabled",
     "no_pending_activation",
+    # parent registration and linking (ADR 0026)
+    "registration_not_pending",
+    "already_linked",
+    "link_request_pending",
+    "request_not_pending",
+    "already_sponsored",
+    "identity_mismatch",
+    "identity_rejected",
+    "identity_not_verified",
+    "student_approval_required",
+    "rights_exceed_sponsor",
+    "sponsor_not_verified",
     # documents (ADR 0016)
     "document_source_not_final",
     "document_official",

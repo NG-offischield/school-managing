@@ -1,6 +1,18 @@
 """People of a school. Split in modules for readability; Django sees one app."""
 
 from .guardians import GuardianProfile, GuardianStatus
+from .parent_workflow import (
+    DocumentType,
+    IdentityMethod,
+    IdentityStatus,
+    IdentityVerification,
+    LinkInitiator,
+    LinkRequestStatus,
+    ParentStudentLinkRequest,
+    RegistrationRequest,
+    RegistrationStatus,
+    StudentApproval,
+)
 from .parents import Language, ParentProfile, ParentStudent, RelationshipType, VerificationMethod
 from .staff import (
     CompatibilityOverride,
@@ -28,6 +40,16 @@ from .students import (
 )
 
 __all__ = [
+    "DocumentType",
+    "IdentityMethod",
+    "IdentityStatus",
+    "IdentityVerification",
+    "LinkInitiator",
+    "LinkRequestStatus",
+    "ParentStudentLinkRequest",
+    "RegistrationRequest",
+    "RegistrationStatus",
+    "StudentApproval",
     "CompatibilityOverride",
     "CompatibilityResult",
     "EmployeeProfile",

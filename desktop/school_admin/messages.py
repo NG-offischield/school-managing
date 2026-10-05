@@ -172,6 +172,17 @@ RULE_MESSAGES = {
     "account_not_disabled": "Ce compte n'est pas suspendu.",
     "no_pending_activation": "Aucun code d'activation en attente pour ce compte.",
     "cannot_disable_self": "Vous ne pouvez pas suspendre votre propre compte.",
+    # parent registrations and links (ADR 0026)
+    "registration_not_pending": "Cette inscription a déjà été traitée.",
+    "request_not_pending": "Cette demande de rattachement n'est plus en cours.",
+    "identity_mismatch": "Le numéro saisi ne correspond pas à la pièce déclarée par le parent.",
+    "identity_rejected": "Vérification d'identité refusée (trop d'écarts) : refusez la demande.",
+    "identity_not_verified": "Vérifiez d'abord l'identité du parent (pièce présentée à l'école).",
+    "student_approval_required": "La désignation par l'élève manque (ou l'élève a refusé).",
+    "rights_exceed_sponsor": "Un parent parrainé ne peut pas avoir plus de droits financiers que son parrain.",
+    "sponsor_not_verified": "Le parrain n'est plus un parent vérifié de l'élève.",
+    "already_linked": "Ce parent est déjà rattaché à cet élève.",
+    "link_request_pending": "Une demande est déjà en cours pour cet élève.",
 }
 
 

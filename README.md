@@ -13,7 +13,7 @@ Les écarts validés par rapport à la spec sont tracés dans [docs/adr/](docs/a
 | Base de données | PostgreSQL 17 | conteneur `db` |
 | Temps réel / cache / limitation de débit | Redis 7 | conteneur `redis` |
 | Client administrateur | Python + PySide6 (bureau) | `desktop/` |
-| Enseignant / Parent / Gardien / Personnel | Flutter | `mobile/` *(phase ultérieure)* |
+| Enseignant / Parent / Gardien / Personnel | Flutter | `mobile/` *(enseignant et parent ; gardien et personnel ensuite)* |
 | Site public | Django Templates | `backend/` *(phase ultérieure)* |
 
 Le backend est la seule autorité pour les permissions, les calculs, la finance et les règles métier. Les clients ne parlent jamais directement à PostgreSQL ou Redis.
@@ -59,4 +59,5 @@ Voir [docs/runbook.md](docs/runbook.md) pour l'exploitation courante.
 - [x] Poste d'administration PySide6 : connexion, shell, tableau de bord avec graphiques, années scolaires, niveaux, catégories pédagogiques, matières, classes, élèves, enseignants, cours, planning, finance, paie, communication, documents (`desktop/`, voir desktop/README.md, ADR 0017 à 0023)
 - [x] Cycle de vie des comptes : codes d'activation à usage unique (hachés, expirants, révocables), premier mot de passe choisi par la personne, suspension / réactivation (ADR 0024)
 - [x] Mobile Flutter : socle partagé `school_core` et application enseignant (activation, connexion, tableau de bord, planning, séance, communication ; `mobile/`, ADR 0025)
+- [x] Parents : inscription validée par l'école, rattachement vérifié (pièce d'identité contrôlée à l'école — empreinte HMAC seulement —, désignation par l'élève, parrainage d'un second parent par code à usage unique), page Parents du poste, application Flutter parent (accueil, présences, planning, finance selon les droits, bulletins, messages ; ADR 0026)
 - [ ] Phases suivantes — autres écrans du poste d'administration, présence par séance (fiches d'appel), envoi FCM, site public, client Flutter

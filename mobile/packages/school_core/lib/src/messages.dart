@@ -17,6 +17,16 @@ const ruleMessages = <String, String>{
   'complaint_final': 'Cette réclamation est close ou annulée.',
   'invalid_transition': 'Ce changement de statut n\'est pas permis.',
   'reason_required': 'Indiquez le motif.',
+  // parent registration and linking (ADR 0026)
+  'student_not_found':
+      'Aucun élève ne correspond à ce matricule et à cette date de naissance. Vérifiez-les sur un document scolaire.',
+  'already_linked': 'Vous êtes déjà rattaché(e) à cet élève.',
+  'link_request_pending': 'Une demande est déjà en cours pour cet élève.',
+  'request_not_pending': 'Cette demande n\'est plus en cours.',
+  'document_number_invalid': 'Numéro de pièce d\'identité invalide.',
+  'sponsor_code_invalid': 'Code de parrainage invalide ou expiré. Demandez un nouveau code au parent vérifié.',
+  'already_sponsored': 'Cette demande est déjà parrainée.',
+  'document_source_not_final': 'Ce document n\'est pas encore disponible (bulletin non validé, paiement non abouti).',
 };
 
 const codeMessages = <String, String>{

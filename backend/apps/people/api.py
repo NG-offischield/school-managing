@@ -78,6 +78,7 @@ class EnrollmentSerializer(serializers.ModelSerializer):
 
 class ChildLinkSerializer(serializers.ModelSerializer):
     student = StudentSerializer(read_only=True)
+    enrollment = serializers.SerializerMethodField()
 
     class Meta:
         model = ParentStudent
@@ -91,7 +92,23 @@ class ChildLinkSerializer(serializers.ModelSerializer):
             "can_pay",
             "can_submit_complaints",
             "verified_at",
+            "enrollment",
         ]
+
+    def get_enrollment(self, obj):
+        """The child's current schooling (class, year, status) — ADR 0026."""
+        enrollment = (
+            obj.student.enrollments.filter(academic_year__is_current=True)
+            .select_related("school_class", "academic_year")
+            .first()
+        )
+        if enrollment is None:
+            return None
+        return {
+            "class_name": enrollment.school_class.name,
+            "academic_year_name": enrollment.academic_year.name,
+            "status": enrollment.status,
+        }
 
 
 class TeacherSerializer(serializers.ModelSerializer):

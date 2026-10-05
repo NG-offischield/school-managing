@@ -103,7 +103,9 @@ school_admin/
                        (payroll.py : périodes, calcul, approbation, paiement) — décisions du serveur,
                        montants en Decimal (money.py), jamais en float, communication
                        (communication.py : notifications, messagerie, forum, réclamations, pièces jointes
-                       privées) et documents (documents.py : registre, génération, téléchargement),
+                       privées), documents (documents.py : registre, génération, téléchargement) et
+                       parents (parents.py : inscriptions, rattachements — identité vérifiée sur la pièce
+                       originale, désignation par l'élève, droits ; ADR 0026),
   realtime.py          client WebSocket de l'endpoint existant ws/v1/realtime/ (resynchronisation,
                        reconnexion, session révoquée -> connexion),
                        tableau de bord (indicateurs et séries réels de l'API)

@@ -1,5 +1,5 @@
 """Mutation check of the administration verticals (ADR 0018 to ADR 0020) and of
-the account activation (ADR 0024).
+the account activation (ADR 0024) and the parent workflow (ADR 0026).
 
 Each mutation removes ONE protection from the code (school filtering,
 year/class control, permission check, compatibility control), runs the
@@ -11,6 +11,7 @@ always restored.
     docker compose run --rm -T web python tools/mutation_check.py teachers
     docker compose run --rm -T web python tools/mutation_check.py courses
     docker compose run --rm -T web python tools/mutation_check.py activation
+    docker compose run --rm -T web python tools/mutation_check.py parents
 
 Exit code 0 only if every mutation is killed.
 """
@@ -230,11 +231,108 @@ ACTIVATION = [
     ),
 ]
 
+PARENTS = [
+    # --- parent / child filter -------------------------------------------------
+    (
+        "parent/child filter: /parents/children/ lists every verified link of the school",
+        "apps/people/api.py",
+        "queryset.filter(parent__membership=self.membership(), active=True, identity_verified=True)",
+        "queryset.filter(active=True, identity_verified=True)",
+    ),
+    (
+        "parent/child filter: student visibility (attendance, ...) ignores the parent",
+        "apps/people/api.py",
+        "                parent_links__parent__membership=membership,\n",
+        "",
+    ),
+    (
+        "parent/child filter: child endpoints of the parent app ignore the parent",
+        "apps/people/parent_workflow_api.py",
+        "            parent_links__parent__membership=self.membership(),\n",
+        "",
+    ),
+    (
+        "parent/child filter: scans of any child of the school",
+        "apps/attendance/api.py",
+        "                parent_links__parent__membership=self.membership(),\n",
+        "",
+    ),
+    # --- verification ----------------------------------------------------------
+    (
+        "verification: declared (unverified) links listed as children",
+        "apps/people/api.py",
+        "queryset.filter(parent__membership=self.membership(), active=True, identity_verified=True)",
+        "queryset.filter(parent__membership=self.membership(), active=True)",
+    ),
+    (
+        "verification: student visibility through an unverified link",
+        "apps/people/api.py",
+        "                parent_links__identity_verified=True,\n",
+        "",
+    ),
+    (
+        "verification: link approved without a verified identity",
+        "apps/people/parent_workflow.py",
+        "    if identity.status != IdentityStatus.VERIFIED:\n",
+        "    if False:\n",
+    ),
+    (
+        "verification: link approved without the pupil's designation",
+        "apps/people/parent_workflow.py",
+        "    if request.student_approval_status not in (StudentApproval.APPROVED, StudentApproval.NOT_REQUIRED):\n",
+        "    if False:\n",
+    ),
+    (
+        "verification: any document number accepted",
+        "apps/people/parent_workflow.py",
+        "        if matches:\n",
+        "        if True:\n",
+    ),
+    (
+        "verification: an unverified parent issues sponsor codes",
+        "apps/people/parent_workflow.py",
+        "    if student.school_id != membership.school_id or _verified_link(parent, student) is None:\n",
+        "    if student.school_id != membership.school_id:\n",
+    ),
+    (
+        "verification: sponsored parent gets more rights than the sponsor",
+        "apps/people/parent_workflow.py",
+        '        ):\n            raise ValidationError(\n                "A sponsored parent',
+        '        ) and False:\n            raise ValidationError(\n                "A sponsored parent',
+    ),
+    (
+        "verification: sponsored parent may pay although the sponsor may not",
+        "apps/people/parent_workflow.py",
+        "        if (can_pay and not sponsor_link.can_pay) or (\n",
+        "        if (False) or (\n",
+    ),
+    # --- school isolation ------------------------------------------------------
+    (
+        "school isolation: link request to a pupil of another school",
+        "apps/people/parent_workflow.py",
+        "    student = Student.objects.filter(\n        school=membership.school,\n",
+        "    student = Student.objects.filter(\n",
+    ),
+    (
+        "school isolation: admin reads link requests of another school",
+        "apps/people/parent_workflow_api.py",
+        "get_object_or_404(scope_to_current_school(ParentStudentLinkRequest.objects.all(), self.request), pk=pk)",
+        "get_object_or_404(ParentStudentLinkRequest.objects.all(), pk=pk)",
+    ),
+    (
+        "school isolation: admin reads registrations of another school",
+        "apps/people/parent_workflow_api.py",
+        "get_object_or_404(scope_to_current_school(RegistrationRequest.objects.all(), self.request), pk=pk)",
+        "get_object_or_404(RegistrationRequest.objects.all(), pk=pk)",
+    ),
+]
+
 SUITES = {
     "students": (["tests/test_students_admin_api.py"], STUDENTS),
     "teachers": (["tests/test_teachers_admin_api.py"], TEACHERS),
     "courses": (["tests/test_courses_admin_api.py"], COURSES),
     "activation": (["tests/test_account_activation.py"], ACTIVATION),
+    "parents": (["tests/test_parent_workflow.py"], PARENTS),
 }
 
 

@@ -96,6 +96,10 @@ class FakeAuthServer {
     }
     if (request.headers['Authorization'] != 'Bearer $access') return fail(401, 'INVALID_ACCESS_TOKEN');
     if (path == 'auth/me/') return ok(identity);
+    if (path == 'files/report.pdf') {
+      return http.Response.bytes(utf8.encode('%PDF-1.4'), 200, headers: {'content-type': 'application/pdf'});
+    }
+    if (path == 'files/other.pdf') return fail(403, 'PERMISSION_DENIED');
     if (path == 'things/') {
       return ok(
         [
@@ -225,6 +229,57 @@ void main() {
       expect(weak.fieldErrors['password'], ['Ce mot de passe est trop court.']);
       expect(await auth.completeActivation('GOOD-CODE', 'Bon-Mot-De-Passe-2026'), 'prof@ecole.test');
       expect(store.refreshToken, isNull); // activation does not log in: the normal login follows
+    });
+  });
+
+  group('Parent building blocks (ADR 0026)', () {
+    test('PDF download: bytes after the permission check, refresh on 401, errors typed', () async {
+      await auth.login('prof@ecole.test', 'Bon-Mot-De-Passe-2026');
+      expect(utf8.decode(await api.download('files/report.pdf')), '%PDF-1.4');
+      expect(await caught(api.download('files/other.pdf')), isA<ForbiddenException>());
+      server.access = 'rotated'; // access token refused once -> one refresh, then replay
+      expect(utf8.decode(await api.download('files/report.pdf')), '%PDF-1.4');
+    });
+
+    test('a PENDING membership is kept only by apps that allow it, and reloads once approved', () async {
+      final pending = {
+        ...me,
+        'memberships': [
+          {
+            'id': 'm1',
+            'school_code': 'E1',
+            'school_name': 'École Test',
+            'status': 'PENDING',
+            'is_primary_school': true,
+            'roles': <String>[],
+          },
+        ],
+      };
+      server.identity = pending;
+      final parentAuth = AuthService(api, store, requiredRole: 'PARENT', allowPending: true);
+      await parentAuth.login('prof@ecole.test', 'Bon-Mot-De-Passe-2026');
+      expect(parentAuth.status, AuthStatus.pending);
+      expect(store.refreshToken, isNotNull); // the session is kept
+      expect(await caught(auth.login('prof@ecole.test', 'Bon-Mot-De-Passe-2026')), isA<ForbiddenException>());
+      expect(auth.status, isNot(AuthStatus.signedIn)); // default: refused
+
+      server.identity = {
+        ...me,
+        'memberships': [
+          {
+            ...(me['memberships'] as List).first as Map,
+            'roles': ['PARENT'],
+          },
+        ],
+      };
+      await parentAuth.login('prof@ecole.test', 'Bon-Mot-De-Passe-2026');
+      await parentAuth.reloadIdentity();
+      expect(parentAuth.status, AuthStatus.signedIn);
+    });
+
+    test('money keeps the narrow no-break space and never uses doubles', () {
+      expect(formatMoney('1500000.00'), '1 500 000 XAF');
+      expect(formatMoney('-2500.50', 'EUR'), '−2 500,50 EUR');
     });
   });
 

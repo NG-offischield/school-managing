@@ -302,7 +302,39 @@ class FakeApi {
       row['is_read'] = true;
       return ok(row);
     }
-    if (path == 'conversations/') return ok(<Map>[], meta: {'count': 0, 'next': null});
+    if (path == 'conversations/') {
+      final rows = who.key == 'ta'
+          ? [
+              {
+                'id': 'cv1',
+                'conversation_type': 'PARENT_TEACHER',
+                'title': 'Devoirs de Awa',
+                'student': 's0',
+                'participants': [
+                  {'member': 'm-ta', 'name': a.name},
+                  {'member': 'm-pa', 'name': parent.name},
+                ],
+                'unread_count': 1,
+                'last_message_at': null,
+              },
+            ]
+          : <Map>[];
+      return ok(rows, meta: {'count': rows.length, 'next': null});
+    }
+    if (path == 'conversations/cv1/messages/' && who.key == 'ta') {
+      final rows = [
+        {
+          'id': 'msg1',
+          'conversation': 'cv1',
+          'sender_name': parent.name,
+          'body': 'Bonjour, une question sur les devoirs.',
+          'created_at': '2026-10-04T18:00:00+01:00',
+          'attachments': <Map>[],
+        },
+      ];
+      return ok(rows, meta: {'count': 1, 'next': null});
+    }
+    if (path == 'conversations/cv1/read/' && who.key == 'ta') return ok({'read': true});
     if (path == 'complaints/') return ok(<Map>[], meta: {'count': 0, 'next': null});
     return fail(404, 'NOT_FOUND');
   }

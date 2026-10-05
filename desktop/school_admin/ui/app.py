@@ -18,6 +18,7 @@ from ..services.courses import CourseService
 from ..services.dashboard import DashboardService
 from ..services.documents import DocumentService
 from ..services.finance import FinanceService
+from ..services.parents import ParentAdminService
 from ..services.payroll import PayrollService
 from ..services.planning import PlanningService
 from ..services.structure import LevelService, YearService
@@ -33,6 +34,7 @@ from .pages.courses_page import CoursesPage
 from .pages.dashboard_page import DashboardPage
 from .pages.documents_page import DocumentsPage
 from .pages.finance_page import FinancePage
+from .pages.parents_page import ParentsPage
 from .pages.payroll_page import PayrollPage
 from .pages.planning_page import PlanningPage
 from .pages.structure_pages import LevelsPage, YearsPage
@@ -64,6 +66,7 @@ class AppController:
         self.payroll = PayrollService(api)
         self.communication = CommunicationService(api)
         self.accounts = AccountService(api)
+        self.parents = ParentAdminService(api)
         self.documents = DocumentService(api)
         self.login_window = LoginWindow(auth, runner, config)
         self.login_window.logged_in.connect(self.show_shell)
@@ -83,6 +86,7 @@ class AppController:
             "students": lambda: StudentsPage(
                 self.students, self.references, self.runner, **options.get("students", {})
             ),
+            "parents": lambda: ParentsPage(self.parents, self.runner, **options.get("parents", {})),
             "teachers": lambda: TeachersPage(
                 self.teachers,
                 self.categories,

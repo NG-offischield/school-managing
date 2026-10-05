@@ -25,6 +25,7 @@ from school_admin.models import (
     ForumSpace,
     Invoice,
     Level,
+    LinkRequest,
     Member,
     Notification,
     Payment,
@@ -71,6 +72,12 @@ from school_admin.ui.dialogs.finance_dialogs import (
     RefundDialog,
 )
 from school_admin.ui.dialogs.level_dialog import LevelDialog
+from school_admin.ui.dialogs.parent_dialogs import (
+    IdentityCheckDialog,
+    LinkApprovalDialog,
+    LinkRequestDialog,
+    StudentApprovalDialog,
+)
 from school_admin.ui.dialogs.payroll_dialogs import (
     AdjustmentDialog,
     PayDialog,
@@ -377,6 +384,28 @@ DOC_SOURCES = {
 
 ACCOUNT = AccountSummary("m1", "Jean Mbarga", "jean.mbarga@ecole.test", "PENDING_ACTIVATION")
 ISSUED = type("Issued", (), {"code": "7KQ2-M9XA-4TZP-QH3W-B8NC", "expires_at": None, "account": ACCOUNT})()
+LINK_REQUEST = LinkRequest(
+    "lr1",
+    "s0",
+    "Élève Zéro Avec Un Très Long Nom Composé",
+    "MAT00001",
+    "3e A",
+    "Marie-Christine Ndiaye Mbarga",
+    "marie.ndiaye@example.cm",
+    "+237 600 00 00 00",
+    "LEGAL_GUARDIAN",
+    "PENDING",
+    "VERIFIED",
+    "SPONSOR_2FA",
+    "CNI",
+    2,
+    "APPROVED",
+    "Confirmé en classe " * 8,
+    True,
+    "Paul Mbarga",
+    None,
+    "",
+)
 
 
 class StubTeachers:
@@ -435,6 +464,10 @@ DIALOGS = {
     "détail paie": lambda: PayrollDetailDialog(PAYROLL),
     "correction": lambda: AdjustmentDialog([("e1", "Mbarga Jean (ENS-001)")]),
     "code d'activation": lambda: ActivationCodeDialog("Mbarga Jean", ISSUED),
+    "rattachement (fiche)": lambda: LinkRequestDialog(LINK_REQUEST),
+    "vérification d'identité": lambda: IdentityCheckDialog(LINK_REQUEST),
+    "désignation par l'élève": lambda: StudentApprovalDialog(LINK_REQUEST),
+    "validation du rattachement": lambda: LinkApprovalDialog(LINK_REQUEST),
     "fiche enseignant (compte)": lambda: TeacherRecordDialog(TEACHER, QUALS, [], account=ACCOUNT),
     "notification": lambda: NotificationDialog(NOTE),
     "nouvelle conversation": lambda: NewConversationDialog(MEMBERS),

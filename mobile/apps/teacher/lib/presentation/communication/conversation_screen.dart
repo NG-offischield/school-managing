@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:school_core/school_core.dart';
 
 import '../../data/teacher_repository.dart';
-import '../../models/models.dart';
 import '../common.dart';
 import '../home/home_shell.dart';
 
@@ -30,6 +29,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   String? _pendingBody;
   String? _error;
   bool _sending = false;
+  late final LiveState _liveState; // kept: no context lookup in dispose()
 
   String get _myName => context.read<AuthService>().identity?.fullName ?? '';
 
@@ -37,7 +37,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   void initState() {
     super.initState();
     _load();
-    final live = context.read<LiveState>();
+    final live = _liveState = context.read<LiveState>();
     live.client?.watch(widget.conversation.id);
     _live = live.messages.stream.listen((data) {
       final message = ChatMessage.fromJson(data, myName: _myName);
@@ -51,7 +51,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   @override
   void dispose() {
     _live?.cancel();
-    context.read<LiveState>().client?.unwatch(widget.conversation.id);
+    _liveState.client?.unwatch(widget.conversation.id);
     _text.dispose();
     _scroll.dispose();
     super.dispose();

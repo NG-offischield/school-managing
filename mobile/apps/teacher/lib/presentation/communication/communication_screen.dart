@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:school_core/school_core.dart';
 
 import '../../data/teacher_repository.dart';
-import '../../models/models.dart';
 import '../common.dart';
 import '../home/home_shell.dart';
 import 'conversation_screen.dart';
@@ -190,7 +189,9 @@ class _ConversationsTabState extends State<ConversationsTab> {
     _load();
   }
 
-  void _load() => setState(() => _future = context.read<TeacherRepository>().conversations()..ignore());
+  void _load() => setState(() {
+    _future = context.read<TeacherRepository>().conversations()..ignore();
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -218,9 +219,16 @@ class _ConversationsTabState extends State<ConversationsTab> {
                   ),
                   trailing: c.unread > 0 ? Badge(label: Text('${c.unread}')) : const Icon(Icons.chevron_right),
                   onTap: () async {
-                    await Navigator.of(
-                      context,
-                    ).push(MaterialPageRoute(builder: (_) => ConversationScreen(conversation: c)));
+                    // The route sits above the shell: its live state is provided again.
+                    final live = context.read<LiveState>();
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ChangeNotifierProvider<LiveState>.value(
+                          value: live,
+                          child: ConversationScreen(conversation: c),
+                        ),
+                      ),
+                    );
                     _load();
                   },
                 ),
@@ -248,7 +256,9 @@ class _ComplaintsTabState extends State<ComplaintsTab> {
     _load();
   }
 
-  void _load() => setState(() => _future = context.read<TeacherRepository>().complaints()..ignore());
+  void _load() => setState(() {
+    _future = context.read<TeacherRepository>().complaints()..ignore();
+  });
 
   Tone _tone(String status) => switch (status) {
     'OPEN' => Tone.warning,

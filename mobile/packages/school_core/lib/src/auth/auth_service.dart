@@ -20,7 +20,10 @@ import '../api/api_error.dart';
 import 'identity.dart';
 import 'token_store.dart';
 
-enum AuthStatus { restoring, signedOut, signedIn }
+/// `pending`: signed in, but the account still waits for the school's approval
+/// (self-registered parent, membership PENDING) — only apps created with
+/// `allowPending` use it; the server grants nothing of the school meanwhile.
+enum AuthStatus { restoring, signedOut, signedIn, pending }
 
 class DeviceInfo {
   const DeviceInfo({
@@ -54,7 +57,7 @@ class WrongRoleException implements Exception {
 }
 
 class AuthService extends ChangeNotifier {
-  AuthService(this.api, this.store, {this.device = const DeviceInfo(), this.requiredRole}) {
+  AuthService(this.api, this.store, {this.device = const DeviceInfo(), this.requiredRole, this.allowPending = false}) {
     api.refreshHandler = _refreshQuietly;
   }
 
@@ -64,6 +67,10 @@ class AuthService extends ChangeNotifier {
 
   /// Role the app is made for (e.g. TEACHER); null = any member.
   final String? requiredRole;
+
+  /// Keep the session of an account whose membership is still PENDING
+  /// (status [AuthStatus.pending]) instead of refusing it.
+  final bool allowPending;
 
   AuthStatus status = AuthStatus.restoring;
   Identity? identity;
@@ -136,6 +143,9 @@ class AuthService extends ChangeNotifier {
     return (data['login'] as String?) ?? '';
   }
 
+  /// Reload `/auth/me/` (e.g. the school approved a pending account).
+  Future<void> reloadIdentity() => _loadIdentity();
+
   Future<void> logout() async {
     try {
       if (api.accessToken != null) await api.post('auth/logout/');
@@ -185,6 +195,13 @@ class AuthService extends ChangeNotifier {
   Future<void> _loadIdentity() async {
     final me = Identity.fromMe((await api.get('auth/me/') as Map).cast<String, dynamic>());
     if (me.current == null) {
+      if (allowPending && me.memberships.any((m) => m.status == 'PENDING')) {
+        identity = me;
+        notice = null;
+        status = AuthStatus.pending;
+        notifyListeners();
+        return;
+      }
       await _clear();
       throw ForbiddenException(code: 'NO_ACTIVE_MEMBERSHIP', message: 'No active membership.');
     }

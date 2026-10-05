@@ -170,6 +170,26 @@ void main() {
     expect(find.text('Non lue'), findsNothing);
   });
 
+  testWidgets('messages and complaints tabs open; a conversation keeps its live state (regression)', (tester) async {
+    final h = Harness();
+    await h.start(tester);
+    await h.login(tester, h.fake.a);
+    await tester.tap(find.text('Messages'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(Tab, 'Messages')); // the conversations tab
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Devoirs de Awa'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull); // no ProviderNotFoundException
+    expect(find.text('Bonjour, une question sur les devoirs.'), findsOneWidget);
+    await tester.binding.handlePopRoute(); // system back
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(Tab, 'Réclamations'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Aucune réclamation ne vous concerne.'), findsOneWidget);
+  });
+
   testWidgets('expired session goes back to login; logout; network errors are explained', (tester) async {
     final h = Harness();
     await h.start(tester);

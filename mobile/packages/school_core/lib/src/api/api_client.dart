@@ -11,6 +11,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -117,6 +118,37 @@ class ApiClient {
     }
     if (response.statusCode >= 400 || decoded?['success'] == false) throw errorFor(response.statusCode, decoded);
     return (data: decoded?['data'], meta: ((decoded?['meta'] as Map?) ?? const {}).cast<String, dynamic>());
+  }
+
+  /// Binary content (PDF of a report card, receipt...), after the server's
+  /// permission check. Same token / refresh / error handling as JSON calls.
+  Future<Uint8List> download(String path, {Map<String, Object?>? params, bool retry = true}) async {
+    if (accessToken == null) {
+      throw UnauthorizedException(code: 'NOT_AUTHENTICATED', message: 'Authentification requise.');
+    }
+    final requestObject = http.Request('GET', uri(path, params))
+      ..headers.addAll({'Accept': 'application/pdf, application/json', 'Authorization': 'Bearer $accessToken'});
+    http.Response response;
+    try {
+      response = await http.Response.fromStream(await _http.send(requestObject).timeout(timeout));
+    } on TimeoutException {
+      throw NetworkException(timeout: true);
+    } on http.ClientException {
+      throw NetworkException();
+    }
+    if (response.statusCode == 401 && retry && await _refresh()) {
+      return download(path, params: params, retry: false);
+    }
+    if (response.statusCode >= 400) {
+      Map<String, dynamic>? decoded;
+      try {
+        decoded = (jsonDecode(utf8.decode(response.bodyBytes)) as Map).cast<String, dynamic>();
+      } on FormatException {
+        decoded = null;
+      }
+      throw errorFor(response.statusCode, decoded);
+    }
+    return response.bodyBytes;
   }
 
   Future<bool> _refresh() {

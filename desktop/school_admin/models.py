@@ -1789,3 +1789,153 @@ class AccountSummary:
             _datetime(row.get("last_issued_at")),
             _datetime(row.get("activated_at")),
         )
+
+
+# =============================================================================
+# Parent registrations and verified links (backend people/parent_workflow_api.py, ADR 0026)
+# =============================================================================
+
+REGISTRATION_STATUSES = {"PENDING": "En attente", "APPROVED": "Validée", "REJECTED": "Refusée"}
+LINK_REQUEST_STATUSES = {"PENDING": "En cours", "APPROVED": "Validée", "REJECTED": "Refusée", "CANCELLED": "Annulée"}
+IDENTITY_STATUSES = {"PENDING": "À vérifier", "VERIFIED": "Vérifiée", "REJECTED": "Refusée"}
+IDENTITY_METHODS = {"ID_DOCUMENT": "Pièce d'identité", "SPONSOR_2FA": "Parrainage (code à usage unique)"}
+STUDENT_APPROVALS = {
+    "PENDING": "À confirmer par l'élève",
+    "APPROVED": "Confirmée par l'élève",
+    "REJECTED": "Refusée par l'élève",
+    "NOT_REQUIRED": "Non requise",
+}
+IDENTITY_DOCUMENTS = {
+    "CNI": "Carte nationale d'identité",
+    "PASSPORT": "Passeport",
+    "RESIDENCE_PERMIT": "Titre de séjour",
+    "OTHER": "Autre pièce officielle",
+}
+RELATIONSHIPS = {
+    "MOTHER": "Mère",
+    "FATHER": "Père",
+    "LEGAL_GUARDIAN": "Tuteur légal",
+    "TUTOR": "Tuteur",
+    "OTHER": "Autre",
+}
+
+
+@dataclass(frozen=True)
+class ParentRegistration:
+    """A parent account created from the app, waiting for the school."""
+
+    id: str
+    status: str
+    applicant_name: str
+    email: str
+    phone: str
+    submitted_at: datetime | None = None
+    reviewed_at: datetime | None = None
+    rejection_reason: str = ""
+
+    @property
+    def status_label(self):
+        return REGISTRATION_STATUSES.get(self.status, self.status)
+
+    @property
+    def active(self):  # list pages: "still to decide"
+        return self.status == "PENDING"
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            row.get("status") or "",
+            row.get("applicant_name") or "",
+            row.get("applicant_email") or "",
+            row.get("applicant_phone") or "",
+            _datetime(row.get("submitted_at")),
+            _datetime(row.get("reviewed_at")),
+            row.get("rejection_reason") or "",
+        )
+
+
+@dataclass(frozen=True)
+class LinkRequest:
+    """« This is my child »: what the administration needs to decide —
+    never the identity document number (the server keeps an HMAC only)."""
+
+    id: str
+    student_id: str
+    student_name: str
+    student_number: str
+    class_name: str
+    parent_name: str
+    parent_email: str
+    parent_phone: str
+    relationship_type: str
+    status: str
+    identity_status: str
+    identity_method: str
+    document_type: str
+    identity_failed_checks: int
+    student_approval_status: str
+    student_approval_note: str
+    sponsored: bool
+    sponsor_name: str
+    created_at: datetime | None = None
+    decision_reason: str = ""
+
+    @property
+    def status_label(self):
+        return LINK_REQUEST_STATUSES.get(self.status, self.status)
+
+    @property
+    def identity_label(self):
+        label = IDENTITY_STATUSES.get(self.identity_status, self.identity_status)
+        return f"{label} ({IDENTITY_METHODS.get(self.identity_method, self.identity_method).lower()})"
+
+    @property
+    def approval_label(self):
+        return STUDENT_APPROVALS.get(self.student_approval_status, self.student_approval_status)
+
+    @property
+    def relationship_label(self):
+        return RELATIONSHIPS.get(self.relationship_type, self.relationship_type)
+
+    @property
+    def pending(self):
+        return self.status == "PENDING"
+
+    active = pending  # list pages: "still to decide"
+
+    @property
+    def ready(self):
+        """What the server requires before approving (it re-checks)."""
+        return (
+            self.pending
+            and self.identity_status == "VERIFIED"
+            and self.student_approval_status in ("APPROVED", "NOT_REQUIRED")
+        )
+
+    @classmethod
+    def from_api(cls, row):
+        student = row.get("student") or {}
+        parent = row.get("parent") or {}
+        return cls(
+            row["id"],
+            student.get("id") or "",
+            student.get("name") or "",
+            student.get("student_number") or "",
+            row.get("class_name") or "",
+            parent.get("name") or "",
+            parent.get("email") or "",
+            parent.get("phone") or "",
+            row.get("relationship_type") or "",
+            row.get("status") or "",
+            row.get("identity_status") or "",
+            row.get("identity_method") or "",
+            row.get("document_type") or "",
+            int(row.get("identity_failed_checks") or 0),
+            row.get("student_approval_status") or "",
+            row.get("student_approval_note") or "",
+            bool(row.get("sponsored")),
+            row.get("sponsor_name") or "",
+            _datetime(row.get("created_at")),
+            row.get("decision_reason") or "",
+        )

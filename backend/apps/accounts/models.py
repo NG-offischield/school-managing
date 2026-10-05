@@ -344,6 +344,55 @@ class AccountActivation(BaseModel):
 
 
 # =============================================================================
+# Verification challenges (spec V4 "VerificationChallenge", ADR 0026)
+# =============================================================================
+
+
+class ChallengePurpose(models.TextChoices):
+    # A VERIFIED parent vouches for a second parent / tutor of the same pupil.
+    LINK_SPONSOR = "LINK_SPONSOR", "Parrainage d'un rattachement parent–élève"
+
+
+class ChallengeChannel(models.TextChoices):
+    # Shown in the issuer's authenticated app, handed over in person: no SMS /
+    # e-mail provider needed (LAN-first, no cloud dependency).
+    IN_APP = "IN_APP", "Application (remis en personne)"
+
+
+class VerificationChallenge(BaseModel):
+    """Short-lived, single-use challenge. Only its SHA-256 is stored.
+
+    Additions to the spec table (ADR 0026): `school` and `target_id` (the
+    object the challenge is about — the pupil for LINK_SPONSOR) so that a
+    challenge can only be used inside its school and for its object.
+    """
+
+    school = models.ForeignKey("core.School", on_delete=models.PROTECT, related_name="+")
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="challenges")
+    purpose = models.CharField(max_length=40, choices=ChallengePurpose.choices)
+    channel = models.CharField(max_length=30, choices=ChallengeChannel.choices, default=ChallengeChannel.IN_APP)
+    target_id = models.UUIDField(db_index=True)
+    challenge_hash = models.CharField(max_length=128, unique=True)
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(blank=True, null=True)
+    attempt_count = models.PositiveIntegerField(default=0)
+    max_attempts = models.PositiveIntegerField(default=5)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(expires_at__gt=F("created_at")), name="challenge_expires_after_creation"
+            ),
+            models.CheckConstraint(condition=Q(purpose__in=ChallengePurpose.values), name="challenge_purpose_valid"),
+        ]
+
+    def usable(self, now=None):
+        now = now or timezone.now()
+        return self.consumed_at is None and self.expires_at > now and self.attempt_count < self.max_attempts
+
+
+# =============================================================================
 # Security events (separate from business audit - spec §3)
 # =============================================================================
 
@@ -370,6 +419,13 @@ class SecurityEventType(models.TextChoices):
     ACCOUNT_ACTIVATION_REJECTED = "ACCOUNT_ACTIVATION_REJECTED"
     ACCOUNT_DISABLED = "ACCOUNT_DISABLED"
     ACCOUNT_ENABLED = "ACCOUNT_ENABLED"
+    # Parent registration and linking (ADR 0026). Never a password, a code or
+    # an identity document number in the metadata.
+    PARENT_REGISTRATION_SUBMITTED = "PARENT_REGISTRATION_SUBMITTED"
+    PARENT_REGISTRATION_DUPLICATE = "PARENT_REGISTRATION_DUPLICATE"
+    LINK_IDENTITY_MISMATCH = "LINK_IDENTITY_MISMATCH"
+    LINK_SPONSOR_CODE_ISSUED = "LINK_SPONSOR_CODE_ISSUED"
+    LINK_SPONSOR_CODE_REJECTED = "LINK_SPONSOR_CODE_REJECTED"
 
 
 class SecuritySeverity(models.TextChoices):
