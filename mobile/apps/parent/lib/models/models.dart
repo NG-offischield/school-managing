@@ -380,6 +380,48 @@ class Invoice {
   final DateTime? dueDate;
 
   String get statusLabel => invoiceStatuses[status] ?? status;
+
+  /// The server's status says it is still to be paid (the amount is its balance_due).
+  bool get payable => status == 'ISSUED' || status == 'PARTIALLY_PAID';
+
+  /// Motif: the lines of the invoice, as issued by the school.
+  String get reason => lines.map((l) => l.label).where((l) => l.isNotEmpty).join(', ');
+}
+
+/// The payer's own mobile wallet (opened by the school, ADR 0013 §12.4).
+class Wallet {
+  Wallet({
+    required this.id,
+    required this.provider,
+    required this.identifier,
+    required this.balance,
+    required this.currency,
+    required this.status,
+  });
+
+  factory Wallet.fromJson(Map<String, dynamic> json) => Wallet(
+    id: '${json['id']}',
+    provider: (json['provider_code'] as String?) ?? '',
+    identifier: (json['wallet_identifier'] as String?) ?? '',
+    balance: '${json['balance'] ?? '0'}',
+    currency: (json['currency'] as String?) ?? 'XAF',
+    status: (json['status'] as String?) ?? '',
+  );
+
+  final String id;
+  final String provider;
+  final String identifier;
+  final String balance;
+  final String currency;
+  final String status;
+
+  bool get active => status == 'ACTIVE';
+
+  /// "FAKE ••0633": never the whole number on screen.
+  String get label {
+    final tail = identifier.length > 4 ? identifier.substring(identifier.length - 4) : identifier;
+    return '$provider ••$tail';
+  }
 }
 
 /// What the child's account owes, computed by the server (amounts are
@@ -424,6 +466,19 @@ const paymentStatuses = {
   'REFUNDED': 'Remboursé',
 };
 
+/// What the payer is told about a payment the server answered. A failure is
+/// a RESULT recorded by the server, never computed here; a failed payment
+/// moves no money (ADR 0013 §4).
+const paymentOutcomes = {
+  'SUCCEEDED': 'Paiement réussi',
+  'PENDING': 'Paiement en attente de confirmation du fournisseur',
+  'DECLINED': 'Paiement refusé par le fournisseur : aucun débit',
+  'INSUFFICIENT_FUNDS': 'Solde du portefeuille insuffisant : aucun débit',
+  'TIMEOUT': 'Le fournisseur n\x27a pas répondu à temps : aucun débit',
+  'PROVIDER_ERROR': 'Erreur du fournisseur : aucun débit',
+  'CANCELLED': 'Paiement annulé : aucun débit',
+};
+
 class Payment {
   Payment({
     required this.id,
@@ -432,6 +487,9 @@ class Payment {
     required this.currency,
     required this.status,
     this.at,
+    this.failureReason,
+    this.invoiceNumbers = const [],
+    this.replayed = false,
   });
 
   factory Payment.fromJson(Map<String, dynamic> json) => Payment(
@@ -441,6 +499,15 @@ class Payment {
     currency: (json['currency'] as String?) ?? 'XAF',
     status: (json['status'] as String?) ?? '',
     at: schoolTime(json['completed_at'] ?? json['initiated_at']),
+    failureReason: (json['failure_reason'] as String?)?.trim().isNotEmpty == true
+        ? json['failure_reason'] as String
+        : null,
+    invoiceNumbers: ((json['allocations'] as List?) ?? const [])
+        .map((a) => '${(a as Map)['invoice_number'] ?? ''}')
+        .where((n) => n.isNotEmpty)
+        .toSet()
+        .toList(),
+    replayed: json['replayed'] == true,
   );
 
   final String id;
@@ -450,7 +517,17 @@ class Payment {
   final String status;
   final DateTime? at;
 
+  /// The provider's explanation of a failure, as recorded by the server.
+  final String? failureReason;
+  final List<String> invoiceNumbers;
+
+  /// The server answered with the payment ALREADY created for this
+  /// idempotency key (retry after a lost answer): nothing was debited again.
+  final bool replayed;
+
   String get statusLabel => paymentStatuses[status] ?? status;
+  String get outcome => paymentOutcomes[status] ?? statusLabel;
+  bool get succeeded => status == 'SUCCEEDED';
 
   /// A receipt exists once the payment went through (the server checks again).
   bool get hasReceipt => status == 'SUCCEEDED' || status == 'PARTIALLY_REFUNDED' || status == 'REFUNDED';

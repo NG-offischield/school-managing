@@ -191,6 +191,12 @@ Depuis le poste d'administration, publier ou envoyer quelque chose au compte. La
 
 Envoyer un message, par exemple personnel ou parent vers l'administration, ou enseignant vers parent. Il arrive en direct sur l'autre appareil et sur le poste. Le gardien n'a pas de messagerie (spec §8) : notifications seulement.
 
+### 16 bis. Paiement parent
+
+Avec un compte parent autorisé à payer (`can_pay`) et un portefeuille ouvert par l'école : Finance → facture → « Payer » → confirmer. Le résultat vient du serveur (réussi, refusé, fonds insuffisants…), puis « Télécharger le reçu ».
+- **Wi-Fi coupé pendant le paiement :** l'application l'explique et « Réessayer » renvoie la **même** demande, sans jamais de second débit.
+- **Contrôle :** dans l'historique, un seul paiement réussi apparaît.
+
 ## 17. Problèmes réseau
 
 | Symptôme | Cause probable | Remède |

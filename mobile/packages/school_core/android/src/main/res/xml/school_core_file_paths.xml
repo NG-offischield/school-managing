@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The only folder shared with other apps: copies of the PDFs the user chose to open
+     (DocumentOpener). Never the app's files, databases or secure storage. -->
+<paths>
+    <cache-path name="shared" path="shared/" />
+</paths>

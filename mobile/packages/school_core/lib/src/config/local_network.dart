@@ -268,3 +268,16 @@ class ConfigErrorApp extends StatelessWidget {
 /// Opens this app's page in the Android settings (a permission refused for
 /// good: local network, camera...). Same native channel; no-op elsewhere.
 Future<void> openAppSettings() => const LocalNetworkAccess().openSettings();
+
+/// Shows a downloaded document (official PDF) with the phone's viewer.
+/// False when there is no viewer or no Android side: the file stays saved.
+Future<bool> openDocument(String path, {String mimeType = 'application/pdf'}) async {
+  try {
+    return await const MethodChannel(
+          'school_core/local_network',
+        ).invokeMethod<bool>('openDocument', {'path': path, 'mimeType': mimeType}) ??
+        false;
+  } on MissingPluginException {
+    return false;
+  }
+}

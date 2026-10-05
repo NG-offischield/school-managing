@@ -38,6 +38,8 @@ android {
 }
 
 dependencies {
+    // FileProvider (DocumentOpener). minSdk 21.
+    implementation("androidx.core:core:1.13.1")
     testImplementation("junit:junit:4.13.2")
 }
 

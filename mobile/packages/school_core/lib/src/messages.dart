@@ -26,6 +26,14 @@ const ruleMessages = <String, String>{
   'document_number_invalid': 'Numéro de pièce d\'identité invalide.',
   'sponsor_code_invalid': 'Code de parrainage invalide ou expiré. Demandez un nouveau code au parent vérifié.',
   'already_sponsored': 'Cette demande est déjà parrainée.',
+  // finance (ADR 0013): the server decides, the app only explains
+  'idempotency_conflict':
+      'Cette demande de paiement a déjà servi pour un autre paiement : recommencez depuis la facture.',
+  'invoice_not_payable': 'Cette facture n\'est plus à payer (déjà réglée ou annulée).',
+  'amount_exceeds_balance': 'Le montant dû a changé entre-temps : rechargez la facture.',
+  'invoice_other_student': 'Cette facture ne concerne pas cet enfant.',
+  'wallet_required': 'Choisissez un portefeuille mobile.',
+  'payment_reason_required': 'Choisissez la facture à régler.',
   'document_source_not_final': 'Ce document n\'est pas encore disponible (bulletin non validé, paiement non abouti).',
 };
 

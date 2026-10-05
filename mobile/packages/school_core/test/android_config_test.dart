@@ -83,6 +83,19 @@ void main() {
     expect(permissions, ['android.permission.INTERNET', 'android.permission.ACCESS_LOCAL_NETWORK']);
   });
 
+  test('opening a PDF: private FileProvider, cache/shared/ only, no storage permission', () {
+    final manifest = read('android/src/main/AndroidManifest.xml');
+    expect(manifest, contains('android:name="cm.schoolmanaging.school_core.SchoolCoreFileProvider"'));
+    expect(manifest, contains('android:exported="false"'));
+    expect(manifest, isNot(contains('STORAGE')));
+    expect(manifest, isNot(contains('requestLegacyExternalStorage')));
+    final paths = read('android/src/main/res/xml/school_core_file_paths.xml');
+    final shared = RegExp(
+      r'<([a-z-]+-path)[^>]*path="([^"]*)"',
+    ).allMatches(paths).map((m) => '${m[1]}:${m[2]}').toList();
+    expect(shared, ['cache-path:shared/']); // never root-path, files-path or external storage
+  });
+
   test('the Android 17 permission is only requested behind an SDK_INT check', () {
     final plugin = read('android/src/main/kotlin/cm/schoolmanaging/school_core/SchoolCorePlugin.kt');
     expect(plugin, contains('fun required(sdkInt: Int): Boolean = sdkInt >= SINCE_SDK'));

@@ -3,9 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:school_core/school_core.dart';
 
 import '../../data/parent_repository.dart';
-import '../../data/pdf_store.dart';
 import '../../models/models.dart';
 import '../common.dart';
+import 'payment_screen.dart';
+import 'receipt.dart';
 
 /// Scolarité et paiements of the selected child. The SERVER decides:
 /// - without `can_view_financial_data`, obligations and invoices are not
@@ -14,7 +15,8 @@ import '../common.dart';
 /// - "can pay" is the server's answer for THIS account, never deduced from
 ///   the fact that the parent sees the child;
 /// - every amount comes from the server (strings, never recomputed).
-/// No payment is initiated from this screen.
+/// Paying opens [PaymentScreen], offered on an open invoice only when the
+/// server says this account may pay (can_pay).
 class FinanceScreen extends StatelessWidget {
   const FinanceScreen({super.key});
 
@@ -83,16 +85,11 @@ class _ChildFinanceState extends State<_ChildFinance> {
     _future = _fetch()..ignore();
   });
 
-  Future<void> _receipt(Payment payment) async {
-    final repo = context.read<ParentRepository>();
-    final store = context.read<PdfStore>();
-    try {
-      final bytes = await repo.receiptPdf(payment.id);
-      await store.save('recu-${payment.reference}.pdf', bytes);
-      if (mounted) showMessage(context, 'Reçu ${payment.reference} enregistré dans l\'application.');
-    } on ApiException catch (error) {
-      if (mounted) showMessage(context, error.userMessage);
-    }
+  Future<void> _receipt(Payment payment) => downloadReceipt(context, payment);
+
+  Future<void> _pay(Invoice invoice) async {
+    final answered = await openScreen<bool>(context, PaymentScreen(child: widget.child, invoiceId: invoice.id));
+    if (answered == true && mounted) _load(); // balance, status and history from the server again
   }
 
   @override
@@ -191,6 +188,15 @@ class _ChildFinanceState extends State<_ChildFinance> {
             const Divider(),
             InfoRow('Total', formatMoney(i.total, i.currency), strong: true),
             InfoRow('Payé', formatMoney(i.paid, i.currency)),
+            if (o.canPay && i.payable) ...[
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                key: Key('invoice.pay.${i.id}'),
+                onPressed: () => _pay(i),
+                icon: const Icon(Icons.payments_outlined),
+                label: Text('Payer ${formatMoney(i.balance, i.currency)}'),
+              ),
+            ],
           ],
         ),
       ),

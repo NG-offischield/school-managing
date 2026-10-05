@@ -5,6 +5,7 @@
 /// validated report cards only — not the backend's logic.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -319,33 +320,48 @@ class FakeApi {
       final row = link(id);
       if (row == null) return fail(404, 'NOT_FOUND');
       if (row['can_view_financial_data'] != true) return fail(403, 'PERMISSION_DENIED');
+      final invoice = invoices[id];
+      final open = invoice != null && _payable(invoice);
       return ok({
         'student': id,
         'currency': 'XAF',
-        'balance_due': '40000.00',
-        'solvency': 'OVERDUE',
+        'balance_due': open ? invoice['balance_due'] : '0.00',
+        'solvency': open ? 'OVERDUE' : 'UP_TO_DATE',
         'can_pay': row['can_pay'],
-        'open_invoices': [_invoice()],
+        'open_invoices': [if (open) invoice],
       });
     }
     if (path == 'finance/invoices/') {
       final row = link(params['student'] ?? '');
-      return page(row != null && row['can_view_financial_data'] == true ? [_invoice()] : []);
+      final invoice = invoices[params['student']];
+      return page(row != null && row['can_view_financial_data'] == true && invoice != null ? [invoice] : []);
+    }
+    if (path.startsWith('finance/invoices/')) {
+      final id = path.split('/')[2];
+      final entry = invoices.entries.where((e) => e.value['id'] == id).firstOrNull;
+      // Another family's or another school's invoice: like a missing one.
+      if (entry == null || link(entry.key)?['can_view_financial_data'] != true) return fail(404, 'NOT_FOUND');
+      return ok(entry.value);
+    }
+    if (path == 'finance/wallets/') return page(wallets[who.key] ?? const []); // MY wallets only
+    if (path == 'finance/payments/' && request.method == 'POST') {
+      await holdPayment?.future; // the provider takes its time: the phone shows « en cours »
+      return _pay(who, body, link);
     }
     if (path == 'finance/payments/') {
+      final student = params['student'];
+      final row = link(student ?? '');
       return page(
-        mineIds.contains(params['student'])
-            ? [
-                {
-                  'id': 'pay1',
-                  'payment_reference': 'PAY-0001',
-                  'amount': '60000.00',
-                  'currency': 'XAF',
-                  'status': 'SUCCEEDED',
-                  'completed_at': _at(-20, 9),
-                },
-              ]
-            : [],
+        payments
+            .where(
+              (p) =>
+                  p['student'] == student &&
+                  row != null &&
+                  (row['can_view_financial_data'] == true || p['payer'] == 'm-${who.key}'),
+            )
+            .toList()
+            .reversed
+            .toList(),
       );
     }
     if (path == 'report-cards/') {
@@ -370,7 +386,20 @@ class FakeApi {
             : [],
       );
     }
-    if (path == 'report-cards/rc1/pdf/' || path == 'payments/pay1/receipt.pdf/') {
+    if (path.startsWith('payments/') && path.endsWith('/receipt.pdf/')) {
+      final id = path.split('/')[1];
+      final payment = payments.where((p) => p['id'] == id).firstOrNull;
+      if (payment == null || link('${payment['student']}') == null) return fail(404, 'NOT_FOUND');
+      if (payment['status'] != 'SUCCEEDED') {
+        return fail(409, 'CONFLICT', details: {'rule': 'document_source_not_final'});
+      }
+      return http.Response.bytes(
+        utf8.encode('%PDF-1.4 receipt $id'),
+        200,
+        headers: {'content-type': 'application/pdf'},
+      );
+    }
+    if (path == 'report-cards/rc1/pdf/') {
       return http.Response.bytes(utf8.encode('%PDF-1.4 fake'), 200, headers: {'content-type': 'application/pdf'});
     }
     if (path == 'documents/verify/') {
@@ -447,18 +476,163 @@ class FakeApi {
     return fail(404, 'NOT_FOUND');
   }
 
-  Map<String, dynamic> _invoice() => {
-    'id': 'inv1',
-    'invoice_number': 'FAC-2026-0001',
-    'status': 'PARTIALLY_PAID',
-    'issue_date': '2026-09-01',
-    'due_date': '2026-09-30',
-    'total_amount': '100000.00',
-    'amount_paid': '60000.00',
-    'balance_due': '40000.00',
-    'currency': 'XAF',
-    'lines': [
-      {'fee_type_code': 'TUITION', 'description': 'Scolarité', 'total': '100000.00'},
+  // --- finance: the SERVER's state and rules (ADR 0013), the app computes nothing ---------
+
+  /// Invoice of each child (by student id), mutated by payments like the server's.
+  late final invoices = <String, Map<String, dynamic>>{
+    'c1': _invoiceOf('inv1', 'FAC-2026-0001', total: 100000, paid: 60000),
+    'c3': _invoiceOf('inv3', 'FAC-2026-0003', total: 40000, paid: 0),
+  };
+
+  /// Wallets by owner (opened by the school): Paul has an active one and a blocked one.
+  final wallets = <String, List<Map<String, dynamic>>>{
+    'pb': [
+      _wallet('w1', 'pb', '690000633', '100000.00', 'ACTIVE'),
+      _wallet('w2', 'pb', '690000999', '5000.00', 'BLOCKED'),
     ],
   };
+
+  late final payments = <Map<String, dynamic>>[
+    _payment('pay1', 'PAY-0001', 'c1', 'm-pa', 'w0', '60000.00', 'SUCCEEDED', ['FAC-2026-0001']),
+  ];
+  final _byKey = <String, (String, Map<String, dynamic>)>{};
+
+  /// Outcome the simulated provider gives to the next NEW payment.
+  String nextOutcome = 'SUCCEEDED';
+
+  /// Holds the answer of POST /finance/payments/ until completed.
+  Completer<void>? holdPayment;
+
+  /// The next payment is processed, but its answer never reaches the phone.
+  bool loseNextAnswer = false;
+
+  /// Payments really created by the server (replays excluded).
+  int get created => payments.length - 1;
+
+  static String _money(num value) => value.toStringAsFixed(2);
+
+  static Map<String, dynamic> _wallet(String id, String owner, String number, String balance, String status) => {
+    'id': id,
+    'owner': 'm-$owner',
+    'wallet_type': 'SIMULATION',
+    'provider_code': 'FAKE',
+    'wallet_identifier': number,
+    'balance': balance,
+    'currency': 'XAF',
+    'status': status,
+  };
+
+  Map<String, dynamic> _invoiceOf(String id, String number, {required num total, required num paid}) => {
+    'id': id,
+    'invoice_number': number,
+    'status': paid == 0 ? 'ISSUED' : (paid >= total ? 'PAID' : 'PARTIALLY_PAID'),
+    'issue_date': '2026-09-01',
+    'due_date': '2026-09-30',
+    'total_amount': _money(total),
+    'amount_paid': _money(paid),
+    'balance_due': _money(total - paid),
+    'currency': 'XAF',
+    'lines': [
+      {'fee_type_code': 'TUITION', 'description': 'Scolarité', 'total': _money(total)},
+    ],
+  };
+
+  Map<String, dynamic> _payment(
+    String id,
+    String reference,
+    String student,
+    String payer,
+    String wallet,
+    String amount,
+    String status,
+    List<String> invoiceNumbers,
+  ) => {
+    'id': id,
+    'payment_reference': reference,
+    'student': student,
+    'payer': payer,
+    'wallet': wallet,
+    'amount': amount,
+    'currency': 'XAF',
+    'payment_method': 'WALLET',
+    'status': status,
+    'initiated_at': _at(0, 9),
+    'completed_at': _at(0, 9),
+    'failure_reason': status == 'SUCCEEDED' ? '' : 'Simulation : $status',
+    'allocations': [
+      if (status == 'SUCCEEDED')
+        for (final n in invoiceNumbers) {'invoice_number': n},
+    ],
+  };
+
+  static bool _payable(Map<String, dynamic> invoice) =>
+      invoice['status'] == 'ISSUED' || invoice['status'] == 'PARTIALLY_PAID';
+
+  /// POST /finance/payments/ — same rules and answers as the server (ADR 0013 §4-§8).
+  http.Response _pay(FakePerson who, Map<String, dynamic> body, Map<String, dynamic>? Function(String) link) {
+    final student = '${body['student']}';
+    final key = '${body['idempotency_key'] ?? ''}';
+    if (key.isEmpty) {
+      return fail(
+        400,
+        'VALIDATION_ERROR',
+        details: {
+          'idempotency_key': ['Required.'],
+        },
+      );
+    }
+    final row = link(student);
+    // A pupil of this school I may not pay for (not my child, or no can_pay): 403,
+    // like the server (services.can_pay); a pupil unknown here (other school): 404.
+    final known = children.values.expand((c) => c).any((c) => (c['student'] as Map)['id'] == student);
+    if (row == null) return fail(known ? 403 : 404, known ? 'PERMISSION_DENIED' : 'NOT_FOUND');
+    if (row['can_pay'] != true) return fail(403, 'PERMISSION_DENIED');
+    final fingerprint = '$student|${body['amount']}|${body['payment_method']}|${body['wallet']}|${body['invoices']}';
+    final previous = _byKey[key];
+    if (previous != null) {
+      if (previous.$1 != fingerprint) {
+        return fail(409, 'CONFLICT', details: {'rule': 'idempotency_conflict'});
+      }
+      return ok({...previous.$2, 'replayed': true}); // 200: the payment already made, no new debit
+    }
+    final wallet = (wallets[who.key] ?? const []).where((w) => w['id'] == body['wallet']).firstOrNull;
+    if (wallet == null) return fail(403, 'PERMISSION_DENIED'); // only my own wallet
+    final invoiceIds = (body['invoices'] as List).cast<String>();
+    final invoice = invoices[student];
+    if (invoice == null || !invoiceIds.contains(invoice['id'])) {
+      return fail(400, 'BUSINESS_RULE_VIOLATION', details: {'rule': 'invoice_other_student'});
+    }
+    if (!_payable(invoice)) return fail(409, 'CONFLICT', details: {'rule': 'invoice_not_payable'});
+    final amount = num.parse('${body['amount']}');
+    if (amount > num.parse('${invoice['balance_due']}')) {
+      return fail(409, 'CONFLICT', details: {'rule': 'amount_exceeds_balance'});
+    }
+    var status = nextOutcome;
+    if (wallet['status'] != 'ACTIVE') status = 'DECLINED';
+    if (status == 'SUCCEEDED' && num.parse('${wallet['balance']}') < amount) status = 'INSUFFICIENT_FUNDS';
+    final payment = _payment(
+      'pay${payments.length + 1}',
+      'PAY-${(payments.length + 1).toString().padLeft(4, '0')}',
+      student,
+      'm-${who.key}',
+      '${wallet['id']}',
+      _money(amount),
+      status,
+      ['${invoice['invoice_number']}'],
+    );
+    payments.add(payment);
+    _byKey[key] = (fingerprint, payment);
+    if (status == 'SUCCEEDED') {
+      // Only a success moves money (wallet debited, invoice settled).
+      wallet['balance'] = _money(num.parse('${wallet['balance']}') - amount);
+      final total = num.parse('${invoice['total_amount']}');
+      final paid = num.parse('${invoice['amount_paid']}') + amount;
+      invoices[student] = _invoiceOf('${invoice['id']}', '${invoice['invoice_number']}', total: total, paid: paid);
+    }
+    if (loseNextAnswer) {
+      loseNextAnswer = false;
+      throw http.ClientException('connection lost after the server answered');
+    }
+    return ok({...payment, 'replayed': false}, status: 201);
+  }
 }

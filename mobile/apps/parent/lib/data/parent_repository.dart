@@ -13,7 +13,10 @@
 ///   GET  /parents/children/{id}/teachers/  who I may write to about this child
 ///   GET  /students/{id}/attendance/  …/scans/  (never who scanned)   GET /parents/convocations/
 ///   GET  /students/{id}/sessions/?date_from&date_to
-///   GET  /finance/students/{id}/obligations/  /finance/invoices/?student=  /finance/payments/?student=
+///   GET  /finance/students/{id}/obligations/  /finance/invoices/?student=  /finance/invoices/{id}/
+///   GET  /finance/payments/?student=   GET /finance/wallets/ (my own wallets)
+///   POST /finance/payments/            {student, amount = the invoice's balance_due as given by the
+///                                       server, WALLET, wallet, invoices, idempotency_key}
 ///   GET  /report-cards/?student=  (validated only for parents)   GET /report-cards/{id}/pdf/
 ///   GET  /payments/{id}/receipt.pdf/        GET /documents/verify/?code=
 ///   communication: CommunicationRepository (school_core)
@@ -25,6 +28,7 @@ import 'package:intl/intl.dart';
 import 'package:school_core/school_core.dart';
 
 import '../models/models.dart';
+import 'payment_flow.dart';
 
 final _day = DateFormat('yyyy-MM-dd');
 
@@ -133,7 +137,7 @@ class ParentRepository extends CommunicationRepository {
       ..sort((a, b) => (a.start ?? DateTime(0)).compareTo(b.start ?? DateTime(0)));
   }
 
-  // --- finance (read only; the server enforces can_view_financial_data) -------------
+  // --- finance (the server enforces can_view_financial_data / can_pay) -------------
 
   Future<Obligations> obligations(String childId) async =>
       Obligations.fromJson((await api.get('finance/students/$childId/obligations/') as Map).cast<String, dynamic>());
@@ -143,6 +147,31 @@ class ParentRepository extends CommunicationRepository {
 
   Future<List<Payment>> payments(String childId) async =>
       (await api.listAll('finance/payments/', params: {'student': childId})).map(Payment.fromJson).toList();
+
+  Future<Invoice> invoice(String invoiceId) async =>
+      Invoice.fromJson((await api.get('finance/invoices/$invoiceId/') as Map).cast<String, dynamic>());
+
+  /// The caller's OWN wallets (the server never returns another payer's).
+  Future<List<Wallet>> wallets() async => (await api.listAll('finance/wallets/')).map(Wallet.fromJson).toList();
+
+  /// Pays [intent]: the amount is the invoice's balance_due exactly as the server gave it
+  /// (a string, never typed nor recomputed here). Same [PaymentIntent] = same
+  /// idempotency key: a retry after a lost answer returns the payment already made.
+  Future<Payment> pay(PaymentIntent intent) async => Payment.fromJson(
+    (await api.post(
+              'finance/payments/',
+              body: {
+                'student': intent.childId,
+                'amount': intent.invoice.balance,
+                'payment_method': 'WALLET',
+                'wallet': intent.wallet.id,
+                'invoices': [intent.invoice.id],
+                'idempotency_key': intent.key,
+              },
+            )
+            as Map)
+        .cast<String, dynamic>(),
+  );
 
   // --- report cards and documents -------------------------------------------------------
 

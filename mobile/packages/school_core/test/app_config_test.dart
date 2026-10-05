@@ -193,6 +193,23 @@ void main() {
     });
   });
 
+  testWidgets('openDocument without a native side: false, the file simply stays saved', (tester) async {
+    const channel = MethodChannel('school_core/local_network');
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      channel,
+      (call) async => throw MissingPluginException(),
+    );
+    expect(await openDocument('/tmp/recu.pdf'), isFalse);
+    final calls = <MethodCall>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      return true;
+    });
+    expect(await openDocument('/tmp/recu.pdf'), isTrue);
+    expect(calls.single.arguments, {'path': '/tmp/recu.pdf', 'mimeType': 'application/pdf'});
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
+  });
+
   testWidgets('ConfigErrorApp explains a missing API_URL', (tester) async {
     try {
       AppConfig.parse(apiUrl: '');

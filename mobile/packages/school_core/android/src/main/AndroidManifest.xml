@@ -9,4 +9,18 @@
          Unknown to API 29–36 devices, which ignore it; it is only requested at runtime on API 37+
          and only when the API address is a private LAN address (school_core LocalNetworkGate). -->
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+
+    <application>
+        <!-- Opening a downloaded official PDF (receipt, report card) with the phone's viewer:
+             not exported, temporary read grants only, cache/shared/ only. No storage permission. -->
+        <provider
+            android:name="cm.schoolmanaging.school_core.SchoolCoreFileProvider"
+            android:authorities="${applicationId}.schoolcore.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/school_core_file_paths" />
+        </provider>
+    </application>
 </manifest>

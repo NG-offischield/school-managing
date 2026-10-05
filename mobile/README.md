@@ -202,6 +202,23 @@ Parcours réel sur une base de **test** :
 
 Le mot de passe du parent est généré pendant le test et n'est écrit nulle part.
 
+### Paiement mobile (ADR 0030)
+
+Parcours : Finance → facture → « Payer » → détail → choix du portefeuille → confirmation → résultat du serveur → reçu.
+
+- **Droits :** « Payer » n'apparaît que si le serveur répond `can_pay` pour cet enfant. Sans `can_view_financial_data`, les factures ne sont même pas demandées. L'écran de paiement redemande les droits et la facture au moment de payer.
+- **Montant :** c'est le `balance_due` de la facture, exactement tel que le serveur le donne. Rien n'est saisi ni recalculé sur le téléphone, et une requête falsifiée est refusée (409 `amount_exceeds_balance`).
+- **Idempotence :** une clé par intention de paiement (`PaymentFlow`).
+  - **Réponse perdue** (réseau, délai, 5xx) : la clé est gardée, et « Réessayer » rejoue la même demande. Le serveur renvoie le paiement déjà fait, sans second débit.
+  - **Réponse définitive** (succès, refus, fonds insuffisants, 4xx) : une nouvelle tentative utilise une nouvelle clé.
+  - **Double appui :** il ne produit qu'une requête.
+- **Résultats :** réussi, refusé, fonds insuffisants, délai du fournisseur, erreur du fournisseur. C'est toujours le statut enregistré par le serveur, et un échec ne débite rien. Les conflits (facture déjà réglée, montant changé, clé réutilisée) sont expliqués, avec « Recharger la facture ».
+- **Reçu :** PDF officiel construit par le serveur avec l'identité et le branding de l'**établissement**, jamais le logo du logiciel. Il est enregistré dans le dossier privé de l'application, puis ouvert avec la visionneuse PDF du téléphone par `school_core` : `FileProvider` non exporté, limité à `cache/shared/`, aucune permission de stockage.
+
+Les portefeuilles sont ouverts et alimentés par l'établissement (simulation V1). Le parent ne voit que les siens.
+
+Parcours réel de paiement sur la base de **test** : même préparation, puis `flutter test test/payment_live_test.dart` avec les mêmes variables. Mettre l'IPv4 du PC dans `PARENT_LIVE_URL` pour passer par le réseau local.
+
 ## Applications gardien et personnel
 
 Les comptes sont créés par l'établissement et activés par la personne avec un code (ADR 0024). Le portail

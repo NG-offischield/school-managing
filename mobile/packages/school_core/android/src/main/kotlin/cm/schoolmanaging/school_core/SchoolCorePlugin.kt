@@ -27,6 +27,8 @@ import io.flutter.plugin.common.PluginRegistry
  *   status       -> {sdkInt, required, granted, canAsk}
  *   request      -> same map, after the system dialog (API 37+ only)
  *   openSettings -> opens the app's settings (permission denied for good)
+ *   openDocument -> {path, mimeType}: shows a downloaded official PDF (receipt, report card)
+ *                   with the device's viewer; false when none is installed (DocumentOpener)
  */
 class SchoolCorePlugin :
     FlutterPlugin,
@@ -71,6 +73,11 @@ class SchoolCorePlugin :
                     Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", activity.packageName, null)),
                 )
                 result.success(true)
+            }
+            "openDocument" -> {
+                val path = call.argument<String>("path")
+                val mime = call.argument<String>("mimeType") ?: "application/pdf"
+                result.success(activity != null && path != null && DocumentOpener.open(activity, path, mime))
             }
             else -> result.notImplemented()
         }

@@ -134,8 +134,7 @@ bool looksLikeQrToken(String value) => RegExp(r'^[A-Za-z0-9_-]{16,256}$').hasMat
 /// A submission that never reached the server (network down) is not
 /// remembered: retrying it is allowed.
 class ScanGuard {
-  ScanGuard({this.window = const Duration(seconds: 5), DateTime Function()? clock})
-    : _clock = clock ?? DateTime.now;
+  ScanGuard({this.window = const Duration(seconds: 5), DateTime Function()? clock}) : _clock = clock ?? DateTime.now;
 
   final Duration window;
   final DateTime Function() _clock;
@@ -356,7 +355,6 @@ class ScanScreenState extends State<ScanScreen> {
     );
   }
 }
-
 
 class ScanOutcomeCard extends StatelessWidget {
   const ScanOutcomeCard({super.key, required this.outcome});
