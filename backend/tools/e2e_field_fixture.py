@@ -144,6 +144,7 @@ print(
             "school_code": school.code,
             "pupil_token": pupils[0][1].token,
             "pupil_name": pupils[0][0].full_name,
+            "pupil_id": str(pupils[0][0].pk),
             "class_name": klass.name,
             "guardian_member": str(guardian_a.pk),
             "guardian_login": guardian_a.user.email,

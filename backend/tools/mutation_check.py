@@ -1,5 +1,6 @@
 """Mutation check of the administration verticals (ADR 0018 to ADR 0020) and of
-the account activation (ADR 0024), the parent workflow (ADR 0026) and the guardian / staff apps (ADR 0027).
+the account activation (ADR 0024), the parent workflow (ADR 0026), the guardian / staff apps (ADR 0027)
+and the QR control behind the gate camera (ADR 0011 / 0029).
 
 Each mutation removes ONE protection from the code (school filtering,
 year/class control, permission check, compatibility control), runs the
@@ -13,6 +14,7 @@ always restored.
     docker compose run --rm -T web python tools/mutation_check.py activation
     docker compose run --rm -T web python tools/mutation_check.py parents
     docker compose run --rm -T web python tools/mutation_check.py field
+    docker compose run --rm -T web python tools/mutation_check.py gate
 
 Exit code 0 only if every mutation is killed.
 """
@@ -382,6 +384,55 @@ FIELD = [
     ),
 ]
 
+# The camera only reads the EXISTING token: every decision stays on the server (ADR 0029).
+GATE = [
+    # --- QR control ------------------------------------------------------------
+    (
+        "QR control: a token of another school is accepted",
+        "apps/attendance/services.py",
+        ".filter(school=school, token=token).first()",
+        ".filter(token=token).first()",
+    ),
+    (
+        "QR control: a revoked card is accepted",
+        "apps/attendance/services.py",
+        "    if qr.status == QRStatus.REVOKED:\n        return ScanOutcome(log(ScanResult.REVOKED_TOKEN), None)\n",
+        "",
+    ),
+    (
+        "QR control: a card of another school year is accepted",
+        "apps/attendance/services.py",
+        "    if not year.is_current:\n        return ScanOutcome(log(ScanResult.EXPIRED_TOKEN), None)\n",
+        "",
+    ),
+    (
+        "QR control: a pupil no longer enrolled is accepted",
+        "apps/attendance/services.py",
+        "    if qr.student.status != StudentStatus.ACTIVE or not _enrolled(qr.student, year):\n",
+        "    if False:\n",
+    ),
+    # --- isolation -------------------------------------------------------------
+    (
+        "isolation: a guardian sees every scan of the school",
+        "apps/attendance/api.py",
+        "        queryset = queryset.filter(scanned_by=self.membership())\n",
+        "",
+    ),
+    # --- permissions -----------------------------------------------------------
+    (
+        "permission: any member may scan QR codes",
+        "apps/attendance/services.py",
+        "    if not membership_has_role(actor, SCANNER_ROLES):\n",
+        "    if False:\n",
+    ),
+    (
+        "permission: staff see the pupils' solvency at the gate",
+        "apps/attendance/api.py",
+        'SOLVENCY_VIEWER_ROLES = frozenset({"GUARDIAN", *ADMIN_ROLES})',
+        'SOLVENCY_VIEWER_ROLES = frozenset({"GUARDIAN", "STAFF", *ADMIN_ROLES})',
+    ),
+]
+
 SUITES = {
     "students": (["tests/test_students_admin_api.py"], STUDENTS),
     "teachers": (["tests/test_teachers_admin_api.py"], TEACHERS),
@@ -389,6 +440,10 @@ SUITES = {
     "activation": (["tests/test_account_activation.py"], ACTIVATION),
     "parents": (["tests/test_parent_workflow.py"], PARENTS),
     "field": (["tests/test_guardian_staff_api.py"], FIELD),
+    "gate": (
+        ["tests/test_attendance.py", "tests/test_attendance_api.py", "tests/test_guardian_staff_api.py"],
+        GATE,
+    ),
 }
 
 

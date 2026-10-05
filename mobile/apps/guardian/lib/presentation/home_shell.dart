@@ -3,13 +3,16 @@ import 'package:provider/provider.dart';
 import 'package:school_core/school_core.dart';
 
 import '../data/guardian_repository.dart';
+import 'camera/camera_scan_screen.dart';
+import 'camera/qr_camera.dart';
 
 /// Signed-in shell of the guardian: Accueil, Portail (scan), Mes passages,
 /// Messages, Profil — and the live connection for the whole session.
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key, this.realtime});
+  const HomeShell({super.key, this.realtime, this.camera});
 
   final RealtimeClient Function()? realtime;
+  final QrCamera Function()? camera;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -18,6 +21,7 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _tab = 0;
   final _live = LiveState();
+  final _scan = GlobalKey<ScanScreenState>();
 
   @override
   void initState() {
@@ -41,6 +45,12 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
   void open(int tab) => setState(() => _tab = tab);
 
+  /// Accueil -> « Scanner au portail »: the Portail tab, camera open at once.
+  void scan() {
+    open(1);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scan.currentState?.openCamera());
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<LiveState>.value(
@@ -49,8 +59,11 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         body: IndexedStack(
           index: _tab,
           children: [
-            GuardianHome(onOpenTab: open),
-            const ScanScreen(),
+            GuardianHome(onOpenTab: open, onScan: scan),
+            ScanScreen(
+              key: _scan,
+              camera: widget.camera == null ? null : (context) => CameraScanScreen.open(context, widget.camera!),
+            ),
             const MyScansScreen(),
             const CommunicationScreen(messaging: false, complaints: false), // spec §8: no messaging for guardians
             const GuardianProfile(),
@@ -108,9 +121,12 @@ class _Overview {
 
 /// Accueil: my passages of the day, what is new, closures to come.
 class GuardianHome extends StatefulWidget {
-  const GuardianHome({super.key, required this.onOpenTab});
+  const GuardianHome({super.key, required this.onOpenTab, this.onScan});
 
   final void Function(int tab) onOpenTab;
+
+  /// Opens the scanner (camera when available).
+  final VoidCallback? onScan;
 
   @override
   State<GuardianHome> createState() => _GuardianHomeState();
@@ -118,11 +134,20 @@ class GuardianHome extends StatefulWidget {
 
 class _GuardianHomeState extends State<GuardianHome> {
   Future<_Overview>? _future;
+  late final ValueNotifier<int> _scans;
 
   @override
   void initState() {
     super.initState();
+    // Every scan (camera or reader) refreshes the counters of the day.
+    _scans = context.read<GuardianRepository>().gate.scans..addListener(_load);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _scans.removeListener(_load);
+    super.dispose();
   }
 
   Future<_Overview> _fetch() async {
@@ -177,7 +202,7 @@ class _GuardianHomeState extends State<GuardianHome> {
               const SizedBox(height: 8),
               FilledButton.icon(
                 key: const Key('home.scan'),
-                onPressed: () => widget.onOpenTab(1),
+                onPressed: widget.onScan ?? () => widget.onOpenTab(1),
                 icon: const Icon(Icons.qr_code_scanner),
                 label: const Text('Scanner au portail'),
               ),

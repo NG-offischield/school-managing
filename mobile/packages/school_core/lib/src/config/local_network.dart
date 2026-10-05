@@ -264,3 +264,7 @@ class ConfigErrorApp extends StatelessWidget {
     ),
   );
 }
+
+/// Opens this app's page in the Android settings (a permission refused for
+/// good: local network, camera...). Same native channel; no-op elsewhere.
+Future<void> openAppSettings() => const LocalNetworkAccess().openSettings();

@@ -43,6 +43,11 @@ class FakePerson {
   String get name => '$first $last';
 }
 
+/// Card QR tokens, in the real format (secrets.token_urlsafe(32)).
+const qrLea = 'LeaMbarga_7dK2pQ9vX4mZ8rT1wY6bN3cF5hJ0aSx';
+const qrRevoked = 'OldCard-8sJ3kL0pQ2wE4rT6yU8iO1aS3dF5gH7jK';
+const qrOtherSchool = 'OtherSchool_2xC4vB6nM8qW0eR2tY4uI6oP8aSd';
+
 class FakeApi {
   FakeApi() {
     scans = [
@@ -65,6 +70,7 @@ class FakeApi {
   String activationCode = 'K7Q2-M9XA-4TZP-QH3W-B8NC';
   bool activationUsed = false;
   bool offline = false;
+  int scanCalls = 0;
   int issued = 0;
 
   List<FakePerson> get people => [a, b, parent];
@@ -181,14 +187,11 @@ class FakeApi {
     }
     if (path == 'qr/scans/') {
       if (!who.roles.contains('STAFF')) return fail(403, 'PERMISSION_DENIED');
-      final known = body['token'] == 'QR-LEA';
-      final row = _scan(
-        'sc${scans.length + 1}',
-        who,
-        known ? 'Léa Mbarga' : null,
-        known ? 'ACCEPTED' : 'UNKNOWN_TOKEN',
-        8,
-      );
+      scanCalls++;
+      final known = body['token'] == qrLea;
+      // The server decides: a revoked card, another school's card (= unknown here), anything else.
+      final refused = body['token'] == qrRevoked ? 'REVOKED_TOKEN' : 'UNKNOWN_TOKEN';
+      final row = _scan('sc${scans.length + 1}', who, known ? 'Léa Mbarga' : null, known ? 'ACCEPTED' : refused, 8);
       scans.add(row);
       return ok({
         'scan_id': row['id'],

@@ -101,7 +101,7 @@ void main() {
     await h.start(tester);
     await h.login(tester, h.fake.a);
     await h.tab(tester, 'Portail');
-    await tester.enterText(find.byKey(const Key('scan.token')), 'QR-LEA');
+    await tester.enterText(find.byKey(const Key('scan.token')), qrLea);
     await tester.pump();
     await tester.tap(find.byKey(const Key('scan.submit')));
     await tester.pumpAndSettle();

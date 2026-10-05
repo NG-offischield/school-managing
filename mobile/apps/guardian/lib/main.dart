@@ -4,6 +4,7 @@ import 'package:school_core/school_core.dart';
 
 import 'app.dart';
 import 'data/guardian_repository.dart';
+import 'presentation/camera/qr_camera.dart';
 
 /// Backend address, given at build time — never written in the sources
 /// (school_core AppConfig, docs/reseau-local.md):
@@ -33,6 +34,7 @@ Future<void> main() async {
         auth: auth,
         repository: GuardianRepository(api),
         realtime: () => RealtimeClient(api, config.socket, refresh: auth.refreshSession),
+        camera: MobileScannerQrCamera.new,
       ),
     ),
   );

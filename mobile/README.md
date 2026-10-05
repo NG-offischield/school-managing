@@ -14,11 +14,12 @@ mobile/
                           communication selon le rôle, portail QR, calendrier ; testing.dart
   apps/teacher/           application enseignant (data/, models/, presentation/)
   apps/parent/            application parent (même organisation ; ADR 0026)
-  apps/guardian/          application gardien (portail, mes passages, notifications ; ADR 0027)
+  apps/guardian/          application gardien (portail QR par caméra, mes passages, notifications ; ADR 0027, 0029)
   apps/staff/             application personnel (planning, portail, messages, rémunération ; ADR 0027)
   gradle/                 school-android.gradle : niveaux Android communs aux quatre applications
   config/                 lan.example.json ; lan.json (adresse du PC, non versionné)
-  tools/                  configure_lan.ps1 (réseau local) ; préparation des parcours réels (base de TEST)
+  tools/                  configure_lan.ps1 (réseau local) ; mutation_check.py (protections mobiles) ;
+                          préparation des parcours réels (base de TEST)
 ```
 
 ## Versions Android supportées
@@ -69,13 +70,15 @@ Le **Pixel 7a sous Android 17 (API 37)** est l'appareil principal de validation.
 |---|---|---|
 | `INTERNET` | API REST et WebSocket | toujours (permission normale, aucune demande) |
 | `ACCESS_LOCAL_NETWORK` | joindre le PC Django sur le Wi-Fi local | **Android 17 uniquement** et seulement si `API_URL` est une adresse locale ; demandée au lancement, avant toute requête |
+| `CAMERA` | **gardien seulement** : lire le QR de la carte au portail | demandée à la première ouverture du scanner ; refus géré (explication, paramètres, saisie manuelle), jamais en boucle |
+| `ACCESS_NETWORK_STATE` | ajoutée par ML Kit (gardien) | permission normale, aucune demande |
 
 Aucune autre permission n'est déclarée :
-- pas de caméra (le portail QR caméra fera l'objet d'une phase suivante) ;
+- pas d'écriture de photo : le scanner ne garde que le texte du QR (`returnImage: false`) ;
 - pas de stockage : les PDF sont rangés dans le dossier privé de l'application ;
 - pas de notifications système : pas de FCM en V1, les notifications s'affichent dans l'application.
 
-Ces permissions viennent toutes du manifeste de `school_core` et sont fusionnées dans chaque APK. Les manifestes des applications n'en déclarent aucune.
+Ces permissions viennent des bibliothèques et sont fusionnées dans chaque APK : `school_core` pour les quatre applications, `mobile_scanner` pour le gardien seulement. Les manifestes des applications n'en déclarent aucune.
 
 ### Android 17 : `ACCESS_LOCAL_NETWORK`
 
@@ -99,7 +102,7 @@ Une application qui cible l'API 37 ne peut plus ouvrir de connexion vers une adr
 
 ## Réseau local (LAN)
 
-Les téléphones joignent le PC Windows **par le Wi-Fi de la box**. Le guide complet, à suivre aussi après un changement de box ou de réseau, est [docs/reseau-local.md](../docs/reseau-local.md).
+Les téléphones joignent le PC Windows **par le Wi-Fi de la box**. Le guide complet, à suivre aussi après un changement de box ou de réseau, est [docs/mobile-lan-setup.md](../docs/mobile-lan-setup.md) ; après un simple changement de box ou d'adresse : [docs/reseau-local.md](../docs/reseau-local.md).
 
 ```
 Pixel (Wi-Fi) ─► box / routeur ─► PC Windows ─► Docker ─► Django
@@ -145,7 +148,7 @@ Chaque étape n'est validée qu'avec un résultat réellement observé.
 10. Android 17 : accepter « Accès au réseau local ». Tester aussi le refus (écran d'explication), puis l'acceptation.
 11. Login avec un compte activé ; vérifier « Serveur : <IPv4>:8000 » sur l'écran de connexion.
 12. WebSocket : l'indicateur « En direct » passe au vert.
-13. Portail QR caméra : phase suivante. Aujourd'hui, saisie du code ou lecteur QR « clavier ».
+13. Portail QR caméra (gardien) : Accueil → « Scanner au portail » → autoriser l'appareil photo → présenter une carte ; le résultat du serveur s'affiche et l'historique se met à jour (détail : [docs/mobile-lan-setup.md](../docs/mobile-lan-setup.md) §14).
 14. Notification : en envoyer une depuis le poste d'administration, elle doit arriver en direct.
 15. Communication : envoyer un message (enseignant, parent, personnel) et le voir arriver sur l'autre appareil.
 
@@ -202,7 +205,7 @@ Le mot de passe du parent est généré pendant le test et n'est écrit nulle pa
 ## Applications gardien et personnel
 
 Les comptes sont créés par l'établissement et activés par la personne avec un code (ADR 0024). Le portail
-utilise le protocole QR existant : le jeton est saisi ou envoyé par un lecteur QR « clavier ». Le serveur
+utilise le protocole QR existant : le gardien lit la carte avec l'appareil photo (lecteur QR « clavier » ou saisie en secours ; le personnel : lecteur ou saisie). Le serveur
 décide de ce que chaque rôle voit :
 - le gardien voit le statut de solvabilité, jamais de montant ;
 - le personnel ne le voit pas.

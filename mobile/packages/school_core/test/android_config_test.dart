@@ -64,6 +64,14 @@ void main() {
     });
   }
 
+  test('camera: the guardian app only (mobile_scanner, minSdk-compatible), never the others', () {
+    for (final name in apps) {
+      final pubspec = read('../../apps/$name/pubspec.yaml');
+      expect(pubspec.contains('mobile_scanner:'), name == 'guardian', reason: name);
+    }
+    expect(read('../../apps/guardian/pubspec.yaml'), contains('mobile_scanner: ^7.4.2'));
+  });
+
   test('school_core Android module: same levels, both network permissions, nothing else', () {
     final gradle = read('android/build.gradle.kts');
     expect(gradle, contains('compileSdk = 37'));

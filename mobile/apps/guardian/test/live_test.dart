@@ -67,6 +67,17 @@ void main() {
       expect(mine, hasLength(3));
       expect(mine.map((s) => s.id), isNot(contains(data['other_guardian_scan'])));
 
+      // 3b. The school reissues the card: the old QR is refused (revoked), the new one is read.
+      final reissued =
+          await admin.post(
+                'admin/qr-codes/reissue/',
+                body: {'student': data['pupil_id'], 'reason': 'Carte perdue (E2E)'},
+              )
+              as Map;
+      expect((await repo.gate.scan(data['pupil_token'])).result, 'REVOKED_TOKEN');
+      expect(looksLikeQrToken('${reissued['token']}'), isTrue); // what the camera accepts
+      expect((await repo.gate.scan('${reissued['token']}')).result, 'ALREADY_PRESENT');
+
       // 4. Notifications.
       await repo.notifications();
       await repo.unreadCount();

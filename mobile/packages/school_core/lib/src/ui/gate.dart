@@ -8,8 +8,9 @@
 ///   GET  /guardians/scans/?date=     MY scans only (filtered by the server on
 ///                                    the caller: never another person's)
 ///
-/// The token is typed or sent by a keyboard-wedge QR reader (camera
-/// scanning would need a native plugin: not in this phase).
+/// The token comes from the camera (apps that provide a [QrCameraLauncher]:
+/// guardian), a keyboard-wedge QR reader or the keyboard. Same token, same
+/// endpoint: no second QR protocol, and no image ever leaves the phone.
 library;
 
 import 'package:flutter/material.dart';
@@ -118,20 +119,84 @@ class GateRepository {
       (await api.listAll('guardians/scans/', params: {'date': _day.format(day)})).map(ScanRecord.fromJson).toList();
 }
 
-/// Scan at the gate: token in, the server's answer out.
-class ScanScreen extends StatefulWidget {
-  const ScanScreen({super.key});
+/// What a student card's QR holds: the EXISTING opaque token
+/// (`secrets.token_urlsafe(32)`, 43 URL-safe characters; the API accepts up
+/// to 256). Anything else read by a camera — a URL, a Wi-Fi code, a payment
+/// QR — is not a school card and is NEVER sent to the server. Only the
+/// format is checked here: whether the token is valid, revoked or of another
+/// school is the server's answer.
+bool looksLikeQrToken(String value) => RegExp(r'^[A-Za-z0-9_-]{16,256}$').hasMatch(value.trim());
 
-  @override
-  State<ScanScreen> createState() => _ScanScreenState();
+/// Double-scan protection, shared by the camera and the keyboard reader:
+/// - one submission at a time ([tryBegin] refuses while one is running);
+/// - the same card answered by the server less than [window] ago is not
+///   sent again (a card held in front of the camera, a reader that repeats).
+/// A submission that never reached the server (network down) is not
+/// remembered: retrying it is allowed.
+class ScanGuard {
+  ScanGuard({this.window = const Duration(seconds: 5), DateTime Function()? clock})
+    : _clock = clock ?? DateTime.now;
+
+  final Duration window;
+  final DateTime Function() _clock;
+  bool _busy = false;
+  String? _lastToken;
+  DateTime? _lastAt;
+
+  bool get busy => _busy;
+
+  /// True when the server answered this very card a moment ago.
+  bool isRepeat(String token) {
+    final at = _lastAt;
+    return token == _lastToken && at != null && _clock().difference(at) < window;
+  }
+
+  /// Takes the lock for [token]; false = busy, or a repeat of the last card.
+  bool tryBegin(String token) {
+    if (_busy || isRepeat(token)) return false;
+    _busy = true;
+    return true;
+  }
+
+  /// Releases the lock; [answered] = the server gave a result for [token].
+  void end(String token, {required bool answered}) {
+    _busy = false;
+    if (answered) {
+      _lastToken = token;
+      _lastAt = _clock();
+    }
+  }
 }
 
-class _ScanScreenState extends State<ScanScreen> {
+/// Opens a camera scanner and returns the token read, or null (cancelled,
+/// closed, manual entry chosen). Provided by the apps that have a camera
+/// scanner (guardian); without it the screen is keyboard / reader only.
+typedef QrCameraLauncher = Future<String?> Function(BuildContext context);
+
+/// Scan at the gate: token in, the server's answer out.
+class ScanScreen extends StatefulWidget {
+  const ScanScreen({super.key, this.camera});
+
+  /// Camera = main method when provided; the text field (typed code or
+  /// keyboard-wedge USB/Bluetooth reader) stays as the secondary one.
+  final QrCameraLauncher? camera;
+
+  @override
+  State<ScanScreen> createState() => ScanScreenState();
+}
+
+class ScanScreenState extends State<ScanScreen> {
   final _token = TextEditingController();
   final _focus = FocusNode();
+  final _guard = ScanGuard();
   bool _busy = false;
+  bool _cameraOpen = false;
   ScanOutcome? _last;
   String? _error;
+  String? _notice;
+
+  /// Read but not answered (network down / timeout): offered for a retry.
+  String? _pending;
 
   @override
   void dispose() {
@@ -140,68 +205,158 @@ class _ScanScreenState extends State<ScanScreen> {
     super.dispose();
   }
 
-  Future<void> _scan() async {
+  /// Camera -> token -> server. Called by the button, or by the home screen.
+  Future<void> openCamera() async {
+    final launcher = widget.camera;
+    if (launcher == null || _cameraOpen || _busy) return;
+    _cameraOpen = true;
+    try {
+      final token = await launcher(context);
+      if (token != null && mounted) await submit(token);
+    } finally {
+      _cameraOpen = false;
+    }
+  }
+
+  Future<void> _typed() async {
     final token = _token.text.trim();
-    if (token.isEmpty || _busy) return;
+    _token.clear();
+    if (token.isEmpty) return;
+    if (!looksLikeQrToken(token)) {
+      setState(() {
+        _error = 'Ce code n\'est pas celui d\'une carte d\'élève.';
+        _notice = null;
+      });
+      _focus.requestFocus();
+      return;
+    }
+    await submit(token);
+    if (mounted) _focus.requestFocus(); // ready for the next pupil
+  }
+
+  /// Sends [token] to the EXISTING endpoint, once at a time.
+  Future<void> submit(String token) async {
+    if (_guard.isRepeat(token)) {
+      setState(() {
+        _notice = 'Cette carte vient d\'être lue : le résultat est affiché ci-dessous.';
+        _error = null;
+      });
+      return;
+    }
+    if (!_guard.tryBegin(token)) return;
     setState(() {
       _busy = true;
       _error = null;
+      _notice = null;
     });
+    var answered = false;
     try {
       _last = await context.read<GateRepository>().scan(token);
+      _pending = null;
+      answered = true;
+    } on NetworkException catch (error) {
+      _last = null;
+      _pending = token; // kept in memory only, for « Réessayer »
+      _error = error.timeout
+          ? 'Le serveur ne répond pas : le passage n\'est PAS enregistré.'
+          : 'Réseau indisponible : le passage n\'est PAS enregistré.';
     } on ApiException catch (error) {
       _last = null;
+      _pending = null;
+      answered = true;
       _error = error.userMessage;
     } finally {
-      _token.clear();
-      if (mounted) {
-        setState(() => _busy = false);
-        _focus.requestFocus(); // ready for the next pupil
-      }
+      _guard.end(token, answered: answered);
+      if (mounted) setState(() => _busy = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final last = _last;
+    final camera = widget.camera != null;
+    final manual = <Widget>[
+      TextField(
+        key: const Key('scan.token'),
+        controller: _token,
+        focusNode: _focus,
+        autofocus: !camera, // with a camera, no keyboard popping up
+        autocorrect: false,
+        enableSuggestions: false,
+        textInputAction: TextInputAction.done,
+        onSubmitted: (_) => _typed(),
+        onChanged: (_) => setState(() {}),
+        decoration: const InputDecoration(labelText: 'Code du QR', prefixIcon: Icon(Icons.keyboard_outlined)),
+      ),
+      const SizedBox(height: 12),
+      if (camera)
+        OutlinedButton.icon(
+          key: const Key('scan.submit'),
+          onPressed: _token.text.trim().isEmpty || _busy ? null : _typed,
+          icon: const Icon(Icons.how_to_reg_outlined),
+          label: const Text('Enregistrer le passage'),
+        )
+      else
+        FilledButton.icon(
+          key: const Key('scan.submit'),
+          onPressed: _token.text.trim().isEmpty || _busy ? null : _typed,
+          icon: const Icon(Icons.how_to_reg_outlined),
+          label: const Text('Enregistrer le passage'),
+        ),
+    ];
     return Scaffold(
       appBar: AppBar(title: const Text('Portail'), actions: const [LiveIndicator()]),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text(
-            'Présentez la carte de l\'élève au lecteur, ou saisissez le code du QR. Le serveur enregistre '
-            'l\'arrivée et décide de ce qui vous est affiché.',
-            style: TextStyle(color: Tokens.textSecondary),
+          Text(
+            camera
+                ? 'Scannez la carte de l\'élève avec l\'appareil photo. Le serveur enregistre l\'arrivée et décide '
+                      'de ce qui vous est affiché.'
+                : 'Présentez la carte de l\'élève au lecteur, ou saisissez le code du QR. Le serveur enregistre '
+                      'l\'arrivée et décide de ce qui vous est affiché.',
+            style: const TextStyle(color: Tokens.textSecondary),
           ),
           const SizedBox(height: 14),
-          TextField(
-            key: const Key('scan.token'),
-            controller: _token,
-            focusNode: _focus,
-            autofocus: true,
-            autocorrect: false,
-            enableSuggestions: false,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _scan(),
-            onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(labelText: 'Code du QR', prefixIcon: Icon(Icons.qr_code_scanner)),
-          ),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            key: const Key('scan.submit'),
-            onPressed: _token.text.trim().isEmpty || _busy ? null : _scan,
-            icon: const Icon(Icons.how_to_reg_outlined),
-            label: const Text('Enregistrer le passage'),
-          ),
+          if (camera) ...[
+            FilledButton.icon(
+              key: const Key('scan.camera'),
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
+              onPressed: _busy ? null : openCamera,
+              icon: const Icon(Icons.qr_code_scanner),
+              label: Text(last == null && _error == null ? 'Scanner une carte' : 'Scanner la carte suivante'),
+            ),
+            const SizedBox(height: 8),
+            ExpansionTile(
+              key: const Key('scan.manual'),
+              tilePadding: EdgeInsets.zero,
+              title: const Text('Lecteur USB / Bluetooth ou saisie du code'),
+              childrenPadding: const EdgeInsets.only(bottom: 8),
+              children: manual,
+            ),
+          ] else
+            ...manual,
           const SizedBox(height: 18),
+          if (_busy) const LinearProgressIndicator(key: Key('scan.busy')),
+          if (_notice != null) MessageBanner(_notice!, tone: Tone.info),
           if (_error != null) MessageBanner(_error!),
+          if (_pending != null && !_busy)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: OutlinedButton.icon(
+                key: const Key('scan.retry'),
+                onPressed: () => submit(_pending!),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Réessayer l\'envoi'),
+              ),
+            ),
           if (last != null) ScanOutcomeCard(outcome: last),
         ],
       ),
     );
   }
 }
+
 
 class ScanOutcomeCard extends StatelessWidget {
   const ScanOutcomeCard({super.key, required this.outcome});

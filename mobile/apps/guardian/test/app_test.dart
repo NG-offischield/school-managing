@@ -1,59 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/testing.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:school_core/school_core.dart';
-import 'package:school_core/testing.dart';
-import 'package:school_guardian/app.dart';
-import 'package:school_guardian/data/guardian_repository.dart';
 
 import 'fake_api.dart';
-
-class Harness {
-  Harness({bool live = false}) {
-    api = ApiClient(baseUrl: 'http://testserver/api/v1/', client: MockClient(fake.call));
-    auth = AuthService(api, store, requiredRole: 'GUARDIAN');
-    repository = GuardianRepository(api);
-    if (live) {
-      realtime = () => RealtimeClient(
-        api,
-        socketUri('http://testserver/api/v1/'),
-        channelFactory: (uri, headers) => channels[channels.length] = FakeChannel(),
-        refresh: auth.refreshSession,
-      );
-    }
-  }
-
-  final fake = FakeApi();
-  final store = MemoryTokenStore();
-  final channels = <int, FakeChannel>{};
-  late final ApiClient api;
-  late final AuthService auth;
-  late final GuardianRepository repository;
-  RealtimeClient Function()? realtime;
-
-  Future<void> start(WidgetTester tester, {Size size = const Size(1080, 2400), double ratio = 2.6}) async {
-    tester.view.physicalSize = size;
-    tester.view.devicePixelRatio = ratio;
-    addTearDown(tester.view.reset);
-    await tester.pumpWidget(GuardianApp(auth: auth, repository: repository, realtime: realtime));
-    await auth.restore();
-    await tester.pumpAndSettle();
-  }
-
-  Future<void> login(WidgetTester tester, FakePerson who, {String? password}) async {
-    await tester.enterText(find.byKey(const Key('login.identifier')), who.email);
-    await tester.enterText(find.byKey(const Key('login.password')), password ?? who.password);
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('login.submit')));
-    await tester.pumpAndSettle();
-  }
-
-  Future<void> tab(WidgetTester tester, String label) async {
-    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text(label)));
-    await tester.pumpAndSettle();
-  }
-}
+import 'harness.dart';
 
 void main() {
   setUpAll(() => initializeDateFormatting('fr_FR'));
@@ -84,7 +35,7 @@ void main() {
     await h.start(tester);
     await h.login(tester, h.fake.a);
     await h.tab(tester, 'Portail');
-    await tester.enterText(find.byKey(const Key('scan.token')), 'QR-LEA');
+    await tester.enterText(find.byKey(const Key('scan.token')), qrLea);
     await tester.testTextInput.receiveAction(TextInputAction.done); // a QR reader ends with Enter
     await tester.pumpAndSettle();
     expect(find.text('Arrivée enregistrée'), findsOneWidget);
@@ -94,7 +45,7 @@ void main() {
     expect(find.text('Échéance dépassée'), findsOneWidget); // status only, never an amount
     expect(find.textContaining('XAF'), findsNothing);
 
-    await tester.enterText(find.byKey(const Key('scan.token')), 'PAS-UN-QR');
+    await tester.enterText(find.byKey(const Key('scan.token')), qrOtherSchool);
     await tester.pump();
     await tester.tap(find.byKey(const Key('scan.submit')));
     await tester.pumpAndSettle();

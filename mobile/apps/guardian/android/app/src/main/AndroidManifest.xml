@@ -1,7 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Permissions come from school_core (packages/school_core/android): INTERNET, and
-         ACCESS_LOCAL_NETWORK for Android 17. No other permission: no camera, storage
-         (PDFs go to the app's private folder) or notification permission is used. -->
+    <!-- Permissions come from the merged libraries, never declared here:
+         school_core: INTERNET, ACCESS_LOCAL_NETWORK (Android 17);
+         mobile_scanner: CAMERA (runtime, asked when the gate scanner opens) with
+         android.hardware.camera required="false" (keyboard / QR reader without camera).
+         No storage (no picture is kept) and no notification permission. -->
     <application
         android:label="School Managing Gardien"
         android:allowBackup="false"
