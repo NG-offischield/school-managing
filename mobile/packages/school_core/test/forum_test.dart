@@ -140,7 +140,7 @@ class FakeForum {
       if (match[2] == null) return _json(row);
       if (request.method == 'POST') {
         if (row['thread_type'] == 'ANNOUNCEMENT') return _fail(403, 'PERMISSION_DENIED');
-        if (row['status'] != 'OPEN') return _fail(400, 'BUSINESS_RULE_VIOLATION', rule: 'thread_locked');
+        if (row['status'] != 'OPEN') return _fail(409, 'CONFLICT', rule: 'thread_locked'); // CONFLICT_RULES
         return _json(post(row['id'] as String, '${body['body']}', author: me, name: 'Awa Mbarga'), status: 201);
       }
       return _page(posts[row['id']]!, params, 30);

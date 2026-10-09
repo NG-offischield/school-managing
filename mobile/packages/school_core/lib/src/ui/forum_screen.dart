@@ -6,7 +6,7 @@
 /// Everything comes from the server: the spaces I belong to, who may start a
 /// discussion (no new thread in an announcements-only space), what is locked,
 /// what is an announcement (read-only). The app shows its answers and lets
-/// the server refuse the rest (403 / 404 / 400 explained).
+/// the server refuse the rest (403 / 404 / 400 / 409 thread_locked explained).
 /// Live: a forum or announcement notification pushed on the WebSocket
 /// refreshes the list and the open thread.
 library;
@@ -331,7 +331,8 @@ class _ForumThreadScreenState extends State<ForumThreadScreen> {
     } on ApiException catch (error) {
       if (!mounted) return;
       _say(context, error.userMessage);
-      if (error is ForbiddenException || error is ValidationException) _load(); // locked meanwhile?
+      // Locked meanwhile (409 thread_locked) or no longer allowed (403): show the server's state.
+      if (error is ForbiddenException || error is ConflictException || error is ValidationException) _load();
     } finally {
       if (mounted) setState(() => _sending = false);
     }
