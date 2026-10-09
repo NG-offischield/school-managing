@@ -1371,6 +1371,7 @@ NOTIFICATION_TYPES = {
     "MESSAGE": "Message",
     "ANNOUNCEMENT": "Annonce",
     "COMPLAINT": "Réclamation",
+    "FORUM": "Forum",
 }
 SEVERITIES = {"INFO": "Information", "WARNING": "Attention", "CRITICAL": "Important"}
 CONVERSATION_TYPES = {

@@ -9,6 +9,16 @@ Announcements (thread_type ANNOUNCEMENT, or spaces flagged
 announcements_only) are written by the administration only and notify the
 whole space. Posts are never edited; a deletion hides them (moderation by
 the administration requires a reason).
+
+Forum activity notifications (type FORUM, switchable in the preferences),
+through the ONE notification service (persisted, idempotent per event,
+pushed live after commit, read back later):
+- a new discussion notifies the members of its space (computed above,
+  administration included) except its author;
+- a reply notifies the people taking part in THAT discussion (its author
+  and those who posted in it), still members of the space, except the one
+  replying — never the whole school;
+- announcements keep their own ANNOUNCEMENT notification.
 """
 
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -149,7 +159,28 @@ def create_thread(space, *, actor, title, body, thread_type=ThreadType.GENERAL):
             payload={"thread": str(thread.pk), "space": str(space.pk)},
             source=thread,
         )
+    else:
+        notify_many(
+            members_of(space).exclude(pk=actor.pk),
+            school=space.school,
+            notification_type=NotificationType.FORUM,
+            severity=Severity.INFO,
+            title=f"Nouveau sujet : {thread.title}"[:200],
+            message=f"{actor.user.full_name} : {body.strip()}"[:200],
+            event_key=f"forum.thread:{thread.pk}",
+            payload={"thread": str(thread.pk), "space": str(space.pk)},
+            source=thread,
+        )
     return thread
+
+
+def participants_of(thread):
+    """Who takes part in a discussion: its author and the authors of its
+    visible posts, still members of the space."""
+    authors = set(
+        ForumPost.objects.filter(thread=thread, deleted_at__isnull=True).values_list("author_id", flat=True)
+    ) | {thread.created_by_id}
+    return members_of(thread.space).filter(pk__in=authors)
 
 
 @transaction.atomic
@@ -165,6 +196,18 @@ def add_post(thread, *, actor, body):
         school=thread.school, thread=thread, author=actor, body=_text(body, "body_required")
     )
     ForumThread.objects.filter(pk=thread.pk).update(last_post_at=post.created_at)
+    if thread.thread_type != ThreadType.ANNOUNCEMENT:  # announcements keep their own notification
+        notify_many(
+            participants_of(thread).exclude(pk=actor.pk),
+            school=thread.school,
+            notification_type=NotificationType.FORUM,
+            severity=Severity.INFO,
+            title=f"Réponse : {thread.title}"[:200],
+            message=f"{actor.user.full_name} : {post.body}"[:200],
+            event_key=f"forum.post:{post.pk}",
+            payload={"thread": str(thread.pk), "space": str(thread.space_id), "post": str(post.pk)},
+            source=post,
+        )
     return post
 
 

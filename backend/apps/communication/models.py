@@ -40,6 +40,7 @@ class NotificationType(models.TextChoices):
     MESSAGE = "MESSAGE", "Nouveau message"
     ANNOUNCEMENT = "ANNOUNCEMENT", "Annonce"
     COMPLAINT = "COMPLAINT", "Réclamation"
+    FORUM = "FORUM", "Forum"  # new topic / reply in a discussion I belong to (switchable)
 
 
 # Types a member cannot switch off in-app: they carry obligations or money.
