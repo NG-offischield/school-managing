@@ -24,6 +24,8 @@ Chaque case ne se coche qu'avec un résultat **réellement observé**.
 
 **Le test applicatif sur le Pixel n'a pas encore été réalisé.**
 
+> **Mise à jour du 9 octobre 2026.** L'IPv4 du PC est passée à `192.168.1.102` (nouveau bail DHCP). `.env`, `lan.json` et l'APK du 05/10 visent encore `.113`. Il faut donc faire l'étape 2 (`configure_lan.ps1 -Restart`) puis l'étape 6 (reconstruire l'APK) avant le test. Le Wi-Fi est toujours en profil **Public** et la règle « School Managing API (LAN) » est toujours absente (constat en lecture seule, voir [integration-matrix.md](integration-matrix.md) § 8). Les étapes 14 bis à 14 quater ajoutent la communication et le forum.
+
 ## Déroulé
 
 ```
@@ -59,6 +61,17 @@ PC + téléphone même Wi-Fi
 12. [ ] **Paiement.** Confirmer → « Paiement réussi », référence `PAY-…`.
 13. [ ] **Reçu.** « Télécharger le reçu » : le PDF s'ouvre avec le nom de l'établissement de démonstration et non le logo School Managing.
 14. [ ] **Historique.** Retour à Finance : facture **Payée**, paiement dans l'historique, plus de bouton « Payer ». Solde du wallet : 25 000.
+14 bis. [ ] **Notification en direct.** Le Pixel reste sur l'accueil (« Connecté en direct »). Sur le PC, le poste d'administration est connecté avec **`demo.admin`** (pas `admin`, qui est l'école `TEST01`). Dans Communication → Forum, il publie une **annonce** dans un espace école ouvert aux parents. Sur le Pixel, sans rafraîchir : le badge des notifications augmente et l'annonce apparaît dans les notifications.
+
+14 ter. [ ] **Forum.** Sur le Pixel : Messages → onglet **Forum** → l'espace et l'annonce s'affichent. L'annonce est en lecture seule : pas de zone de réponse. Depuis le poste, publier une **discussion** ordinaire dans le même espace. Le Pixel est notifié (« Nouveau sujet : … ») et « Ouvrir la discussion » l'ouvre. Répondre depuis le Pixel : le poste reçoit la notification « Forum » en direct et voit la réponse dans la discussion.
+
+14 quater. [ ] **Verrouillage et reconnexion.** Depuis le poste, verrouiller la discussion avec un motif. Sur le Pixel, une nouvelle réponse est refusée avec « Cette discussion est verrouillée », puis le bandeau « Verrouillé » et le motif s'affichent. Ensuite :
+   1. couper le Wi-Fi du Pixel ;
+   2. depuis le poste, envoyer un message au parent (Communication → Messagerie) ;
+   3. rallumer le Wi-Fi.
+
+   Attendu : le message et sa notification arrivent sans relancer l'application.
+
 15. [ ] **Contre-épreuves, si le temps le permet :**
     - parent B (`parent.b@demo-ecole.test`) : « Solde du portefeuille insuffisant : aucun débit » ;
     - Wi-Fi coupé pendant un paiement : message, puis « Réessayer » sans second débit.
@@ -72,4 +85,5 @@ PC + téléphone même Wi-Fi
 | 6–7 APK et permission |  |  |
 | 8–9 connexion et enfant |  |  |
 | 10–14 facture → historique |  |  |
+| 14 bis–quater notifications, forum, reconnexion |  |  |
 | 15 contre-épreuves |  |  |
