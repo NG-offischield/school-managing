@@ -156,6 +156,20 @@ class AuthService extends ChangeNotifier {
     _signedOut(notice: 'Vous êtes déconnecté.');
   }
 
+  /// The user switches to ANOTHER server: the old one is told if it still
+  /// answers within [serverTimeout] (after a network change it usually does
+  /// not), and the local session is dropped in every case — access token,
+  /// identity, remembered refresh token. Nothing of the old school survives.
+  Future<void> leaveServer({Duration serverTimeout = const Duration(seconds: 3)}) async {
+    try {
+      if (api.accessToken != null) await api.post('auth/logout/').timeout(serverTimeout);
+    } catch (_) {
+      // Unreachable, revoked or slow: the local session is closed anyway.
+    }
+    await _clear();
+    _signedOut(notice: 'Serveur changé : connectez-vous sur le nouveau serveur.');
+  }
+
   /// Session refused by the server (refresh failed, suspended account...).
   Future<void> expire([String message = 'Votre session a expiré : reconnectez-vous.']) async {
     await _clear();

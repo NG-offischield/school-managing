@@ -59,10 +59,16 @@ void main() {
           .map((f) => f.readAsStringSync())
           .join('\n');
       expect(sources, isNot(matches(RegExp(r'https?://\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}'))));
-      expect(sources, contains('AppConfig.fromEnvironment()'));
-      expect(sources, contains('LocalNetworkGate('));
+      // Address: saved at runtime, else the build's dart-defines (ServerHost), never a literal.
+      expect(sources, contains('ServerHost('));
+      expect(sources, contains("String.fromEnvironment('API_URL')"));
+      expect(sources, contains("String.fromEnvironment('WS_URL')"));
     });
   }
+
+  test('ServerHost keeps the Android 17 local network gate for every server', () {
+    expect(read('lib/src/ui/server_settings.dart'), contains('LocalNetworkGate('));
+  });
 
   test('camera: the guardian app only (mobile_scanner, minSdk-compatible), never the others', () {
     for (final name in apps) {

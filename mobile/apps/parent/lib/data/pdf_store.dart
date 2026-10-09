@@ -15,6 +15,9 @@ abstract class PdfStore {
 
   /// Shows the saved file with the phone's PDF viewer; false when none can.
   Future<bool> open(String path);
+
+  /// Server switch: the documents of the old school leave the phone.
+  Future<void> clear();
 }
 
 class DevicePdfStore extends PdfStore {
@@ -32,6 +35,17 @@ class DevicePdfStore extends PdfStore {
 
   @override
   Future<bool> open(String path) => openDocument(path); // school_core: FileProvider, cache/shared/ only
+
+  @override
+  Future<void> clear() async {
+    // documents/ (saved PDFs) and cache/shared/ (the copies handed to the PDF viewer).
+    for (final folder in [
+      Directory('${(await getApplicationDocumentsDirectory()).path}/documents'),
+      Directory('${(await getTemporaryDirectory()).path}/shared'),
+    ]) {
+      if (await folder.exists()) await folder.delete(recursive: true);
+    }
+  }
 }
 
 /// Tests: keeps the files in memory.
@@ -54,5 +68,11 @@ class MemoryPdfStore extends PdfStore {
   Future<String> save(String name, Uint8List bytes) async {
     files[name] = bytes;
     return 'memory://$name';
+  }
+
+  @override
+  Future<void> clear() async {
+    files.clear();
+    opened.clear();
   }
 }

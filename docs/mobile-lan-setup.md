@@ -110,7 +110,9 @@ Pendant le test, couper les données mobiles du téléphone.
 
 ## 8. `API_URL`
 
-L'adresse est fixée **à la compilation**, sans aucune adresse par défaut ni IP écrite dans les sources :
+L'adresse du serveur se règle **dans l'application**, sans recompiler : « Changer de serveur » sur l'écran de connexion, ou Profil → « Serveur ». On saisit `http://<IPv4 du PC>:8000`, on teste (`GET /api/v1/health/` réel), puis on enregistre. La procédure complète est dans [reseau-local.md](reseau-local.md).
+
+Une **valeur initiale** peut aussi être donnée à la compilation. C'est facultatif : sans elle, l'application s'ouvre sur l'écran « Serveur ». Il n'y a ni adresse par défaut ni IP écrite dans les sources.
 
 ```powershell
 flutter run --dart-define=API_URL=http://192.168.1.100:8000/api/v1/
@@ -204,8 +206,8 @@ Avec un compte parent autorisé à payer (`can_pay`) et un portefeuille ouvert p
 | « Le serveur ne répond pas » | pare-feu / profil Public, autre Wi-Fi, permission Android 17 refusée | §6, §7, §10 |
 | HTTP 400 | IP absente de `DJANGO_ALLOWED_HOSTS` | §5 |
 | marche depuis le PC, pas depuis le téléphone | réseau invité / isolation AP, pare-feu | §6, §7 |
-| « Configuration du serveur » au lancement | APK compilé sans `API_URL`, ou adresse publique en HTTP | §8 |
-| ancienne adresse sur l'écran de connexion | APK compilé avant un changement de réseau | recompiler |
+| écran « Serveur de l'établissement » au lancement | aucune adresse enregistrée ni compilée | saisir l'adresse, tester, enregistrer (§8) |
+| ancienne adresse sur l'écran de connexion | adresse d'un autre réseau | « Changer de serveur » (§8), sans recompiler |
 
 ## 18. Changement d'IP (nouvelle box, autre réseau, bail DHCP)
 
@@ -213,7 +215,7 @@ Avec un compte parent autorisé à payer (`can_pay`) et un portefeuille ouvert p
 powershell -ExecutionPolicy Bypass -File mobile\tools\configure_lan.ps1 -Restart
 ```
 
-Puis recompiler et réinstaller les APK, puisque l'adresse est figée dans l'APK. Pour éviter les changements, réserver une adresse fixe pour le PC dans la box (réservation DHCP).
+Puis, dans chaque application : « Changer de serveur » → nouvelle adresse → « Tester la connexion » → « Enregistrer ». **Rien n'est recompilé ni réinstallé.** Pour éviter les changements, réserver une adresse fixe pour le PC dans la box (réservation DHCP).
 
 ## Ce qui a été vérifié, et sur quoi
 

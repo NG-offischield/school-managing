@@ -54,6 +54,8 @@ class ProfileScreen extends StatelessWidget {
               ],
             ),
           ),
+          // Server of the school (another network = another address, no rebuild).
+          const ServerSettingsTile(),
           const SizedBox(height: 20),
           OutlinedButton.icon(
             key: const Key('profile.logout'),

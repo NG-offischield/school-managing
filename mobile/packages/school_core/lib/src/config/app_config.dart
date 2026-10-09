@@ -1,11 +1,15 @@
 /// Where the apps find the Django backend — ONE place for the four apps.
 ///
-/// The address is given at build time, never written in the sources:
+/// The address is never written in the sources. By priority (ServerHost):
 ///
-///   flutter run --dart-define-from-file=../../config/lan.json
-///   `flutter run --dart-define=API_URL=http://<IPv4 du PC>:8000/api/v1/`
+///   1. the server saved by the user in the app (« Serveur », runtime, no rebuild):
+///      [AppConfig.server], e.g. `http://<IPv4 du PC>:8000`;
+///   2. the build's initial value:
+///      flutter run --dart-define-from-file=../../config/lan.json
+///      `flutter run --dart-define=API_URL=http://<IPv4 du PC>:8000/api/v1/`
+///   3. none: the app opens on the server settings screen (no default address).
 ///
-///   API_URL  REST base, e.g. http://192.168.1.10:8000/api/v1/   (required)
+///   API_URL  REST base, e.g. http://192.168.1.10:8000/api/v1/
 ///   WS_URL   WebSocket, e.g. ws://192.168.1.10:8000/ws/v1/realtime/
 ///            (optional: derived from API_URL, same host and port)
 ///
@@ -76,8 +80,41 @@ class AppConfig {
     return AppConfig._(api, socket);
   }
 
+  /// ONE server address typed by the user at runtime ("http://192.168.1.20:8000"):
+  /// the REST base and the WebSocket are built from it with the backend's own
+  /// paths (`/api/v1/`, `/ws/v1/realtime/` — the same as lan.json), so the two
+  /// can never point at different hosts. No scheme = http (LAN). Refused:
+  /// user:password@, a query or fragment, another path; then the same
+  /// clear-text rules as [AppConfig.parse].
+  factory AppConfig.server(String address, {bool release = kReleaseMode}) {
+    var raw = address.trim();
+    if (raw.isEmpty) throw AppConfigException('Saisissez l\'adresse du serveur, par exemple http://<IPv4 du PC>:8000.');
+    if (!raw.contains('://')) raw = 'http://$raw';
+    final uri = Uri.tryParse(raw);
+    if (uri == null || !(uri.scheme == 'http' || uri.scheme == 'https') || uri.host.isEmpty) {
+      throw AppConfigException('Adresse incorrecte : « ${address.trim()} ». Attendu : http://hôte:port.');
+    }
+    if (uri.userInfo.isNotEmpty) {
+      throw AppConfigException('Adresse refusée : elle ne doit contenir ni identifiant ni mot de passe.');
+    }
+    if (uri.hasQuery || uri.hasFragment) {
+      throw AppConfigException('Adresse incorrecte : ni « ? » ni « # » dans l\'adresse du serveur.');
+    }
+    final path = uri.path.replaceAll(RegExp(r'/+$'), '');
+    if (path.isNotEmpty && path != '/api/v1') {
+      throw AppConfigException('Adresse incorrecte : saisissez seulement http://hôte:port (sans chemin).');
+    }
+    return AppConfig.parse(
+      apiUrl: '${uri.replace(path: '')}/api/v1/',
+      release: release,
+    );
+  }
+
   /// REST base, always ending with '/'.
   final Uri api;
+
+  /// The server as the user types it: "http://192.168.1.20:8000" (stored, shown).
+  String get serverAddress => api.replace(path: '').toString();
 
   /// Live endpoint (ws/v1/realtime/).
   final Uri socket;

@@ -6,6 +6,7 @@ import '../auth/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import 'activation_screen.dart';
+import 'server_settings.dart';
 
 /// Second way in, under the sign-in form: account activation (accounts
 /// created by the school) or self-registration (parents). The screen it
@@ -197,6 +198,14 @@ class _SignInScreenState extends State<SignInScreen> {
                           textAlign: TextAlign.center,
                           style: const TextStyle(color: Tokens.textSecondary, fontSize: 12),
                         ),
+                        // Another network, another PC address: change it here, no rebuild (ServerHost).
+                        if (ServerScope.maybeOf(context) case final control?)
+                          TextButton.icon(
+                            key: const Key('login.server.change'),
+                            onPressed: _busy ? null : () => openServerSettings(context, control),
+                            icon: const Icon(Icons.dns_outlined, size: 18),
+                            label: const Text('Changer de serveur'),
+                          ),
                       ],
                     ),
                   ),

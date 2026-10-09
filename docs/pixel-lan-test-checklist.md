@@ -24,7 +24,9 @@ Chaque case ne se coche qu'avec un résultat **réellement observé**.
 
 **Le test applicatif sur le Pixel n'a pas encore été réalisé.**
 
-> **Mise à jour du 9 octobre 2026.** L'IPv4 du PC est passée à `192.168.1.102` (nouveau bail DHCP). `.env`, `lan.json` et l'APK du 05/10 visent encore `.113`. Il faut donc faire l'étape 2 (`configure_lan.ps1 -Restart`) puis l'étape 6 (reconstruire l'APK) avant le test. Le Wi-Fi est toujours en profil **Public** et la règle « School Managing API (LAN) » est toujours absente (constat en lecture seule, voir [integration-matrix.md](integration-matrix.md) § 8). Les étapes 14 bis à 14 quater ajoutent la communication et le forum.
+> **Mise à jour du 9 octobre 2026.** L'IPv4 du PC est passée à `192.168.1.102` (nouveau bail DHCP). `.env`, `lan.json` et l'APK du 05/10 visent encore `.113`. Il faut donc faire l'étape 2 (`configure_lan.ps1 -Restart`) avant le test. Le Wi-Fi est toujours en profil **Public** et la règle « School Managing API (LAN) » est toujours absente (constat en lecture seule, voir [integration-matrix.md](integration-matrix.md) § 8). Les étapes 14 bis à 14 quater ajoutent la communication et le forum.
+
+> **Mise à jour : adresse réglable dans l'application.** Le test se fera plus tard, **sur un autre réseau local**. L'APK Parent debug est désormais construit **sans adresse compilée** : au premier lancement, il s'ouvre sur « Serveur de l'établissement ». On y saisit l'adresse affichée par `configure_lan.ps1` sur ce réseau-là, sans recompiler (étapes 6 bis et 6 ter). Les constats ci-dessus valaient pour l'ancien réseau.
 
 ## Déroulé
 
@@ -38,7 +40,7 @@ PC + téléphone même Wi-Fi
 ```
 
 1. [ ] **Même Wi-Fi.** Le PC et le Pixel sont sur le Wi-Fi principal de la box (pas le réseau invité). Couper les données mobiles du Pixel.
-2. [ ] **IP du PC.** `ipconfig` : relever l'IPv4 de la carte qui a une passerelle. Si elle a changé, lancer `powershell -ExecutionPolicy Bypass -File mobile\tools\configure_lan.ps1 -Restart`, puis reconstruire l'APK (étape 6).
+2. [ ] **IP du PC.** Lancer `powershell -ExecutionPolicy Bypass -File mobile\tools\configure_lan.ps1 -Restart`. Noter l'interface choisie et la ligne « Adresse à saisir dans les applications ». Si le script signale plusieurs interfaces, relancer avec `-InterfaceAlias "<nom>"`.
 3. [ ] **Backend.** `docker compose up -d` ; `curl http://<IPv4>:8000/api/v1/health/` → 200.
 4. [ ] **Données de démonstration** dans la base utilisée par `web` (une seule fois) :
    ```powershell
@@ -47,13 +49,24 @@ PC + téléphone même Wi-Fi
    Remove-Item Env:DEMO_PASSWORD
    ```
 5. [ ] **Port 8000 depuis le téléphone.** Ouvrir `http://<IPv4>:8000/api/v1/health/` dans le navigateur du Pixel. Attendu : `{"success":true,"data":{"status":"ok"},…}`.
-6. [ ] **APK Parent.** Si l'IP n'a pas changé, l'APK existant convient. Sinon :
+6. [ ] **APK Parent.** Installer l'APK construit **sans adresse compilée**. Il n'a pas à être reconstruit quand le réseau change :
    ```powershell
    cd mobile\apps\parent
-   flutter build apk --debug --dart-define-from-file=../../config/lan.json
+   flutter build apk --debug          # seulement si l'APK n'existe pas encore
+   adb install -r build\app\outputs\flutter-apk\app-debug.apk
    ```
-   Puis l'installer : `adb install -r build\app\outputs\flutter-apk\app-debug.apk`. L'USB sert seulement à installer ; **pas d'`adb reverse`**.
-7. [ ] **Lancement et réseau local.** Android 17 affiche d'abord « Accès au réseau local », puis la fenêtre « Appareils à proximité » : **autoriser**. L'écran de connexion affiche « Serveur : <IPv4>:8000 ».
+   L'USB sert seulement à installer ; **pas d'`adb reverse`**.
+6 bis. [ ] **Adresse du serveur dans l'application.** Au premier lancement, l'écran « Serveur de l'établissement » s'ouvre.
+   1. Saisir l'adresse de l'étape 2.
+   2. **« Tester la connexion ».** Sur Android 17, la fenêtre « Appareils à proximité » (réseau local) s'affiche à ce moment-là : **autoriser**.
+   3. Attendu : « Serveur joignable ». Tout autre message se note tel quel : inaccessible, délai dépassé, HTTP 400, refus d'Android.
+   4. « Enregistrer », puis confirmer.
+6 ter. [ ] **Changement de serveur sans recompiler.**
+   1. Profil → « Serveur ».
+   2. Saisir une adresse fausse, par exemple un autre port, puis « Tester ». Attendu : un message d'erreur, et non un faux succès.
+   3. Ressaisir la bonne adresse, « Enregistrer », puis confirmer.
+   4. Attendu : l'application revient à la connexion et affiche le nouveau serveur.
+7. [ ] **Lancement et réseau local.** Si Android 17 n'a pas encore demandé l'accès, il affiche « Accès au réseau local », puis la fenêtre « Appareils à proximité » : **autoriser**. L'écran de connexion affiche « Serveur : <IPv4>:8000 ».
 8. [ ] **Connexion.** Compte `parent.a@demo-ecole.test` avec le mot de passe de démonstration. L'accueil s'affiche et l'icône « Connecté en direct » confirme le WebSocket.
 9. [ ] **Liste enfant.** Léa Mbarga (6e A) apparaît, et elle seule.
 10. [ ] **Facture.** Finance : la facture « Frais de scolarité » de Léa (numéro `F26-…` attribué par Finance), **75 000 XAF**, à payer, échéance visible.
@@ -82,7 +95,7 @@ PC + téléphone même Wi-Fi
 | Étape | OK / KO | Remarque |
 |---|---|---|
 | 1–5 réseau |  |  |
-| 6–7 APK et permission |  |  |
+| 6–7 APK, adresse du serveur et permission |  |  |
 | 8–9 connexion et enfant |  |  |
 | 10–14 facture → historique |  |  |
 | 14 bis–quater notifications, forum, reconnexion |  |  |
