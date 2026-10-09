@@ -251,4 +251,52 @@ void main() {
     expect(find.text('Annonce'), findsOneWidget);
     expect(find.byKey(const Key('forum.new')), findsOneWidget); // a space where members may write
   });
+
+  Future<void> openComposer(WidgetTester tester, Harness h, FakeTeacher who) async {
+    await h.start(tester);
+    await h.login(tester, who);
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Messages')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(Tab, 'Messages'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('conversations.new')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('compose.parent')));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('teacher -> parent: only the parents the server offers, about one pupil', (tester) async {
+    final h = Harness();
+    await openComposer(tester, h, h.fake.a);
+    expect(h.fake.requests.where((r) => r.url.path.endsWith('teacher/contacts/')), hasLength(1));
+    expect(find.text('Awa Bella'), findsOneWidget);
+    expect(find.text('Paul Parent'), findsOneWidget);
+    expect(find.text('Père'), findsOneWidget);
+    expect(find.text('Aucun parent vérifié.'), findsOneWidget); // Boris: nobody to write to
+    await tester.enterText(find.byKey(const Key('contacts.filter')), 'bor');
+    await tester.pumpAndSettle();
+    expect(find.text('Awa Bella'), findsNothing); // the filter only narrows the server's list
+    await tester.enterText(find.byKey(const Key('contacts.filter')), '');
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('message.body')), 'Bonjour, un point sur le devoir.');
+    await tester.pumpAndSettle();
+    final send = find.byKey(const Key('message.send'));
+    expect(tester.widget<ButtonStyleButton>(send).onPressed, isNull); // no parent chosen yet
+    await tester.tap(find.byKey(const Key('parent.s0.m-pa')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(send);
+    await tester.tap(send);
+    await tester.pumpAndSettle();
+    expect(h.fake.started, hasLength(1));
+    expect(h.fake.started.single['conversation_type'], 'PARENT_TEACHER');
+    expect(h.fake.started.single['student'], 's0');
+    expect(h.fake.started.single['participants'], ['m-pa']);
+  });
+
+  testWidgets('teacher -> parent: nobody to contact without pupils (server scope)', (tester) async {
+    final h = Harness();
+    await openComposer(tester, h, h.fake.b);
+    expect(find.byKey(const Key('contacts.empty')), findsOneWidget);
+    expect(find.text('Paul Parent'), findsNothing);
+  });
 }

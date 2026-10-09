@@ -121,6 +121,7 @@ class FakeApi {
   final refreshes = <String, FakeTeacher>{};
   final suspended = <String>{};
   final checkIns = <String, String>{};
+  final started = <Map<String, dynamic>>[]; // POST /conversations/ bodies accepted
   String activationCode = 'K7Q2-M9XA-4TZP-QH3W-B8NC';
   bool activationUsed = false;
   bool offline = false;
@@ -301,6 +302,37 @@ class FakeApi {
       if (row == null) return fail(404, 'NOT_FOUND');
       row['is_read'] = true;
       return ok(row);
+    }
+    // Teacher contacts: the server scopes them to the pupils I teach (A only here).
+    if (path == 'teacher/contacts/') {
+      if (who.key != 'ta') return ok(<Map>[]);
+      return ok([
+        {
+          'student': 's0',
+          'name': 'Awa Bella',
+          'parents': [
+            {'member': 'm-pa', 'name': parent.name, 'relationship': 'FATHER'},
+          ],
+        },
+        {'student': 's1', 'name': 'Boris Eto', 'parents': <Map>[]},
+      ]);
+    }
+    if (path == 'conversations/' && request.method == 'POST') {
+      // The server re-checks the pair (teacher of the pupil + verified parent).
+      if (body['conversation_type'] == 'PARENT_TEACHER' &&
+          !(who.key == 'ta' && body['student'] == 's0' && (body['participants'] as List).join() == 'm-pa')) {
+        return fail(403, 'PERMISSION_DENIED');
+      }
+      started.add(body);
+      return ok({
+        'id': 'cv-new',
+        'conversation_type': body['conversation_type'],
+        'title': body['title'] ?? '',
+        'student': body['student'],
+        'participants': <Map>[],
+        'unread_count': 0,
+        'last_message_at': null,
+      }, status: 201);
     }
     if (path == 'conversations/') {
       final rows = who.key == 'ta'

@@ -10,6 +10,8 @@ Private messaging:
     GET  /conversations/{id}/         GET/POST /conversations/{id}/messages/ (multipart: attachments)
     POST /conversations/{id}/read/    POST /conversations/{id}/participants/ (administration)
     DELETE /messages/{id}/            own message only, hidden not destroyed
+    GET  /teacher/contacts/           (?student=)  teacher only: the pupils I teach now and
+                                      their verified parents (who I may write to)
 Forum:
     GET  /forum/spaces/               POST /admin/forum/spaces/
     GET/POST /forum/threads/          (?space=)
@@ -712,6 +714,37 @@ class ComplaintAttachments(ComplaintMixin, APIView):
 
 
 # =============================================================================
+# Teacher contacts (parent–teacher conversations)
+# =============================================================================
+
+
+class TeacherContacts(SchoolScopedMixin, APIView):
+    """Mirror of GET /parents/children/{id}/teachers/: the pupils a teacher
+    teaches now, each with the verified parents he or she may write to. No
+    e-mail or phone; no search over the school's parents."""
+
+    permission_classes = [HasSchoolRole]
+    required_roles = {"TEACHER"}
+
+    def get(self, request):
+        links = access.teacher_contacts(self.membership())
+        student = self.uuid_param("student")
+        if student:
+            links = links.filter(student_id=student)
+        pupils = {}
+        for link in links:
+            entry = pupils.setdefault(
+                link.student_id,
+                {"student": str(link.student_id), "name": link.student.full_name, "parents": []},
+            )
+            member = link.parent.membership
+            entry["parents"].append(
+                {"member": str(member.pk), "name": member.user.full_name, "relationship": link.relationship_type}
+            )
+        return Response(list(pupils.values()))
+
+
+# =============================================================================
 # Administration directory (ADR 0023)
 # =============================================================================
 
@@ -815,5 +848,6 @@ urlpatterns = [
     path("complaints/<uuid:pk>/attachments/", ComplaintAttachments.as_view()),
     path("admin/complaints/<uuid:pk>/status/", AdminComplaintStatus.as_view()),
     path("admin/communication/members/", AdminMembers.as_view()),
+    path("teacher/contacts/", TeacherContacts.as_view()),
     path("attachments/<str:kind>/<uuid:pk>/download/", AttachmentDownload.as_view()),
 ]

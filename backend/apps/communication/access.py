@@ -7,8 +7,9 @@ Relations are read from the existing domains, never copied:
   pupil is actively enrolled in (gradebook.Course, people.StudentEnrollment).
 """
 
+from apps.accounts.models import MembershipStatus
 from apps.gradebook.models import Course
-from apps.people.models import EnrollmentStatus, ParentStudent
+from apps.people.models import EnrollmentStatus, ParentStudent, StudentEnrollment
 from common.permissions import ADMIN_ROLES, membership_has_role
 
 from .models import ConversationParticipant
@@ -42,6 +43,34 @@ def teaches(membership, student):
             school_class__enrollments__student=student,
             school_class__enrollments__status=EnrollmentStatus.ACTIVE,
         ).exists()
+    )
+
+
+def teacher_contacts(membership):
+    """Parent links a teacher may write to: the verified parents (active
+    PARENT members) of the pupils he or she teaches NOW — exactly the pairs
+    `teaches` + `parent_of` accept, never a search over the whole school."""
+    if not membership_has_role(membership, {"TEACHER"}):
+        return ParentStudent.objects.none()
+    taught = StudentEnrollment.objects.filter(
+        school=membership.school,
+        status=EnrollmentStatus.ACTIVE,
+        school_class__courses__active=True,
+        school_class__courses__teacher__employee__membership=membership,
+    ).values("student")
+    return (
+        ParentStudent.objects.filter(
+            school=membership.school,
+            student__in=taught,
+            active=True,
+            identity_verified=True,
+            parent__membership__status=MembershipStatus.ACTIVE,
+            parent__membership__membership_roles__active=True,
+            parent__membership__membership_roles__role__code="PARENT",
+        )
+        .distinct()
+        .select_related("student", "parent__membership__user")
+        .order_by("student__last_name", "student__first_name", "student_id", "parent__membership__user__last_name")
     )
 
 

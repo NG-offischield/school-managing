@@ -8,6 +8,8 @@
 ///   GET  /planning/changes/?session=        changes concerning me
 ///   POST /teacher/sessions/{id}/check-in/   self-declared presence (verified later)
 ///   GET  /teacher/payroll/?date_from&date_to    own remuneration (live)
+///   GET  /teacher/contacts/                 pupils I teach now + their verified parents
+///                                           (who I may write to; the server re-checks on send)
 ///   communication (notifications, conversations, complaints): CommunicationRepository (school_core)
 library;
 
@@ -53,4 +55,8 @@ class TeacherRepository extends CommunicationRepository {
     (await api.get('teacher/payroll/', params: {'date_from': _day.format(from), 'date_to': _day.format(to)}) as Map)
         .cast<String, dynamic>(),
   );
+
+  Future<List<PupilContacts>> contacts() async => ((await api.get('teacher/contacts/') as List?) ?? const [])
+      .map((p) => PupilContacts.fromJson((p as Map).cast<String, dynamic>()))
+      .toList();
 }

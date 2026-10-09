@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:school_core/school_core.dart';
 
+import '../communication/new_conversation_screen.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../planning/planning_screen.dart';
 import '../profile/profile_screen.dart';
@@ -53,7 +54,10 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           children: [
             DashboardScreen(onOpenTab: open),
             const PlanningScreen(),
-            const CommunicationScreen(forum: true),
+            CommunicationScreen(
+              forum: true,
+              composeConversation: (context) => openAbove<Conversation>(context, const NewConversationScreen()),
+            ),
             const ProfileScreen(),
           ],
         ),

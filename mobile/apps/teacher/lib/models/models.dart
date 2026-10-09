@@ -126,3 +126,45 @@ class PaySummary {
   final String paid;
   final Map<String, dynamic> sessions;
 }
+
+const relationships = {
+  'FATHER': 'Père',
+  'MOTHER': 'Mère',
+  'LEGAL_GUARDIAN': 'Tuteur légal',
+  'TUTOR': 'Tuteur',
+  'OTHER': 'Autre',
+};
+
+/// A verified parent of one of my pupils, as offered by the server.
+class ParentContact {
+  ParentContact({required this.member, required this.name, required this.relationship});
+
+  factory ParentContact.fromJson(Map<String, dynamic> json) => ParentContact(
+    member: '${json['member']}',
+    name: (json['name'] as String?) ?? '',
+    relationship: (json['relationship'] as String?) ?? '',
+  );
+
+  final String member;
+  final String name;
+  final String relationship;
+
+  String get relationshipLabel => relationships[relationship] ?? relationship;
+}
+
+/// A pupil I teach now and the parents I may write to about him or her.
+class PupilContacts {
+  PupilContacts({required this.student, required this.name, required this.parents});
+
+  factory PupilContacts.fromJson(Map<String, dynamic> json) => PupilContacts(
+    student: '${json['student']}',
+    name: (json['name'] as String?) ?? '',
+    parents: ((json['parents'] as List?) ?? const [])
+        .map((p) => ParentContact.fromJson((p as Map).cast<String, dynamic>()))
+        .toList(),
+  );
+
+  final String student;
+  final String name;
+  final List<ParentContact> parents;
+}
