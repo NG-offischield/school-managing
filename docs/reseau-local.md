@@ -39,14 +39,22 @@ L'émulateur Android joint le PC par `10.0.2.2`.
    ```
 
    Le script :
-   - trouve l'IPv4 du PC sur le réseau de la box (interface qui a une passerelle). Les adaptateurs VirtualBox, Hyper-V et les adresses `169.254.x.x` sont ignorés ;
-   - met à jour `DJANGO_ALLOWED_HOSTS` dans `.env` : il garde `localhost` et `127.0.0.1`, retire l'ancienne adresse LAN et ajoute la nouvelle. Il n'utilise jamais `*` ;
-   - écrit `mobile/config/lan.json` ;
+   - **choisit l'interface réellement reliée à la box.** Il retient un adaptateur actif, avec une passerelle IPv4 et une adresse privée (hors `169.254.x.x`). Il ignore les interfaces déconnectées, le loopback, le Bluetooth, VirtualBox / VMware Host-Only et Hyper-V / WSL (`vEthernet`) ;
+   - **s'arrête s'il trouve plusieurs candidates**, en les listant, au lieu d'en prendre une au hasard. On relance alors avec `-InterfaceAlias "<nom>"` : celle du Wi-Fi ou du câble utilisé par les téléphones. `-ListInterfaces` affiche chaque interface avec la raison de son choix ou de son rejet, sans rien modifier ;
+   - met à jour `DJANGO_ALLOWED_HOSTS` dans `.env` : il garde `localhost` et `127.0.0.1`, retire l'ancienne adresse LAN et ajoute la nouvelle. Il n'utilise jamais `*`. Il n'affiche que la liste des hôtes acceptés, **jamais le reste de `.env`** ;
+   - écrit `mobile/config/lan.json`, qui ne sert plus que de valeur initiale facultative ;
    - redémarre le conteneur `web` (`-Restart`) pour que Django relise `.env` ;
    - vérifie `http://<IP>:8000/api/v1/health/` ;
-   - affiche le profil réseau Windows et l'état du pare-feu, avec les commandes administrateur à lancer si besoin. **Il ne modifie aucun réglage système.**
+   - affiche :
+     - l'interface et l'IPv4 retenues ;
+     - le profil réseau Windows ;
+     - les règles de pare-feu qui ouvrent le port (y compris celles de Docker Desktop sur le profil Public) ;
+     - **l'adresse à saisir dans les applications** ;
+     - la liste des **vérifications restantes**, avec les commandes administrateur à lancer.
 
-   Pour imposer une adresse : `... configure_lan.ps1 -Ip 192.168.0.42 -Restart`.
+     **Il ne modifie aucun réglage système.**
+
+   Pour imposer une adresse : `... configure_lan.ps1 -Ip 192.168.0.42 -Restart`. Pour imposer une interface : `... configure_lan.ps1 -InterfaceAlias "Wi-Fi" -Restart`.
 
 4. Lire l'adresse affichée par le script, à la ligne « Adresse à saisir dans les applications », par exemple `http://192.168.1.102:8000`.
 5. Ouvrir l'application sur le téléphone : Parent, Enseignant, Personnel ou Gardien.
