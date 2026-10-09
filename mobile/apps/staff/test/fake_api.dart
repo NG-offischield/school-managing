@@ -338,6 +338,29 @@ class FakeApi {
       }
       return page(complaints);
     }
+    // Forum (EXISTING API): the server decides the spaces of the member.
+    if (path == 'forum/spaces/') {
+      return ok([
+        {'id': 'sp1', 'name': 'Vie de l\x27école', 'announcements_only': false},
+      ]);
+    }
+    if (path == 'forum/threads/') {
+      return ok(
+        [
+          {
+            'id': 'th1',
+            'space': 'sp1',
+            'title': 'Réunion de rentrée',
+            'thread_type': 'ANNOUNCEMENT',
+            'status': 'OPEN',
+            'author_name': 'Direction',
+            'created_at': '2026-10-08T08:00:00+01:00',
+            'last_post_at': '2026-10-08T08:00:00+01:00',
+          },
+        ],
+        meta: {'count': 1, 'next': null},
+      );
+    }
     return fail(404, 'NOT_FOUND');
   }
 }

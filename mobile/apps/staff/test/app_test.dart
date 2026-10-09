@@ -215,4 +215,16 @@ void main() {
       expect(tester.takeException(), isNull, reason: label);
     }
   });
+
+  testWidgets('forum: the school forum is offered (spaces decided by the server)', (tester) async {
+    final h = Harness();
+    await h.start(tester);
+    await h.login(tester, h.fake.a);
+    await h.tab(tester, 'Messages');
+    await tester.tap(find.widgetWithText(Tab, 'Forum'));
+    await tester.pumpAndSettle();
+    expect(find.text('Réunion de rentrée'), findsOneWidget);
+    expect(find.text('Annonce'), findsOneWidget);
+    expect(find.byKey(const Key('forum.new')), findsOneWidget); // a space where members may write
+  });
 }

@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import 'composers.dart';
 import 'conversation_screen.dart';
+import 'forum_screen.dart';
 import 'live_state.dart';
 
 /// Notifications, messages and complaints of the parent (existing
@@ -16,19 +17,25 @@ import 'live_state.dart';
 typedef Composer<T> = Future<T?> Function(BuildContext context);
 
 /// Notifications, and — only for the roles the server lets use them —
-/// messages and complaints (spec §8: guardians have no messaging; complaints
-/// are filed by parents and teachers). The server re-checks every action.
+/// messages, complaints and the school forum (spec §8: guardians have no
+/// messaging and no forum; complaints are filed by parents and teachers).
+/// Forum (collective) and messages (private) stay separate tabs. The server
+/// re-checks every action.
 class CommunicationScreen extends StatelessWidget {
   const CommunicationScreen({
     super.key,
     this.messaging = true,
     this.complaints = true,
+    this.forum = false,
     this.composeConversation,
     this.composeComplaint,
   });
 
   final bool messaging;
   final bool complaints;
+
+  /// The school forum (parents, teachers, staff); off by default (guardians).
+  final bool forum;
 
   /// New conversation; default: a message to the administration.
   final Composer<Conversation>? composeConversation;
@@ -52,6 +59,7 @@ class CommunicationScreen extends StatelessWidget {
           'Réclamations',
           ComplaintsTab(compose: composeComplaint ?? (c) => openAbove<Complaint>(c, const ComplaintComposer())),
         ),
+      if (forum) ('Forum', const ForumTab()),
     ];
     if (tabs.length == 1) {
       return Scaffold(
@@ -142,6 +150,18 @@ class _NotificationsTabState extends State<NotificationsTab> {
             const SizedBox(height: 10),
             if (notification.at != null)
               Text(dateTime.format(notification.at!), style: const TextStyle(color: Tokens.textSecondary)),
+            if (notification.threadId != null) ...[
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                key: const Key('notification.thread'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  openAbove<void>(context, ForumThreadScreen(threadId: notification.threadId!));
+                },
+                icon: const Icon(Icons.forum_outlined),
+                label: const Text('Ouvrir la discussion'),
+              ),
+            ],
           ],
         ),
       ),

@@ -67,6 +67,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             const PlanningScreen(),
             const FinanceScreen(),
             CommunicationScreen(
+              forum: true, // the school forum (server-side membership; guardians excluded)
               composeConversation: (context) => openScreen<Conversation>(context, const NewConversationScreen()),
               composeComplaint: (context) {
                 final child = context.read<ChildScope>().selected;

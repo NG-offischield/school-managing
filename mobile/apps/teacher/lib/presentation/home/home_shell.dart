@@ -53,7 +53,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           children: [
             DashboardScreen(onOpenTab: open),
             const PlanningScreen(),
-            const CommunicationScreen(),
+            const CommunicationScreen(forum: true),
             const ProfileScreen(),
           ],
         ),

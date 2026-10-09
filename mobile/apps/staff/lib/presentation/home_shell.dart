@@ -53,7 +53,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             StaffHome(onOpenTab: open),
             const StaffPlanning(),
             const ScanScreen(),
-            const CommunicationScreen(complaints: false), // complaints: parents and teachers only
+            const CommunicationScreen(complaints: false, forum: true), // complaints: parents and teachers only
             const StaffProfile(),
           ],
         ),

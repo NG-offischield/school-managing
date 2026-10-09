@@ -7,11 +7,13 @@
 ///   GET  /conversations/ …/{id}/messages/  POST …/messages/  …/read/
 ///   POST /conversations/ {conversation_type, participants, student, title, body, client_id}
 ///   GET  /complaints/    POST /complaints/ {category, subject, description, student, submit}
+///   forum: GET /forum/spaces/  GET/POST /forum/threads/  GET/POST /forum/threads/{id}/posts/  (forum.dart)
 library;
 
 import 'dart:math';
 
 import '../api/api_client.dart';
+import 'forum.dart';
 
 /// Server datetimes carry the school's offset ("2026-10-05T08:00:00+01:00"):
 /// the wall-clock part is shown as is — the school's time, whatever the
@@ -63,6 +65,7 @@ const notificationTypes = {
   'MESSAGE': 'Message',
   'ANNOUNCEMENT': 'Annonce',
   'COMPLAINT': 'Réclamation',
+  'FORUM': 'Forum',
 };
 
 const complaintCategories = {
@@ -82,6 +85,7 @@ class AppNotification {
     required this.message,
     required this.read,
     required this.at,
+    this.payload = const {},
   });
 
   factory AppNotification.fromJson(Map<String, dynamic> json) => AppNotification(
@@ -92,6 +96,7 @@ class AppNotification {
     message: (json['message'] as String?) ?? '',
     read: json['is_read'] == true,
     at: schoolTime(json['created_at']),
+    payload: ((json['payload'] as Map?) ?? const {}).cast<String, dynamic>(),
   );
 
   final String id;
@@ -101,6 +106,12 @@ class AppNotification {
   final String message;
   final bool read;
   final DateTime? at;
+
+  /// What the notification is about (ids decided by the server), e.g. {thread, space}.
+  final Map<String, dynamic> payload;
+
+  /// The forum thread this notification opens (announcement, forum activity).
+  String? get threadId => payload['thread'] as String?;
 
   String get typeLabel => notificationTypes[type] ?? type;
 
@@ -292,4 +303,40 @@ class CommunicationRepository {
     );
     return Complaint.fromJson((data as Map).cast<String, dynamic>());
   }
+
+  // --- forum (ADR 0015): the server decides spaces, membership, locks, announcements -------------
+
+  Future<List<ForumSpace>> forumSpaces() async => ((await api.get('forum/spaces/') as List?) ?? const [])
+      .map((r) => ForumSpace.fromJson((r as Map).cast<String, dynamic>()))
+      .toList();
+
+  /// Threads, most recent activity first; [space] = one space, null = all mine.
+  Future<ForumPage<ForumThread>> forumThreads({String? space, int page = 1, int pageSize = 20}) async {
+    final result = await api.page('forum/threads/', page: page, pageSize: pageSize, params: {'space': space});
+    return ForumPage(result.rows.map(ForumThread.fromJson).toList(), hasNext: result.hasNext, page: page);
+  }
+
+  Future<ForumThread> forumThread(String id) async =>
+      ForumThread.fromJson((await api.get('forum/threads/$id/') as Map).cast<String, dynamic>());
+
+  /// Posts in reading order (oldest first).
+  Future<ForumPage<ForumPost>> forumPosts(String threadId, {int page = 1, int pageSize = 30}) async {
+    final result = await api.page('forum/threads/$threadId/posts/', page: page, pageSize: pageSize);
+    return ForumPage(result.rows.map(ForumPost.fromJson).toList(), hasNext: result.hasNext, page: page);
+  }
+
+  Future<ForumThread> createForumThread({required String space, required String title, required String body}) async =>
+      ForumThread.fromJson(
+        (await api.post('forum/threads/', body: {'space': space, 'title': title.trim(), 'body': body.trim()}) as Map)
+            .cast<String, dynamic>(),
+      );
+
+  Future<ForumPost> replyForum(String threadId, String body) async => ForumPost.fromJson(
+    (await api.post('forum/threads/$threadId/posts/', body: {'body': body.trim()}) as Map).cast<String, dynamic>(),
+  );
+
+  /// Removes MY post (the server refuses anybody else's: moderation is the administration's).
+  Future<ForumPost> deleteForumPost(String postId) async => ForumPost.fromJson(
+    ((await api.request('DELETE', 'forum/posts/$postId/', body: const {})).data as Map).cast<String, dynamic>(),
+  );
 }

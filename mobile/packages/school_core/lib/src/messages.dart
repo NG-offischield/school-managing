@@ -26,6 +26,11 @@ const ruleMessages = <String, String>{
   'document_number_invalid': 'Numéro de pièce d\'identité invalide.',
   'sponsor_code_invalid': 'Code de parrainage invalide ou expiré. Demandez un nouveau code au parent vérifié.',
   'already_sponsored': 'Cette demande est déjà parrainée.',
+  // forum (ADR 0015)
+  'thread_locked': 'Cette discussion est verrouillée : on ne peut plus y répondre.',
+  'title_required': 'Indiquez un titre.',
+  'body_required': 'Le message est vide.',
+  'post_already_deleted': 'Ce message a déjà été retiré.',
   // finance (ADR 0013): the server decides, the app only explains
   'idempotency_conflict':
       'Cette demande de paiement a déjà servi pour un autre paiement : recommencez depuis la facture.',

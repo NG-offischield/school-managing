@@ -174,4 +174,14 @@ void main() {
       expect(tester.takeException(), isNull, reason: label);
     }
   });
+
+  testWidgets('forum: never offered to a guardian, never even asked', (tester) async {
+    final h = Harness();
+    await h.start(tester);
+    await h.login(tester, h.fake.a);
+    await h.tab(tester, 'Alertes');
+    expect(find.widgetWithText(Tab, 'Forum'), findsNothing);
+    expect(find.text('Forum'), findsNothing);
+    expect(h.fake.requests.where((r) => r.url.path.contains('forum/')), isEmpty);
+  });
 }

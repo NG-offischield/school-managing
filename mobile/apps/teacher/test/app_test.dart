@@ -238,4 +238,17 @@ void main() {
     expect(find.text('Bonjour Jean'), findsOneWidget);
     expect(tester.takeException(), isNull); // no overflow on a small screen
   });
+
+  testWidgets('forum: the school forum is offered (spaces decided by the server)', (tester) async {
+    final h = Harness();
+    await h.start(tester);
+    await h.login(tester, h.fake.a);
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Messages')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(Tab, 'Forum'));
+    await tester.pumpAndSettle();
+    expect(find.text('Réunion de rentrée'), findsOneWidget);
+    expect(find.text('Annonce'), findsOneWidget);
+    expect(find.byKey(const Key('forum.new')), findsOneWidget); // a space where members may write
+  });
 }
