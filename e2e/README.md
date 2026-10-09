@@ -12,7 +12,7 @@ Il ne parle qu'au backend : aucun accès direct à PostgreSQL ou à Redis, et au
 |---|---|
 | Cible | un backend **de TEST** (`config.settings.test`, base `db_test`), jamais la base de développement |
 | Données | le jeu DEMO (`seed_demo`) + `backend/tools/e2e_cross_app_fixture.py` |
-| Prérequis | Docker Desktop, Node.js ≥ 22 (`fetch` et `WebSocket` intégrés, aucune dépendance) |
+| Prérequis | Docker Desktop, Node.js ≥ 22 (`fetch` et `WebSocket` intégrés, aucune dépendance) ; pour `desktop_forum.py`, l'environnement virtuel du poste (`desktop\.venv`) |
 | Résultat | une ligne par vérification (`PASS` / `FAIL` / `GAP`), code de sortie 1 au premier `FAIL` |
 
 `GAP` signale un comportement que le produit n'offre pas aujourd'hui. Il est affiché et compté, jamais masqué.
@@ -61,7 +61,16 @@ docker exec -e DEMO_PASSWORD school-e2e python manage.py shell -c "exec(open('to
 $env:E2E_API_URL = "http://${ip}:8001"
 $env:E2E_FIXTURE = "$env:TEMP\e2e_fixture.json"
 node e2e/cross_app.mjs
+desktop\.venv\Scripts\python e2e\desktop_forum.py
 ```
+
+`desktop_forum.py` fait tourner le **code du poste d'administration lui-même** contre ce backend, par le réseau : `ApiClient`, `CommunicationService` et le `RealtimeClient` Qt (sans affichage). Il vérifie :
+
+- la publication d'une discussion ;
+- la notification « Forum » reçue en direct quand un parent répond, puis retrouvée par `GET` ;
+- la lecture de la réponse ;
+- la modération avec motif ;
+- le verrouillage (la réponse suivante du parent reçoit 409).
 
 **6. Nettoyage :**
 
