@@ -33,9 +33,20 @@ cd desktop
 .venv\Scripts\python -m school_admin
 ```
 
-## Compte de test
+## Comptes administrateur : un compte = un établissement
 
-Utilisez le SUPER_ADMIN créé par `manage.py bootstrap_school` (sur la base de développement actuelle : identifiant `admin`, école `TEST01`). Son mot de passe est celui saisi lors du bootstrap. **Il n'est écrit nulle part dans le dépôt.**
+Chaque compte administrateur n'agit **que dans son établissement** : il ne voit ni les élèves, ni les parents, ni les messages, ni les factures d'une autre école. C'est l'isolation multi-école voulue (un objet d'une autre école répond 404), **pas** une panne de communication.
+
+La base de développement contient deux établissements :
+
+| École | Compte administrateur | Usage | Mot de passe |
+|---|---|---|---|
+| `TEST01` | `admin` | école créée par `manage.py bootstrap_school` | celui saisi lors du bootstrap |
+| `DEMO` | `demo.admin` | jeu de démonstration (`manage.py seed_demo`, [docs/demo-data.md](../docs/demo-data.md)) : parents A–D, élèves, factures, wallets | `DEMO_PASSWORD` choisi au premier chargement |
+
+**Pour tester avec les parents de démonstration** (messages, réclamations, forum, paiements), connectez le poste avec **`demo.admin`**. Avec `admin`, vous êtes dans `TEST01` et ne verrez rien de ce que font les parents `DEMO`.
+
+L'école en cours est affichée dans le titre de la fenêtre et en haut de la barre latérale. Aucun mot de passe n'est écrit dans le dépôt.
 
 ## Tests
 

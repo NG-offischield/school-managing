@@ -7,6 +7,8 @@ Ce document décrit le jeu de démonstration : un établissement fictif complet 
 - **Commande :** `manage.py seed_demo`.
 - **Tests :** `backend/tests/test_demo_seed.py`.
 
+> **Un compte = un établissement.** Les données de démonstration appartiennent à l'école **`DEMO`**. Pour les voir dans le poste d'administration, connectez-vous avec **`demo.admin`** et non avec `admin`, qui est l'administrateur de l'école `TEST01`. Un administrateur ne voit jamais les élèves, parents, messages ou factures d'une autre école : c'est l'isolation multi-école voulue, pas une panne de communication.
+
 > **Aucun vrai mot de passe ici.** Tous les comptes de démonstration reçoivent le mot de passe passé dans la variable `DEMO_PASSWORD` **au moment où le seed les crée**. Il n'est ni stocké dans le dépôt, ni affiché, ni journalisé. Les adresses utilisent le domaine réservé `.test`.
 
 ## Charger, compléter, recharger
