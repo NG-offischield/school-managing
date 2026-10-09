@@ -108,7 +108,7 @@ def test_substitution_notifies_teachers_and_parents_without_internal_reason(w):
     assert not inbox(w.tf_member, "SUBSTITUTION").exists()
 
 
-def test_payment_and_refund_go_to_the_payer_only(w):
+def test_payment_goes_to_the_payer_and_the_admins_refund_to_the_payer_only(w):
     tuition = fin.create_fee_type(w.school, actor=w.admin, code="TUI", name="Scolarité")
     invoice = fin.issue_invoice(
         w.students[0], actor=w.admin, due_date=date(2025, 10, 1), lines=[{"fee_type": tuition, "unit_price": "1000"}]
@@ -128,7 +128,11 @@ def test_payment_and_refund_go_to_the_payer_only(w):
     assert inbox(w.parent, "PAYMENT").get().payload["status"] == "SUCCEEDED"
     fin.refund_payment(payment, actor=w.admin, amount="400", reason="Trop-perçu")
     assert inbox(w.parent, "REFUND").count() == 1
-    assert not inbox(w.other_parent, "PAYMENT").exists() and not inbox(w.admin, "PAYMENT").exists()
+    assert not inbox(w.other_parent, "PAYMENT").exists()
+    # A parent's confirmed mobile payment also reaches the administration (once);
+    # the refund stays the payer's (tests/test_payment_admin_notifications.py).
+    assert inbox(w.admin, "PAYMENT").get().event_key == f"payment.admin:{payment.pk}"
+    assert not inbox(w.admin, "REFUND").exists()
 
 
 def test_payroll_validation_and_payment_notify_the_employee(w):

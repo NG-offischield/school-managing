@@ -9,12 +9,15 @@
 | backend | pytest |
 | widget | Flutter, faux serveur |
 | desktop | pytest Qt hors affichage, faux serveur |
-| **réseau** | `e2e/cross_app.mjs` ou `e2e/desktop_forum.py` contre le vrai backend, par l'IP LAN |
+| **réseau** | `e2e/cross_app.mjs`, `e2e/desktop_forum.py` ou `e2e/desktop_payment.py` contre le vrai backend, par l'IP LAN |
 
 Dernier passage réseau, le 09/10/2026 sur le backend de **test** (`db_test`), joint par l'IP LAN du PC (192.168.1.102 ce jour-là, lue au lancement) :
 
-- **`cross_app.mjs` : 50 contrôles, 49 PASS, 0 FAIL, 1 GAP** ;
-- **`desktop_forum.py` : 8/8 PASS**.
+- **`cross_app.mjs` : 52 contrôles, 52 PASS, 0 FAIL, 0 GAP** ;
+- **`desktop_forum.py` : 8/8 PASS** ;
+- **`desktop_payment.py` : 10/10 PASS**.
+
+Ces chiffres sont ceux du dernier passage, après l'ajout de la notification administrative des paiements. L'IP était alors 192.168.1.113 : le bail DHCP était revenu à cette adresse pendant la journée. Le passage précédent, avant cet ajout, donnait 49 PASS et 1 GAP sur 50 contrôles.
 
 Procédure : [e2e/README.md](../e2e/README.md).
 
@@ -103,7 +106,7 @@ Le type `FORUM` est **désactivable** dans les préférences, comme les autres t
 
 | | API | WS | AUTH | PERM | UI | E2E réseau |
 |---|---|---|---|---|---|---|
-| Admin | PASS (réseau) | PASS (réseau, QWebSocket du poste) | PASS (réseau) | PASS (backend + réseau) | PASS (desktop : notifications, conversations, forum + modération, réclamations, élèves, parents, finance, planning, documents ; libellé « Forum ») | PASS forum : `desktop_forum.py` 8/8, le 09/10. Parcours complet `test_live.py` : non relancé dans cette phase. |
+| Admin | PASS (réseau) | PASS (réseau, QWebSocket du poste) | PASS (réseau) | PASS (backend + réseau) | PASS (desktop : notifications, conversations, forum + modération, réclamations, élèves, parents, finance, planning, documents ; libellé « Forum ») | PASS forum : `desktop_forum.py` 8/8 ; paiements : `desktop_payment.py` 10/10, le 09/10. Parcours complet `test_live.py` : non relancé dans cette phase. |
 | Parent | PASS (réseau) | PASS (réseau) | PASS (réseau) | PASS (backend + réseau) | PASS (widget, dont le **forum**) | PASS (réseau 09/10, par l'API). Application réelle sur téléphone : **à faire** (Pixel, § 8). |
 | Personnel | PASS (réseau) | PASS (réseau) | PASS (réseau) | PASS (backend + réseau) | PASS (widget, dont le **forum**) | PASS (réseau 09/10, par l'API) |
 | Enseignant | PASS (réseau) | PASS (réseau) | PASS (réseau) | PASS (backend + réseau) | PASS (widget, dont le **forum** et **« Nouveau message » → Parent d'élève**) | PASS (réseau 09/10, par l'API) |
@@ -121,7 +124,7 @@ Pour les quatre applications mobiles, **E2E réseau** veut dire : le chemin rés
 | Messaging | PASS | PASS (dont les réponses à un enseignant) | PASS | PASS (vers l'administration ; **vers un parent de ses élèves** : backend + widget + réseau) | N/A (403 vérifié) |
 | Complaints | PASS | PASS | N/A (le personnel n'en dépose pas) | PARTIAL (autorisé et testé en backend, pas joué par le réseau) | N/A |
 | Planning | PASS | PASS (en direct et hors ligne) | PASS (aucune notification de planning de classe, par conception) | PASS | N/A (fermetures seulement) |
-| Finance | PASS (paiement et facture PAYÉE vus ; **GAP** : pas de notification à l'administration) | PASS (paiement, notification) | N/A (sa paie : PASS le 05/10) | N/A (sa paie) | N/A (statut sans montant) |
+| Finance | PASS (paiement et facture PAYÉE vus ; **notifiée** d'un paiement de parent confirmé, une fois, en direct et par `GET` : backend + réseau + poste) | PASS (paiement, notification) | N/A (sa paie : PASS le 05/10) | N/A (sa paie) | N/A (statut sans montant) |
 | Documents | PARTIAL (desktop ; non joué par le réseau dans cette phase) | PASS (reçu PDF, 05/10) | PARTIAL | PARTIAL | N/A |
 
 ## 7. Scénarios E2E (réseau, le 09/10)
@@ -135,7 +138,7 @@ Pour les quatre applications mobiles, **E2E réseau** veut dire : le chemin rés
 | 5 | L'enseignant contacte un parent | **PASS** : conversation `PARENT_TEACHER` au sujet de S1, notifications en direct des deux côtés ; au sujet de S4 (élève non enseigné) : 403 |
 | 6 | L'agent ne reçoit que ce qui le concerne | **PASS** : annonce et nouveau sujet de l'espace école ; aucune réponse, classe, message, paiement ni planning |
 | 7 | Pas de forum pour le gardien | **PASS** : espaces et sujets vides ; écriture 404 ; messagerie 403 ; aucune notification |
-| 8 | Paiement → Finance → administration | **PASS** : paiement SUCCEEDED, notification au parent, facture PAYÉE vue par l'administration. **GAP** : l'administration n'est pas notifiée ; elle voit le paiement dans Finance. |
+| 8 | Paiement → Finance → administration | **PASS** : paiement SUCCEEDED, notification au parent, facture PAYÉE vue par l'administration ; administration notifiée en direct (« Paiement confirmé — facture F26-… — 75 000 XAF »), retrouvée une fois par `GET` ; fonds insuffisants : rien. |
 | 9 | Changement de planning | **PASS** : séance annulée ; parent de 6e A et enseignant notifiés en direct ; parent hors ligne : `GET` |
 | 10 | Reconnexion | **PASS** : notification manquée rendue par `sync`, message manqué par `subscribe(since)` |
 | 11 | Pas de fuite DEMO ↔ TEST01 | **PASS** : aucune conversation ni aucun sujet visible ; élève DEMO = 404 ; écriture vers un parent DEMO = 404 ; aucun événement DEMO sur la connexion en direct de TEST01 |
@@ -196,7 +199,7 @@ Checklist : [pixel-lan-test-checklist.md](pixel-lan-test-checklist.md). Elle cou
 
 | Écart | État |
 |---|---|
-| L'administration n'est pas notifiée d'un paiement | **GAP** assumé : visible dans Finance. Le domaine Finance n'a pas été modifié dans cette phase. |
+| L'administration n'était pas notifiée d'un paiement | **résolu** : notification `PAYMENT` aux administrateurs de l'école pour un paiement de parent confirmé (projecteur après commit, idempotent). Le paiement lui-même est inchangé. |
 | Écrans mobiles contre le vrai backend | `live_test.dart` à rejouer, puis test sur Pixel (§ 8) |
 | Parcours complet du poste (`test_live.py`) | non relancé dans cette phase (il ne couvre pas le forum, couvert par `desktop_forum.py`) |
 | Pare-feu / profil réseau | à régulariser par l'administrateur du poste (§ 8) |

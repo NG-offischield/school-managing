@@ -237,7 +237,21 @@ if (!invoice || !wallet) {
   const adminPay = (await rows(admin.access, `finance/payments/?student=${lea}`)).rows.find((p) => p.id === pay.data?.id);
   const adminInvoice = (await call(admin.access, 'GET', `finance/invoices/${invoice.id}/`)).data;
   check('S8', 'admin Finance sees the payment and the PAID invoice', adminPay?.status === 'SUCCEEDED' && adminInvoice?.status === 'PAID');
-  check('S8', 'admin notified of the payment', (await wsAdmin.wait(notif('PAYMENT'), 2000)) ? true : 'GAP', 'payments notify the payer; the school sees them in Finance');
+  const adminLive = await wsAdmin.wait(notif('PAYMENT', about('payment', pay.data?.id)));
+  const expected = `Paiement confirmé — facture ${adminInvoice?.invoice_number} — `;
+  check('S8', 'admin notified live of the confirmed payment (facture, montant)', !!adminLive && adminLive.data.title.startsWith(expected), adminLive?.data?.title ?? 'none');
+  const adminRows = (await rows(admin.access, 'notifications/?type=PAYMENT')).rows.filter((n) => n.payload?.payment === pay.data?.id);
+  check('S8', 'admin finds it with GET, once', adminRows.length === 1, `${adminRows.length}`);
+  const poorKey = `e2e-poor-${stamp()}`;
+  const parentB_ = await login('parent.b@demo-ecole.test', 'parentB-pay');
+  const childB = (await rows(parentB_.access, 'parents/children/')).rows[0]?.student?.id;
+  const dueB = (await call(parentB_.access, 'GET', `finance/students/${childB}/obligations/`)).data?.open_invoices?.[0];
+  const walletB = (await rows(parentB_.access, 'finance/wallets/')).rows[0];
+  const poor = await call(parentB_.access, 'POST', 'finance/payments/', {
+    student: childB, amount: dueB?.balance_due, payment_method: 'WALLET', wallet: walletB?.id, invoices: [dueB?.id], idempotency_key: poorKey,
+  });
+  const poorNote = await wsAdmin.wait(notif('PAYMENT', about('payment', poor.data?.id)), 2000);
+  check('S8', 'insufficient funds (parent B): recorded as such, admin NOT notified', poor.data?.status === 'INSUFFICIENT_FUNDS' && !poorNote, `${poor.status} ${poor.data?.status}`);
 }
 
 // --- S9 planning change ---------------------------------------------------------------------------
