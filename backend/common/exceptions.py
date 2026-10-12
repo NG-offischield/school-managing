@@ -47,6 +47,7 @@ CONFLICT_RULES = {
     "same_class",
     # teachers (ADR 0019)
     "duplicate_employee_number",
+    "duplicate_guardian_number",
     "email_in_use",
     "already_employee",
     "already_qualified",

@@ -10,7 +10,8 @@ Families:
     GET  /parents/convocations/             the caller's convocations
 
 Administration (PySide6, ADMIN / SUPER_ADMIN):
-    GET  /admin/scans/                      all scans (?date= ?student= ?result=)
+    GET  /admin/scans/                      all scans (?date= ?student= ?result= ?guardian=)
+    GET  /admin/attendance/daily/           ?date= (required) ?school_class=   the day's records, read only
     GET  /admin/attendance/dashboard/       ?date=  counts + students at YELLOW or above
     POST /admin/attendance/finalize/        {date}
     POST /admin/attendance/{id}/correct/    {status, reason, arrival_time?}
@@ -27,6 +28,7 @@ inside the current school (404 otherwise). The QR token is only ever returned
 by the admin QR endpoints.
 """
 
+from django.db.models import F
 from django.shortcuts import get_object_or_404
 from django.urls import path
 from rest_framework import generics, serializers, status
@@ -84,10 +86,15 @@ def date_param(view, name="date"):
 
 class ScanSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source="student.full_name", default=None, read_only=True)
+    scanned_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = GuardianScan
-        fields = ["id", "scanned_at", "result", "student", "student_name", "scanned_by"]
+        fields = ["id", "scanned_at", "result", "student", "student_name", "scanned_by", "scanned_by_name", "guardian"]
+
+    def get_scanned_by_name(self, obj):
+        user = obj.scanned_by.user if obj.scanned_by_id else None
+        return f"{user.first_name} {user.last_name}".strip() if user else None
 
 
 class ChildScanSerializer(serializers.ModelSerializer):
@@ -298,7 +305,7 @@ class ParentConvocations(SchoolScopedMixin, generics.ListAPIView):
 
 
 class AdminScans(AdminMixin, generics.ListAPIView):
-    queryset = GuardianScan.objects.select_related("student").order_by("-scanned_at")
+    queryset = GuardianScan.objects.select_related("student", "scanned_by__user").order_by("-scanned_at")
     serializer_class = ScanSerializer
 
     def restrict(self, queryset):
@@ -314,7 +321,47 @@ class AdminScans(AdminMixin, generics.ListAPIView):
             if result not in ScanResult.values:
                 raise serializers.ValidationError({"result": ["Unknown result."]})
             queryset = queryset.filter(result=result)
+        guardian = self.uuid_param("guardian")
+        if guardian:
+            queryset = queryset.filter(guardian_id=guardian)  # the school scope already applies
         return queryset
+
+
+class AdminDailySerializer(DailySerializer):
+    student_name = serializers.CharField(source="student.full_name", read_only=True)
+    student_number = serializers.CharField(source="student.student_number", read_only=True)
+    school_class_name = serializers.SerializerMethodField()
+
+    class Meta(DailySerializer.Meta):
+        fields = [*DailySerializer.Meta.fields, "student_name", "student_number", "school_class_name"]
+
+    def get_school_class_name(self, obj):
+        for enrollment in obj.student.enrollments.all():
+            if enrollment.academic_year_id == obj.academic_year_id:
+                return enrollment.school_class.name
+        return None
+
+
+class AdminDailyAttendance(AdminMixin, generics.ListAPIView):
+    """The day's records (read only): corrections go through /correct/ (audited)."""
+
+    queryset = StudentDailyAttendance.objects.select_related("student").prefetch_related(
+        "student__enrollments__school_class"
+    )
+    serializer_class = AdminDailySerializer
+
+    def restrict(self, queryset):
+        day = date_param(self)
+        if day is None:
+            raise serializers.ValidationError({"date": ["This query parameter is required."]})
+        queryset = queryset.filter(date=day)
+        school_class = self.uuid_param("school_class")
+        if school_class:
+            queryset = queryset.filter(
+                student__enrollments__school_class_id=school_class,
+                student__enrollments__academic_year=F("academic_year"),
+            ).distinct()
+        return queryset.order_by("student__last_name", "student__first_name")
 
 
 class AttendanceDashboard(AdminMixin, APIView):
@@ -501,6 +548,7 @@ urlpatterns = [
     path("parents/convocations/", ParentConvocations.as_view(), name="parent-convocations"),
     path("admin/scans/", AdminScans.as_view(), name="admin-scans"),
     path("admin/attendance/dashboard/", AttendanceDashboard.as_view(), name="attendance-dashboard"),
+    path("admin/attendance/daily/", AdminDailyAttendance.as_view(), name="attendance-daily"),
     path("admin/attendance/finalize/", AttendanceFinalize.as_view(), name="attendance-finalize"),
     path("admin/attendance/<uuid:pk>/correct/", AttendanceCorrect.as_view(), name="attendance-correct"),
     path("admin/attendance/policies/", PolicyList.as_view(), name="attendance-policies"),
