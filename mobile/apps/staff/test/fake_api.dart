@@ -160,6 +160,31 @@ class FakeApi {
       tokens.removeWhere((_, p) => p == who);
       return ok(null);
     }
+    // Self-service profile (accounts/profile_api.py): the SERVER decides the editable fields.
+    if (path == 'auth/me/profile/') {
+      final parentRole = who.roles.contains('PARENT');
+      final employee = who.roles.contains('TEACHER') || who.roles.contains('STAFF');
+      return ok({
+        'first_name': who.first,
+        'last_name': who.last,
+        'email': who.email,
+        'username': who.email,
+        'phone': '',
+        'has_photo': false,
+        'school_name': 'École Test',
+        'roles': who.roles,
+        'parent': parentRole
+            ? {'occupation': '', 'address': '', 'emergency_phone': '', 'preferred_language': 'fr'}
+            : null,
+        'employee': employee ? {'address': ''} : null,
+        'editable': [
+          'phone',
+          if (parentRole) ...['occupation', 'address', 'emergency_phone', 'preferred_language'],
+          if (employee) 'address',
+        ],
+        'languages': parentRole ? {'fr': 'Français', 'en': 'Anglais'} : {},
+      });
+    }
     if (path == 'auth/me/') {
       return ok({
         'id': 'u-${who.key}',

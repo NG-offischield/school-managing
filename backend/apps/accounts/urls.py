@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import profile_api, views
 from .activation_api import public_urlpatterns
 
 app_name = "accounts"
@@ -10,6 +10,8 @@ urlpatterns = [
     path("refresh/", views.RefreshView.as_view(), name="refresh"),
     path("logout/", views.LogoutView.as_view(), name="logout"),
     path("me/", views.MeView.as_view(), name="me"),
+    path("me/profile/", profile_api.MeProfileView.as_view(), name="me-profile"),
+    path("me/photo/", profile_api.MePhotoView.as_view(), name="me-photo"),
     path("sessions/", views.SessionListView.as_view(), name="sessions"),
     path("sessions/revoke-all/", views.SessionRevokeAllView.as_view(), name="sessions-revoke-all"),
     path("sessions/<uuid:pk>/revoke/", views.SessionRevokeView.as_view(), name="session-revoke"),

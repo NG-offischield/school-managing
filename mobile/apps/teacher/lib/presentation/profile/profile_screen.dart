@@ -62,6 +62,16 @@ class ProfileScreen extends StatelessWidget {
               ],
             ),
           ),
+          Card(
+            child: ListTile(
+              key: const Key('profile.account'),
+              leading: const Icon(Icons.manage_accounts_outlined),
+              title: const Text('Mon compte et paramètres'),
+              subtitle: const Text('Photo, coordonnées, mot de passe, appareils'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AccountScreen())),
+            ),
+          ),
           // Server of the school (another network = another address, no rebuild).
           const ServerSettingsTile(),
           const SizedBox(height: 20),

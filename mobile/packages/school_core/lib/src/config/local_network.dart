@@ -291,3 +291,25 @@ Future<bool> clearSharedDocuments() async {
     return false;
   }
 }
+
+/// An image the user chose with the system picker: its bytes, or why it
+/// could not be read ([error]: `too_large` above 3 MB, `unreadable`).
+class PickedImage {
+  const PickedImage({this.bytes, this.error});
+
+  final Uint8List? bytes;
+  final String? error;
+}
+
+/// System photo picker (Android Photo Picker / ACTION_GET_CONTENT): no storage
+/// permission. Null when cancelled or without an Android side.
+Future<PickedImage?> pickImage() async {
+  try {
+    final result = await const MethodChannel('school_core/local_network').invokeMapMethod<String, Object?>('pickImage');
+    if (result == null) return null;
+    final bytes = result['bytes'];
+    return PickedImage(bytes: bytes is Uint8List ? bytes : null, error: result['error'] as String?);
+  } on MissingPluginException {
+    return null;
+  }
+}

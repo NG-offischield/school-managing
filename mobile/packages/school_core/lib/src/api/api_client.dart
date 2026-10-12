@@ -56,6 +56,8 @@ class ApiClient {
   Future<dynamic> post(String path, {Object? body, bool auth = true}) async =>
       (await request('POST', path, body: body ?? const {}, auth: auth)).data;
 
+  Future<dynamic> patch(String path, {required Object body}) async => (await request('PATCH', path, body: body)).data;
+
   Future<ApiPage> page(String path, {int page = 1, int pageSize = 50, Map<String, Object?>? params}) async {
     final response = await request('GET', path, params: {...?params, 'page': page, 'page_size': pageSize});
     final rows = ((response.data as List?) ?? const []).cast<Map<String, dynamic>>();
@@ -149,6 +151,42 @@ class ApiClient {
       throw errorFor(response.statusCode, decoded);
     }
     return response.bodyBytes;
+  }
+
+  /// One file sent as multipart [field] (e.g. a profile photo): the server
+  /// checks its real content. Same token / refresh / error handling as JSON calls.
+  Future<dynamic> upload(
+    String path, {
+    required String field,
+    required String filename,
+    required Uint8List bytes,
+    bool retry = true,
+  }) async {
+    if (accessToken == null) {
+      throw UnauthorizedException(code: 'NOT_AUTHENTICATED', message: 'Authentification requise.');
+    }
+    final requestObject = http.MultipartRequest('POST', uri(path))
+      ..headers.addAll({'Accept': 'application/json', 'Accept-Language': 'fr', 'Authorization': 'Bearer $accessToken'})
+      ..files.add(http.MultipartFile.fromBytes(field, bytes, filename: filename));
+    http.Response response;
+    try {
+      response = await http.Response.fromStream(await _http.send(requestObject).timeout(timeout));
+    } on TimeoutException {
+      throw NetworkException(timeout: true);
+    } on http.ClientException {
+      throw NetworkException();
+    }
+    if (response.statusCode == 401 && retry && await _refresh()) {
+      return upload(path, field: field, filename: filename, bytes: bytes, retry: false);
+    }
+    Map<String, dynamic>? decoded;
+    try {
+      decoded = (jsonDecode(utf8.decode(response.bodyBytes)) as Map).cast<String, dynamic>();
+    } on FormatException {
+      decoded = null;
+    }
+    if (response.statusCode >= 400 || decoded?['success'] == false) throw errorFor(response.statusCode, decoded);
+    return decoded?['data'];
   }
 
   Future<bool> _refresh() {

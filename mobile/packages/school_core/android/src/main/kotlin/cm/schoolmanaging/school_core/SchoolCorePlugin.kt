@@ -31,16 +31,19 @@ import io.flutter.plugin.common.PluginRegistry
  *   openDocument -> {path, mimeType}: shows a downloaded official PDF (receipt, report card)
  *                   with the device's viewer; false when none is installed (DocumentOpener)
  *   clearSharedDocuments -> deletes cache/shared/ (copies handed to viewers): server switch
+ *   pickImage    -> {bytes, name} | {error} | null (cancelled): system photo picker (ImagePicker)
  */
 class SchoolCorePlugin :
     FlutterPlugin,
     ActivityAware,
     MethodChannel.MethodCallHandler,
-    PluginRegistry.RequestPermissionsResultListener {
+    PluginRegistry.RequestPermissionsResultListener,
+    PluginRegistry.ActivityResultListener {
     private var channel: MethodChannel? = null
     private var context: Context? = null
     private var binding: ActivityPluginBinding? = null
     private var pending: MethodChannel.Result? = null
+    private var pendingImage: MethodChannel.Result? = null
     private var askedThisRun = false
 
     override fun onAttachedToEngine(flutter: FlutterPlugin.FlutterPluginBinding) {
@@ -55,7 +58,10 @@ class SchoolCorePlugin :
     }
 
     override fun onAttachedToActivity(activity: ActivityPluginBinding) {
-        binding = activity.also { it.addRequestPermissionsResultListener(this) }
+        binding = activity.also {
+            it.addRequestPermissionsResultListener(this)
+            it.addActivityResultListener(this)
+        }
     }
 
     override fun onDetachedFromActivityForConfigChanges() = onDetachedFromActivity()
@@ -64,6 +70,7 @@ class SchoolCorePlugin :
 
     override fun onDetachedFromActivity() {
         binding?.removeRequestPermissionsResultListener(this)
+        binding?.removeActivityResultListener(this)
         binding = null
     }
 
@@ -85,6 +92,12 @@ class SchoolCorePlugin :
                 result.success(activity != null && path != null && DocumentOpener.open(activity, path, mime))
             }
             "clearSharedDocuments" -> result.success(context?.let { DocumentOpener.clear(it) } ?: false)
+            "pickImage" -> {
+                if (activity == null) return result.success(null)
+                if (pendingImage != null) return result.error("BUSY", "An image is already being chosen.", null)
+                pendingImage = result
+                activity.startActivityForResult(ImagePicker.intent(), ImagePicker.REQUEST_CODE)
+            }
             else -> result.notImplemented()
         }
     }
@@ -98,6 +111,15 @@ class SchoolCorePlugin :
         pending = result
         askedThisRun = true
         activity.requestPermissions(arrayOf(LocalNetworkPolicy.PERMISSION), REQUEST_CODE)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+        if (requestCode != ImagePicker.REQUEST_CODE) return false
+        val result = pendingImage ?: return true
+        pendingImage = null
+        val activity = binding?.activity
+        result.success(if (activity == null) null else ImagePicker.read(activity, resultCode, data))
+        return true
     }
 
     override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, grants: IntArray): Boolean {
