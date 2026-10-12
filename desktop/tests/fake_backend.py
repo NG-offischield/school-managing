@@ -15,6 +15,7 @@ from .fake_accounts import AccountsFake
 from .fake_comm import CommunicationFake
 from .fake_finance import FinanceFake
 from .fake_parents import ParentsFake
+from .fake_plans import PlansFake
 
 PASSWORD = "correct-horse-test"
 
@@ -30,13 +31,14 @@ def fail(status, code, message, details=None):
     return httpx.Response(status, json={"success": False, "error": error})
 
 
-class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake):
+class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake, PlansFake):
     def __init__(self, *, roles=("SUPER_ADMIN",)):
         self.roles = list(roles)
         self.init_finance()
         self.init_comm()
         self.init_accounts()
         self.init_parents()
+        self.init_plans()
         self.sessions = {}  # access token -> refresh token
         self.refresh_tokens = set()
         self.revoked = set()
@@ -1639,6 +1641,8 @@ class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake):
         if path.startswith(("admin/registrations/", "admin/link-requests/")):
             return self._parents(request, path, body, admin)
         comm = ("notifications/", "conversations/", "messages/", "forum/", "complaints/", "attachments/")
+        if path.startswith("admin/plans/"):
+            return self._plans(request, path, body, admin)
         admin_comm = ("admin/communication/", "admin/forum/", "admin/complaints/")
         if path.startswith(comm) or path.startswith(admin_comm):
             return self._comm(request, path, body, admin)

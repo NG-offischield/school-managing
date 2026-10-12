@@ -31,6 +31,21 @@ RULE_MESSAGES = {
     "regime_in_use": "Des classes suivent encore ce régime horaire : retirez-le de ces classes avant de le désactiver.",
     "duplicate_regime_name": "Un régime horaire porte déjà ce nom pour cette année scolaire.",
     "regime_times_required": "Indiquez l'heure de début et l'heure de fin du régime.",
+    # school plans
+    "plan_format_not_supported": "Format refusé : importez un PDF, un PNG ou un JPEG. Un plan DWG / DXF ou SVG "
+    "s'exporte d'abord en PDF (ou en image) depuis le logiciel de dessin.",
+    "plan_extension_mismatch": "Le nom du fichier ne correspond pas à son contenu (ex. une image nommée .pdf).",
+    "plan_file_corrupted": "Fichier illisible ou endommagé : exportez-le de nouveau depuis le logiciel de dessin.",
+    "plan_file_empty": "Le fichier est vide.",
+    "plan_file_too_large": "Fichier trop volumineux (20 Mo au plus) : exportez-le avec une résolution plus faible.",
+    "plan_image_too_large": "Image trop grande (8 000 pixels au plus par côté) : réduisez sa résolution.",
+    "plan_pdf_encrypted": "PDF protégé par mot de passe : exportez-le sans protection.",
+    "plan_pdf_active_content": "PDF refusé : il contient du contenu actif (script, fichier joint). "
+    "Exportez un PDF simple.",
+    "plan_pdf_pages": "Trop de pages pour un plan (50 au plus).",
+    "plan_audience_empty": "Diffusion manuelle : choisissez au moins un public (classe ou rôle) avant de publier.",
+    "plan_not_published": "Ce plan n'est pas publié : il n'y a rien à retirer.",
+    "plan_version_other_plan": "Cette version appartient à un autre plan.",
     "name_required": "Le nom est obligatoire.",
     "academic_year_required": "Choisissez une année scolaire.",
     "duplicate_year_name": "Une année scolaire porte déjà ce nom : choisissez-en un autre.",

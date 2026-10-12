@@ -21,6 +21,7 @@ from ..services.finance import FinanceService
 from ..services.parents import ParentAdminService
 from ..services.payroll import PayrollService
 from ..services.planning import PlanningService
+from ..services.plans import PlanService
 from ..services.structure import LevelService, YearService
 from ..services.students import StudentService
 from ..services.teachers import TeacherService
@@ -68,6 +69,7 @@ class AppController:
         self.accounts = AccountService(api)
         self.parents = ParentAdminService(api)
         self.documents = DocumentService(api)
+        self.plans = PlanService(api)
         self.login_window = LoginWindow(auth, runner, config)
         self.login_window.logged_in.connect(self.show_shell)
         self.main_window = None
@@ -129,6 +131,7 @@ class AppController:
                 self.references,
                 self.teachers,
                 self.runner,
+                plans=self.plans,
                 **options.get("documents", {}),
             ),
             "courses": lambda: CoursesPage(

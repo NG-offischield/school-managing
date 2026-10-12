@@ -462,6 +462,7 @@ def test_documents_screen(controller, backend, tmp_path):
         "Reçus",
         "Bulletins de paie",
         "Relevés de présence",
+        "Plans",  # the school's 2D plans (not the generated-document registry)
     ]
     cards = page.open_tab("cards")
     assert column(cards.table, 0) == ["Carte d'élève — Awa Ndiaye"] and column(cards.table, 5) == ["Officiel"]
@@ -563,7 +564,7 @@ def test_communication_and_documents_fit(controller, size):
     for widget in (messaging.list, messaging.thread, messaging.compose, messaging.send_button, messaging.new_button):
         assert widget.isVisible() and messaging.rect().contains(widget.mapTo(messaging, widget.rect().bottomRight()))
     documents = shell.open("documents")
-    for tab in ("report_cards", "cards", "attendance"):
+    for tab in ("report_cards", "cards", "attendance", "plans"):
         _fits(documents.open_tab(tab), tab)
     shell.close()
 

@@ -1404,6 +1404,7 @@ NOTIFICATION_TYPES = {
     "ANNOUNCEMENT": "Annonce",
     "COMPLAINT": "Réclamation",
     "FORUM": "Forum",
+    "PLAN": "Plan de l'établissement",
 }
 SEVERITIES = {"INFO": "Information", "WARNING": "Attention", "CRITICAL": "Important"}
 CONVERSATION_TYPES = {
@@ -1971,4 +1972,140 @@ class LinkRequest:
             row.get("sponsor_name") or "",
             _datetime(row.get("created_at")),
             row.get("decision_reason") or "",
+        )
+
+
+# =============================================================================
+# School plans (backend documents/plans_api.py)
+# =============================================================================
+
+PLAN_STATUSES = {"DRAFT": "Brouillon", "PUBLISHED": "Publié", "WITHDRAWN": "Retiré"}
+PLAN_VERSION_STATUSES = {"DRAFT": "Importée", "PUBLISHED": "Publiée (courante)", "SUPERSEDED": "Remplacée"}
+PLAN_DISTRIBUTIONS = {"AUTO": "Automatique", "MANUAL": "Manuelle"}
+PLAN_AUDIENCE_TARGETS = {
+    "SCHOOL_PARENTS": "Tous les parents vérifiés de l'école",
+    "SCHOOL_TEACHERS": "Tous les enseignants en activité de l'école",
+    "CLASS_PARENTS": "Parents vérifiés des élèves de la classe",
+    "CLASS_TEACHERS": "Enseignants de la classe",
+}
+PLAN_FORMATS = {"application/pdf": "PDF", "image/png": "PNG", "image/jpeg": "JPEG"}
+
+
+def _size_label(size):
+    if size is None:
+        return "—"
+    return f"{size / 1024 / 1024:.1f} Mo" if size >= 1024 * 1024 else f"{max(1, round(size / 1024))} Ko"
+
+
+@dataclass
+class PlanVersion:
+    id: str
+    number: int
+    status: str
+    original_name: str
+    mime_type: str
+    size_bytes: int
+    width: int | None
+    height: int | None
+    page_count: int | None
+    uploaded_by: str
+    uploaded_at: datetime | None
+    published_at: datetime | None
+    is_current: bool
+
+    @property
+    def code(self):
+        return f"v{self.number}"
+
+    @property
+    def is_image(self):
+        return self.mime_type.startswith("image/")
+
+    @property
+    def status_label(self):
+        return PLAN_VERSION_STATUSES.get(self.status, self.status)
+
+    @property
+    def details(self):
+        """« PDF · 2 pages · 1.2 Mo » / « PNG · 4000×3000 px · 850 Ko »."""
+        parts = [PLAN_FORMATS.get(self.mime_type, self.mime_type)]
+        if self.page_count:
+            parts.append(f"{self.page_count} page{'s' if self.page_count > 1 else ''}")
+        if self.width and self.height:
+            parts.append(f"{self.width}×{self.height} px")
+        parts.append(_size_label(self.size_bytes))
+        return " · ".join(parts)
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            int(row["number"]),
+            row["status"],
+            row.get("original_name") or "",
+            row["mime_type"],
+            int(row.get("size_bytes") or 0),
+            row.get("width"),
+            row.get("height"),
+            row.get("page_count"),
+            row.get("uploaded_by_name") or "",
+            _datetime(row.get("uploaded_at")),
+            _datetime(row.get("published_at")),
+            bool(row.get("is_current")),
+        )
+
+
+@dataclass
+class SchoolPlan:
+    id: str
+    title: str
+    description: str
+    building: str
+    floor: str
+    display_order: int
+    status: str
+    distribution: str
+    current_version: PlanVersion | None
+    published_at: datetime | None
+    published_by: str
+    versions_count: int
+    audience: list = field(default_factory=list)  # [{"target", "school_class", "school_class_name"}]
+
+    @property
+    def code(self):
+        return self.title
+
+    @property
+    def active(self):
+        return self.status == "PUBLISHED"
+
+    @property
+    def status_label(self):
+        return PLAN_STATUSES.get(self.status, self.status)
+
+    @property
+    def distribution_label(self):
+        return PLAN_DISTRIBUTIONS.get(self.distribution, self.distribution)
+
+    @property
+    def location(self):
+        return " · ".join(part for part in (self.building, self.floor) if part) or "—"
+
+    @classmethod
+    def from_api(cls, row):
+        current = row.get("current_version")
+        return cls(
+            row["id"],
+            row["title"],
+            row.get("description") or "",
+            row.get("building") or "",
+            row.get("floor") or "",
+            int(row.get("display_order") or 0),
+            row["status"],
+            row.get("distribution") or "AUTO",
+            PlanVersion.from_api(current) if current else None,
+            _datetime(row.get("published_at")),
+            row.get("published_by_name") or "",
+            int(row.get("versions_count") or 0),
+            list(row.get("audience") or []),
         )

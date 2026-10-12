@@ -1,7 +1,10 @@
 """Gestion → Documents (ADR 0023): the admin face of the EXISTING `Document`
 registry (ADR 0016). One tab per family:
 
-    Bulletins · Cartes élèves · Emplois du temps · Reçus · Bulletins de paie · Relevés de présence
+    Bulletins · Cartes élèves · Emplois du temps · Reçus · Bulletins de paie · Relevés de présence · Plans
+
+(« Plans » is not part of that registry: the school's 2D plans, imported files
+with versions and a chosen audience — pages/plans_page.py.)
 
 Each tab: server-paginated list (search on title / verification code, status
 filter), detail, generation (the source is chosen, the SERVER builds the PDF
@@ -24,6 +27,7 @@ from ..widgets import Page, button
 from .catalog_base import STATUS_COLUMN_TITLE, PagedCatalogPage
 from .finance_page import coloured
 from .planning_page import _combo
+from .plans_page import PlansPage
 
 TABS = (
     ("report_cards", "Bulletins", ("REPORT_CARD",)),
@@ -265,7 +269,7 @@ class DocumentKindPage(PagedCatalogPage):
 class DocumentsPage(Page):
     title = "Documents"
 
-    def __init__(self, documents, finance, payroll, references, teachers, runner, parent=None, **kwargs):
+    def __init__(self, documents, finance, payroll, references, teachers, runner, parent=None, *, plans=None, **kwargs):
         super().__init__(runner, parent, **kwargs)
         self.layout_.setContentsMargins(0, 8, 0, 0)
         sources = {
@@ -284,6 +288,11 @@ class DocumentsPage(Page):
             setattr(self, name, page)
             self.tabs.addTab(page, label)
             page.session_expired.connect(self.session_expired.emit)
+        if plans is not None:
+            self.plans = PlansPage(plans, references, runner, **kwargs)
+            self.pages["plans"] = self.plans
+            self.tabs.addTab(self.plans, "Plans")
+            self.plans.session_expired.connect(self.session_expired.emit)
         self.layout_.addWidget(self.tabs)
         self.tabs.currentChanged.connect(lambda _: self.tabs.currentWidget().activate())
 
