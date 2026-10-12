@@ -62,6 +62,7 @@ $env:E2E_API_URL = "http://${ip}:8001"
 $env:E2E_FIXTURE = "$env:TEMP\e2e_fixture.json"
 node e2e/cross_app.mjs
 node e2e/school_plans.mjs
+node e2e/accounts_guardians.mjs
 desktop\.venv\Scripts\python e2e\desktop_forum.py
 desktop\.venv\Scripts\python e2e\desktop_payment.py
 ```
@@ -92,6 +93,16 @@ desktop\.venv\Scripts\python e2e\desktop_payment.py
 - diffusion MANUELLE (parents de 6e A) : l'enseignant perd l'accès aussitôt ; public vide refusé (409) ;
 - nouvelle version PDF : seuls les lecteurs du public courant sont notifiés, une seule fois ; une modification des informations ne notifie personne ;
 - retrait : accès fermé aussitôt, sans notification.
+
+`accounts_guardians.mjs` vérifie par le réseau **« Mon compte »** et les **gardiens** (à lancer après les deux scripts précédents : il modifie des coordonnées de comptes DEMO et crée un gardien ; la photo est générée) :
+
+- profil : champs modifiables décidés par le serveur selon le rôle ; une requête contenant rôle, école ou e-mail est refusée en entier ; téléphone invalide expliqué ;
+- photo : réencodée en JPEG sans métadonnées, privée (`no-store`, 401 sans jeton), jamais servie à un autre membre ; un fichier qui n'est pas une image est refusé ;
+- gardien : créé sans mot de passe, numéro en double refusé (409), activation par code, connexion, scan d'un QR (sans aucun montant), passages listés pour CE gardien, présences du jour ; TEST01 : 404 ;
+- suspension (connexion refusée, la session ouverte ne peut plus scanner) puis réactivation ;
+- mot de passe changé : l'autre appareil est déconnecté, celui-ci reste connecté ; une session révoquée par son propriétaire (un autre membre : 404).
+
+**Entre deux scripts, attendre une minute** : la connexion est limitée à 10 par minute et par adresse (`auth-login`), et chaque script se connecte plusieurs fois. Sans cette pause, le script suivant échoue sur « Trop de requêtes » (429), ce qui n'est pas un défaut du produit.
 
 **6. Nettoyage :**
 
