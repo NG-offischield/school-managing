@@ -95,6 +95,28 @@ Chaque lien passe par le vrai parcours (ADR 0026) :
 | C — Mariam Bello | `parent.c@demo-ecole.test` | S3 | mère | idem |
 | D — Roger Nkoulou | `parent.d@demo-ecole.test` | S4, S5 | père | idem |
 
+## Gardien et QR codes
+
+| | Valeur |
+|---|---|
+| Gardien | Emmanuel Essomba, identifiant `demo.guardian` ou e-mail `guardian@demo-ecole.test`, n° `G-DEMO-01` |
+| Création | `people.services.admin_create_guardian` : compte **sans mot de passe**, adhésion DEMO, rôle `GUARDIAN` du catalogue, profil gardien |
+| Mot de passe | posé par le **vrai parcours d'activation** : code émis par l'administration, puis complété avec `DEMO_PASSWORD` |
+| QR codes | un QR annuel actif par élève, S1 à S5 (`attendance.issue_qr_code`) |
+
+Les cartes avec QR s'impriment ou s'affichent depuis le poste d'administration : Documents → Carte élève. C'est elles que l'on scanne avec l'application Gardien.
+
+Ce que le gardien peut faire, selon les règles du serveur :
+- scanner un QR ;
+- voir l'historique de **ses propres** scans ;
+- voir, à l'issue du scan, si l'élève a un impayé (« à jour » ou « en retard »), **jamais un montant**.
+
+Il n'a ni wallets, ni factures, ni paiements, ni notes, ni messagerie, ni forum. Il ne voit pas les scans d'un autre gardien, ni les données d'une autre école.
+
+**Relancer le seed ne touche à rien de ce qui existe déjà :** aucun mot de passe n'est réinitialisé et aucun QR n'est réémis.
+
+**Base DEMO chargée avant l'ajout du gardien :** relancer le seed **avec** `DEMO_PASSWORD` (première commande ci-dessus), pour que le gardien reçoive un mot de passe. Sans `DEMO_PASSWORD`, la commande s'arrête sans rien créer, puisque le seed tourne dans une seule transaction.
+
 ## Factures (XAF)
 
 | Clé | Élève | Motif | Montant | Échéance | État après le seed |

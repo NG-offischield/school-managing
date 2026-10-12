@@ -26,6 +26,15 @@ ADMIN = {
     "last_name": "Ngo Bassa",
 }
 
+# Gate guardian (people.admin_create_guardian, then the real activation flow).
+GUARDIAN = {
+    "username": "demo.guardian",
+    "email": "guardian@demo-ecole.test",
+    "first_name": "Emmanuel",
+    "last_name": "Essomba",
+    "guardian_number": "G-DEMO-01",
+}
+
 # Levels and classes of the current school year (created if missing).
 LEVELS = [
     {"code": "6E", "name": "Sixième", "order_index": 1},

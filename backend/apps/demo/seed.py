@@ -22,7 +22,9 @@ from django.utils import timezone
 
 from apps.academics import services as academics
 from apps.academics.models import AcademicYear, AcademicYearStatus, Level, SchoolClass
+from apps.accounts import activation
 from apps.accounts.models import SchoolMembership, User
+from apps.attendance import services as attendance
 from apps.core.models import School
 from apps.core.services import FirstAdmin, SchoolProvisioningService
 from apps.finance import services as finance
@@ -46,6 +48,8 @@ class DemoWorld:
     classes: dict = field(default_factory=dict)
     students: dict = field(default_factory=dict)
     parents: dict = field(default_factory=dict)  # key -> SchoolMembership
+    guardian: SchoolMembership = None
+    qr_codes: dict = field(default_factory=dict)  # student key -> StudentQRCode
     fee_types: dict = field(default_factory=dict)
     invoices: dict = field(default_factory=dict)
     wallets: dict = field(default_factory=dict)  # parent key -> Wallet
@@ -132,6 +136,43 @@ def _students(w):
             )
             w.created.append(f"élève {spec['student_number']}")
         w.students[spec["key"]] = student
+
+
+# --- gate guardian and the pupils' annual QR codes --------------------------------------------
+
+
+def _guardian(w, password):
+    """The guardian account through the admin service, then its FIRST password
+    through the real activation flow (code issued by the administration,
+    completed with DEMO_PASSWORD). An existing account is never touched
+    (no password reset): a second run changes nothing."""
+    spec = dataset.GUARDIAN
+    membership = SchoolMembership.objects.filter(school=w.school, user__username__iexact=spec["username"]).first()
+    if membership is None:
+        if (
+            User.objects.filter(username__iexact=spec["username"]).exists()
+            or User.objects.filter(email__iexact=spec["email"]).exists()
+        ):
+            raise ImproperlyConfigured(f"{spec['username']} / {spec['email']} already belongs to another account.")
+        guardian = people.admin_create_guardian(w.school, actor=w.admin, **spec)
+        membership = guardian.membership
+        w.created.append(f"gardien {spec['username']}")
+    if not membership.user.has_usable_password():
+        _, code = activation.issue_activation(membership, actor=w.admin)
+        activation.complete_activation(code, _need_password(password))
+        membership.refresh_from_db()
+        w.created.append(f"activation du gardien {spec['username']}")
+    w.guardian = membership
+
+
+def _qr_codes(w):
+    """The annual QR code of every pupil (attendance.issue_qr_code: returns the
+    ACTIVE one if it exists, never a second code)."""
+    for key, student in w.students.items():
+        had = student.qr_codes.filter(academic_year=w.year, status="ACTIVE").exists()
+        w.qr_codes[key] = attendance.issue_qr_code(student, actor=w.admin, academic_year=w.year)
+        if not had:
+            w.created.append(f"QR code annuel de {student.student_number}")
 
 
 # --- parents (real workflow, ADR 0026) ------------------------------------------------------
@@ -274,6 +315,8 @@ def seed(*, password=None):
     _wallets(w)
     _treasury(w)
     _cash_payments(w)
+    _guardian(w, password)
+    _qr_codes(w)
     return w
 
 

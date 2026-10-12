@@ -683,13 +683,19 @@ def _account_for(school, email, first_name, last_name, phone, actor):
 
 
 def _grant_teacher_role(membership, actor):
-    """The role comes from the role catalog (system role TEACHER): never a
-    free role name."""
-    from apps.accounts.models import MembershipRole, Role, RoleCode
+    from apps.accounts.models import RoleCode
+
+    _grant_role(membership, RoleCode.TEACHER, actor)
+
+
+def _grant_role(membership, code, actor):
+    """The role comes from the role catalog (system roles): never a free
+    role name."""
+    from apps.accounts.models import MembershipRole, Role
 
     assignment, created = MembershipRole.objects.get_or_create(
         membership=membership,
-        role=Role.objects.get(code=RoleCode.TEACHER),
+        role=Role.objects.get(code=code),
         defaults={"assigned_by": actor, "active": True},
     )
     if not created and not assignment.active:
@@ -1010,3 +1016,51 @@ def create_guardian(membership, *, guardian_number):
     return GuardianProfile.objects.create(
         school=membership.school, membership=membership, guardian_number=guardian_number
     )
+
+
+@transaction.atomic
+def admin_create_guardian(school, *, actor, first_name, last_name, email, guardian_number, username=None, phone=None):
+    """A new gate guardian account, created by the administration — the
+    guardian's counterpart of admin_create_teacher.
+
+    The account has NO password: the person sets it through the activation
+    code the administration issues (accounts.activation, ADR 0024). Chain:
+    User (unusable password) -> ACTIVE SchoolMembership of `school` -> role
+    GUARDIAN from the catalog -> GuardianProfile. An e-mail or login already
+    used by any account is refused (never attached silently to another
+    person or school)."""
+    from apps.accounts.models import MembershipStatus, RoleCode, SchoolMembership, User
+
+    require_role(actor, ADMIN_ROLES, school=school)
+    first_name, last_name = _text(first_name, "first_name", required=True), _text(last_name, "last_name", required=True)
+    email = _email(email)
+    login = (_text(username, "username") or email).lower()
+    number = _text(guardian_number, "guardian_number", required=True)
+    if GuardianProfile.objects.filter(school=school, guardian_number=number).exists():
+        raise ValidationError(f"The guardian number {number} is already used.", code="duplicate_guardian_number")
+    if User.objects.filter(Q(email__iexact=email) | Q(username__iexact=login) | Q(email__iexact=login)).exists():
+        raise ValidationError("This e-mail address or login is already used by another account.", code="email_in_use")
+    user = User.objects.create_user(
+        username=login,
+        email=email,
+        password=None,
+        first_name=first_name,
+        last_name=last_name,
+        phone=_text(phone, "phone") or None,
+    )
+    membership = SchoolMembership.objects.create(
+        school=school, user=user, status=MembershipStatus.ACTIVE, joined_at=timezone.now(), is_primary_school=True
+    )
+    _grant_role(membership, RoleCode.GUARDIAN, actor)
+    guardian = create_guardian(membership, guardian_number=number)
+    from apps.audit.models import AuditLayer
+    from apps.audit.services import record_audit
+
+    record_audit(
+        "GUARDIAN_CREATED",
+        actor=actor,
+        entity=guardian,
+        new={"guardian_number": number, "login": login},
+        layer=AuditLayer.ADMINISTRATIVE,
+    )
+    return guardian

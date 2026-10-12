@@ -52,10 +52,14 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f"Établissement {world.school.code} prêt : {len(world.students)} élèves, {len(world.parents)} parents, "
-                f"{len(world.invoices)} factures, {len(world.wallets)} wallets."
+                f"{len(world.invoices)} factures, {len(world.wallets)} wallets, 1 gardien."
             )
         )
         for spec in dataset.PARENTS:
             wallet = world.wallets[spec["key"]]
             wallet.refresh_from_db()
             self.stdout.write(f"  parent {spec['key']} {spec['email']} : wallet {wallet} = {wallet.balance} XAF")
+        self.stdout.write(
+            f"  gardien {dataset.GUARDIAN['username']} ({dataset.GUARDIAN['email']}), "
+            f"{len(world.qr_codes)} QR codes élèves actifs (cartes : Documents → Carte élève)"
+        )
