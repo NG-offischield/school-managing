@@ -15,7 +15,7 @@ class AttendanceScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Présences'), actions: const [ChildSwitcher()]),
+      appBar: AppBar(title: Text(tr('Présences')), actions: const [ChildSwitcher()]),
       body: ChildBody(
         builder: (context, child) => _ChildAttendance(key: ValueKey(child.id), child: child),
       ),
@@ -31,7 +31,10 @@ class _Data {
   final List<Convocation> convocations;
 }
 
-const scanResults = {'ACCEPTED': 'Entrée enregistrée', 'ALREADY_PRESENT': 'Déjà présent(e)'};
+const _scanResultsFr = {'ACCEPTED': 'Entrée enregistrée', 'ALREADY_PRESENT': 'Déjà présent(e)'};
+
+/// Labels in the CURRENT language (French source: [_scanResultsFr]).
+Map<String, String> get scanResults => trMap(_scanResultsFr);
 
 Tone dayTone(String status) => switch (status) {
   'PRESENT' => Tone.success,
@@ -86,15 +89,15 @@ class _ChildAttendanceState extends State<_ChildAttendance> {
           children: [
             Text(widget.child.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             Text(widget.child.schooling, style: TextStyle(color: Tokens.textSecondary)),
-            const SectionTitle('Bilan de l\'année'),
+            SectionTitle(tr('Bilan de l\'année')),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Column(
                   children: [
-                    InfoRow('Absences non justifiées', '${data.report.unexcused} h', strong: true),
-                    InfoRow('Absences justifiées', '${data.report.excused} h'),
-                    InfoRow('Retards', '${data.report.lateCount}'),
+                    InfoRow(tr('Absences non justifiées'), '${data.report.unexcused} h', strong: true),
+                    InfoRow(tr('Absences justifiées'), '${data.report.excused} h'),
+                    InfoRow(tr('Retards'), '${data.report.lateCount}'),
                     if (data.report.alert != null && data.report.alert != 'NONE')
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
@@ -108,12 +111,12 @@ class _ChildAttendanceState extends State<_ChildAttendance> {
               ),
             ),
             if (data.convocations.isNotEmpty) ...[
-              const SectionTitle('Convocations'),
+              SectionTitle(tr('Convocations')),
               for (final c in data.convocations)
                 Card(
                   child: ListTile(
                     leading: Icon(Icons.event_note, color: Tokens.warning),
-                    title: Text(c.start == null ? 'Convocation' : capitalize(dayLong.format(c.start!))),
+                    title: Text(c.start == null ? tr('Convocation') : capitalize(dayLong.format(c.start!))),
                     subtitle: Text(
                       '${c.start == null ? '' : hm.format(c.start!)}${c.end == null ? '' : ' – ${hm.format(c.end!)}'}'
                       ' · ${c.reason}',
@@ -123,7 +126,7 @@ class _ChildAttendanceState extends State<_ChildAttendance> {
                 ),
             ],
             if (data.scans.isNotEmpty) ...[
-              const SectionTitle('Passages au portail'),
+              SectionTitle(tr('Passages au portail')),
               Card(
                 child: Column(
                   children: [
@@ -138,11 +141,11 @@ class _ChildAttendanceState extends State<_ChildAttendance> {
                 ),
               ),
             ],
-            const SectionTitle('Historique'),
+            SectionTitle(tr('Historique')),
             if (data.report.days.isEmpty)
               Padding(
                 padding: EdgeInsets.all(8),
-                child: Text('Aucun relevé pour cette année.', style: TextStyle(color: Tokens.textSecondary)),
+                child: Text(tr('Aucun relevé pour cette année.'), style: TextStyle(color: Tokens.textSecondary)),
               ),
             for (final day in data.report.days)
               Card(
@@ -160,8 +163,8 @@ class _ChildAttendanceState extends State<_ChildAttendance> {
 
   String _detail(AttendanceDay day) {
     final parts = <String>[
-      if (day.arrival != null) 'Arrivée ${day.arrival!.substring(0, day.arrival!.length.clamp(0, 5))}',
-      if (day.lateMinutes > 0) '${day.lateMinutes} min de retard',
+      if (day.arrival != null) tr('Arrivée {0}', [day.arrival!.substring(0, day.arrival!.length.clamp(0, 5))]),
+      if (day.lateMinutes > 0) tr('{0} min de retard', [day.lateMinutes]),
       if (day.status == 'ABSENT' || day.status == 'EXCUSED') '${day.absenceHours} h',
       if ((day.note ?? '').isNotEmpty) day.note!,
     ];

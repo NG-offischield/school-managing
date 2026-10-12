@@ -19,7 +19,7 @@ ServerSession teacherSession(
     api,
     tokens ?? SecureTokenStore(prefix: 'school_managing.teacher'),
     requiredRole: 'TEACHER',
-    device: const DeviceInfo(name: 'Application enseignant'),
+    device: DeviceInfo(name: tr('Application enseignant')),
   );
   RealtimeClient live() => channels == null
       ? RealtimeClient(api, config.socket, refresh: auth.refreshSession)

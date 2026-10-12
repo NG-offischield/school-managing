@@ -18,6 +18,7 @@ import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import 'app_config.dart';
+import '../l10n/l10n.dart';
 
 class LocalNetworkStatus {
   const LocalNetworkStatus({required this.required, required this.granted, this.canAsk = false, this.sdkInt});
@@ -190,37 +191,39 @@ class _PermissionScreen extends StatelessWidget {
               const SizedBox(height: 24),
               Icon(Icons.wifi_tethering, size: 56, color: Tokens.primary),
               const SizedBox(height: 16),
-              const Text(
-                'Accès au réseau local',
+              Text(
+                tr('Accès au réseau local'),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 12),
               Text(
-                'Le serveur de l\'établissement ($server) se trouve sur le réseau Wi-Fi local. Android demande '
-                'votre accord pour que l\'application puisse le joindre : sans cet accès, la connexion, les '
-                'messages et les notifications ne fonctionnent pas.',
+                tr(
+                  'Le serveur de l\'établissement ({0}) se trouve sur le réseau Wi-Fi local. Android demande votre accord pour que l\'application puisse le joindre : sans cet accès, la connexion, les messages et les notifications ne fonctionnent pas.',
+                  [server],
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
               if (!canAsk) ...[
-                const MessageBanner(
-                  'L\'accès a été refusé. Autorisez « Appareils à proximité » (réseau local) dans les paramètres '
-                  'de l\'application, puis revenez ici.',
+                MessageBanner(
+                  tr(
+                    'L\'accès a été refusé. Autorisez « Appareils à proximité » (réseau local) dans les paramètres de l\'application, puis revenez ici.',
+                  ),
                 ),
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   key: const Key('lan.settings'),
                   onPressed: onSettings,
                   icon: const Icon(Icons.settings_outlined),
-                  label: const Text('Ouvrir les paramètres'),
+                  label: Text(tr('Ouvrir les paramètres')),
                 ),
               ] else
                 FilledButton.icon(
                   key: const Key('lan.ask'),
                   onPressed: onAsk,
                   icon: const Icon(Icons.check),
-                  label: const Text('Autoriser l\'accès au réseau local'),
+                  label: Text(tr('Autoriser l\'accès au réseau local')),
                 ),
             ],
           ),
@@ -250,8 +253,8 @@ class ConfigErrorApp extends StatelessWidget {
               const SizedBox(height: 24),
               Icon(Icons.dns_outlined, size: 56, color: Tokens.error),
               const SizedBox(height: 16),
-              const Text(
-                'Configuration du serveur',
+              Text(
+                tr('Configuration du serveur'),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
               ),

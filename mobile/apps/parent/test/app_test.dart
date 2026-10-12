@@ -43,11 +43,12 @@ class Harness {
   late final ParentRepository repository;
   RealtimeClient Function()? realtime;
 
-  Future<void> start(WidgetTester tester) async {
+  Future<void> start(WidgetTester tester, {Widget Function(Widget app)? wrap}) async {
     tester.view.physicalSize = const Size(1080, 2400); // Pixel class phone
     tester.view.devicePixelRatio = 2.6;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(ParentApp(auth: auth, repository: repository, pdfStore: pdfs, realtime: realtime));
+    final Widget app = ParentApp(auth: auth, repository: repository, pdfStore: pdfs, realtime: realtime);
+    await tester.pumpWidget(wrap == null ? app : wrap(app));
     await auth.restore();
     await tester.pumpAndSettle();
   }

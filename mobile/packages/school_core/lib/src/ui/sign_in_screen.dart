@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import 'activation_screen.dart';
 import 'server_settings.dart';
+import '../l10n/l10n.dart';
 
 /// Second way in, under the sign-in form: account activation (accounts
 /// created by the school) or self-registration (parents). The screen it
@@ -22,8 +23,8 @@ class SignInAlternative {
 
   /// Activation of an account created by the school (ADR 0024).
   factory SignInAlternative.activation() => SignInAlternative(
-    hint: 'Première connexion ? L\'administration vous a remis un code d\'activation.',
-    label: 'Activer mon compte',
+    hint: tr('Première connexion ? L\'administration vous a remis un code d\'activation.'),
+    label: tr('Activer mon compte'),
     icon: Icons.key_outlined,
     key: const Key('login.activate'),
     open: (context) => Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const ActivationScreen())),
@@ -83,7 +84,9 @@ class _SignInScreenState extends State<SignInScreen> {
     try {
       await auth.login(_identifier.text, _password.text);
     } on WrongRoleException {
-      _error = 'Ce compte n\'est pas un compte ${widget.roleLabel} : utilisez l\'application prévue pour votre rôle.';
+      _error = tr('Ce compte n\'est pas un compte {0} : utilisez l\'application prévue pour votre rôle.', [
+        tr(widget.roleLabel), // « parent », « enseignant »… (French source)
+      ]);
     } on ApiException catch (error) {
       _error = error.userMessage;
     } finally {
@@ -136,8 +139,8 @@ class _SignInScreenState extends State<SignInScreen> {
                           autofillHints: const [AutofillHints.username, AutofillHints.email],
                           textInputAction: TextInputAction.next,
                           autocorrect: false,
-                          decoration: const InputDecoration(
-                            labelText: 'Identifiant (e-mail)',
+                          decoration: InputDecoration(
+                            labelText: tr('Identifiant (e-mail)'),
                             prefixIcon: Icon(Icons.person_outline),
                           ),
                           onChanged: (_) => setState(() {}),
@@ -154,10 +157,10 @@ class _SignInScreenState extends State<SignInScreen> {
                           onSubmitted: (_) => _submit(),
                           onChanged: (_) => setState(() {}),
                           decoration: InputDecoration(
-                            labelText: 'Mot de passe',
+                            labelText: tr('Mot de passe'),
                             prefixIcon: const Icon(Icons.lock_outline),
                             suffixIcon: IconButton(
-                              tooltip: _hidden ? 'Afficher le mot de passe' : 'Masquer le mot de passe',
+                              tooltip: _hidden ? tr('Afficher le mot de passe') : tr('Masquer le mot de passe'),
                               icon: Icon(_hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined),
                               onPressed: () => setState(() => _hidden = !_hidden),
                             ),
@@ -173,7 +176,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                   height: 22,
                                   child: CircularProgressIndicator(strokeWidth: 2.5, color: Tokens.onPrimary),
                                 )
-                              : const Text('Se connecter'),
+                              : Text(tr('Se connecter')),
                         ),
                         const SizedBox(height: 18),
                         const Divider(),
@@ -193,7 +196,7 @@ class _SignInScreenState extends State<SignInScreen> {
                         const SizedBox(height: 18),
                         // Which backend this build talks to: the first thing to check on a LAN setup.
                         Text(
-                          'Serveur : ${server.hasPort ? '${server.host}:${server.port}' : server.host}',
+                          tr('Serveur : {0}', [server.hasPort ? '${server.host}:${server.port}' : server.host]),
                           key: const Key('login.server'),
                           textAlign: TextAlign.center,
                           style: TextStyle(color: Tokens.textSecondary, fontSize: 12),
@@ -204,7 +207,7 @@ class _SignInScreenState extends State<SignInScreen> {
                             key: const Key('login.server.change'),
                             onPressed: _busy ? null : () => openServerSettings(context, control),
                             icon: const Icon(Icons.dns_outlined, size: 18),
-                            label: const Text('Changer de serveur'),
+                            label: Text(tr('Changer de serveur')),
                           ),
                       ],
                     ),

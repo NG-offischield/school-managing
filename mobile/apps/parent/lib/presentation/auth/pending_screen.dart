@@ -35,7 +35,7 @@ class _PendingScreenState extends State<PendingScreen> {
       await auth.reloadIdentity(); // approved -> the gate opens the home
       if (mounted) _load();
     } on WrongRoleException {
-      await auth.expire('Ce compte n\'est pas un compte parent.');
+      await auth.expire(tr('Ce compte n\'est pas un compte parent.'));
     } on ApiException catch (error) {
       if (mounted) setState(() => _error = error.userMessage);
     }
@@ -46,11 +46,11 @@ class _PendingScreenState extends State<PendingScreen> {
     final auth = context.watch<AuthService>();
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mon compte'),
+        title: Text(tr('Mon compte')),
         actions: [
           IconButton(
             key: const Key('pending.logout'),
-            tooltip: 'Se déconnecter',
+            tooltip: tr('Se déconnecter'),
             icon: const Icon(Icons.logout),
             onPressed: auth.logout,
           ),
@@ -65,7 +65,7 @@ class _PendingScreenState extends State<PendingScreen> {
           return ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              const SoftwareBrand(subtitle: 'Espace parent'),
+              SoftwareBrand(subtitle: tr('Espace parent')),
               const SizedBox(height: 24),
               if (_error != null) ...[MessageBanner(_error!), const SizedBox(height: 12)],
               Card(
@@ -83,7 +83,7 @@ class _PendingScreenState extends State<PendingScreen> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'Bonjour ${auth.identity?.firstName ?? ''}',
+                              tr('Bonjour {0}', [auth.identity?.firstName ?? '']),
                               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                             ),
                           ),
@@ -92,31 +92,33 @@ class _PendingScreenState extends State<PendingScreen> {
                       const SizedBox(height: 12),
                       Text(
                         rejected
-                            ? 'Votre demande a été refusée par l\'établissement.'
-                            : 'Votre compte attend la validation de l\'établissement'
-                                  '${last == null ? '' : ' (${last.schoolName})'}.',
+                            ? tr('Votre demande a été refusée par l\'établissement.')
+                            : tr('Votre compte attend la validation de l\'établissement{0}.', [
+                                last == null ? '' : ' (${last.schoolName})',
+                              ]),
                       ),
                       if (last?.submittedAt != null) ...[
                         const SizedBox(height: 6),
                         Text(
-                          'Demande du ${dateTime.format(last!.submittedAt!)}',
+                          tr('Demande du {0}', [dateTime.format(last!.submittedAt!)]),
                           style: TextStyle(color: Tokens.textSecondary),
                         ),
                       ],
                       if (rejected && (last?.rejectionReason ?? '').isNotEmpty) ...[
                         const SizedBox(height: 6),
-                        Text('Motif : ${last!.rejectionReason}'),
+                        Text(tr('Motif : {0}', [last!.rejectionReason])),
                       ],
                       const SizedBox(height: 10),
-                      StatusChip(last?.statusLabel ?? 'En attente', tone: rejected ? Tone.danger : Tone.warning),
+                      StatusChip(last?.statusLabel ?? tr('En attente'), tone: rejected ? Tone.danger : Tone.warning),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 16),
               Text(
-                'Une fois le compte validé, vous demanderez le rattachement de votre enfant : la pièce d\'identité '
-                'indiquée sera vérifiée à l\'école. Aucune donnée d\'élève n\'est visible avant.',
+                tr(
+                  'Une fois le compte validé, vous demanderez le rattachement de votre enfant : la pièce d\'identité indiquée sera vérifiée à l\'école. Aucune donnée d\'élève n\'est visible avant.',
+                ),
                 style: TextStyle(color: Tokens.textSecondary),
               ),
               const SizedBox(height: 20),
@@ -125,7 +127,7 @@ class _PendingScreenState extends State<PendingScreen> {
                   key: const Key('pending.check'),
                   onPressed: _check,
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Vérifier la validation'),
+                  label: Text(tr('Vérifier la validation')),
                 ),
             ],
           );

@@ -12,9 +12,10 @@ import 'dart:typed_data';
 import '../api/api_client.dart';
 import '../api/api_error.dart';
 import 'communication.dart';
+import '../l10n/l10n.dart';
 
 /// Labels of the self-service fields (server names).
-const accountFieldLabels = {
+const _accountFieldLabelsFr = {
   'phone': 'Téléphone',
   'occupation': 'Profession',
   'address': 'Adresse',
@@ -22,7 +23,10 @@ const accountFieldLabels = {
   'preferred_language': 'Langue préférée',
 };
 
-const roleLabels = {
+/// Labels in the CURRENT language (French source: [_accountFieldLabelsFr]).
+Map<String, String> get accountFieldLabels => trMap(_accountFieldLabelsFr);
+
+const _roleLabelsFr = {
   'PARENT': 'Parent',
   'TEACHER': 'Enseignant',
   'STAFF': 'Personnel',
@@ -30,6 +34,9 @@ const roleLabels = {
   'ADMIN': 'Administrateur',
   'SUPER_ADMIN': 'Super-administrateur',
 };
+
+/// Labels in the CURRENT language (French source: [_roleLabelsFr]).
+Map<String, String> get roleLabels => trMap(_roleLabelsFr);
 
 class AccountProfile {
   AccountProfile({
@@ -98,7 +105,7 @@ class UserSession {
 
   factory UserSession.fromJson(Map<String, dynamic> json) => UserSession(
     id: '${json['id']}',
-    deviceName: (json['device_name'] as String?) ?? 'Appareil',
+    deviceName: (json['device_name'] as String?) ?? tr('Appareil'),
     platform: (json['platform'] as String?) ?? '',
     current: json['is_current'] == true,
     lastUsedAt: schoolTime(json['last_used_at'] ?? json['created_at']),

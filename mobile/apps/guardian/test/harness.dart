@@ -35,11 +35,17 @@ class Harness {
   /// Gate camera; null = keyboard / reader only.
   QrCamera Function()? camera;
 
-  Future<void> start(WidgetTester tester, {Size size = const Size(1080, 2400), double ratio = 2.6}) async {
+  Future<void> start(
+    WidgetTester tester, {
+    Size size = const Size(1080, 2400),
+    double ratio = 2.6,
+    Widget Function(Widget app)? wrap,
+  }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = ratio;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(GuardianApp(auth: auth, repository: repository, realtime: realtime, camera: camera));
+    final Widget app = GuardianApp(auth: auth, repository: repository, realtime: realtime, camera: camera);
+    await tester.pumpWidget(wrap == null ? app : wrap(app));
     await auth.restore();
     await tester.pumpAndSettle();
   }

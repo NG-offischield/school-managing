@@ -16,8 +16,8 @@ Tone sessionTone(TeachingSession s) => switch (s.status) {
 /// Y" when I was planned and someone else teaches (names from the server).
 String? substitutionNote(TeachingSession s, String myName) {
   if (!s.substituted) return null;
-  if (s.teacher.label == myName) return 'Vous remplacez ${s.plannedTeacher.label}';
-  return 'Remplacé par ${s.teacher.label}';
+  if (s.teacher.label == myName) return tr('Vous remplacez {0}', [s.plannedTeacher.label]);
+  return tr('Remplacé par {0}', [s.teacher.label]);
 }
 
 class SessionTile extends StatelessWidget {
@@ -31,7 +31,7 @@ class SessionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final note = substitutionNote(session, myName);
-    final room = session.room == null ? 'Salle non attribuée' : 'Salle ${session.room!.label}';
+    final room = session.room == null ? tr('Salle non attribuée') : tr('Salle {0}', [session.room!.label]);
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
@@ -90,7 +90,7 @@ class SessionTile extends StatelessWidget {
                       runSpacing: 4,
                       children: [
                         StatusChip(session.statusLabel, tone: sessionTone(session)),
-                        if (session.moved && !session.cancelled) const StatusChip('Déplacée', tone: Tone.warning),
+                        if (session.moved && !session.cancelled) StatusChip(tr('Déplacée'), tone: Tone.warning),
                       ],
                     ),
                   ],

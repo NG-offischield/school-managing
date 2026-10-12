@@ -13,7 +13,7 @@ ServerSession staffSession(AppConfig config, {http.Client? client, TokenStore? t
     api,
     tokens ?? SecureTokenStore(prefix: 'school_managing.staff'),
     requiredRole: 'STAFF',
-    device: const DeviceInfo(name: 'Application personnel'),
+    device: DeviceInfo(name: tr('Application personnel')),
   );
   RealtimeClient live() => channels == null
       ? RealtimeClient(api, config.socket, refresh: auth.refreshSession)

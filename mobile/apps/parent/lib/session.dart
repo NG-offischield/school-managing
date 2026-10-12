@@ -22,7 +22,7 @@ ServerSession parentSession(
     tokens ?? SecureTokenStore(prefix: 'school_managing.parent'),
     requiredRole: 'PARENT',
     allowPending: true, // a self-registered parent waits for the school's approval
-    device: const DeviceInfo(name: 'Application parent'),
+    device: DeviceInfo(name: tr('Application parent')),
   );
   RealtimeClient live() => channels == null
       ? RealtimeClient(api, config.socket, refresh: auth.refreshSession)

@@ -62,20 +62,20 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             selectedIndex: _tab,
             onDestinationSelected: open,
             destinations: [
-              const NavigationDestination(
+              NavigationDestination(
                 icon: Icon(Icons.home_outlined),
                 selectedIcon: Icon(Icons.home),
-                label: 'Accueil',
+                label: tr('Accueil'),
               ),
-              const NavigationDestination(
+              NavigationDestination(
                 icon: Icon(Icons.calendar_month_outlined),
                 selectedIcon: Icon(Icons.calendar_month),
-                label: 'Planning',
+                label: tr('Planning'),
               ),
-              const NavigationDestination(
+              NavigationDestination(
                 icon: Icon(Icons.qr_code_scanner),
                 selectedIcon: Icon(Icons.qr_code_2),
-                label: 'Portail',
+                label: tr('Portail'),
               ),
               NavigationDestination(
                 icon: Badge(
@@ -84,12 +84,12 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                   child: const Icon(Icons.chat_bubble_outline),
                 ),
                 selectedIcon: const Icon(Icons.chat_bubble),
-                label: 'Messages',
+                label: tr('Messages'),
               ),
-              const NavigationDestination(
+              NavigationDestination(
                 icon: Icon(Icons.person_outline),
                 selectedIcon: Icon(Icons.person),
-                label: 'Profil',
+                label: tr('Profil'),
               ),
             ],
           ),
@@ -161,10 +161,10 @@ class _StaffHomeState extends State<StaffHome> {
     final auth = context.watch<AuthService>();
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Accueil'),
+        title: Text(tr('Accueil')),
         actions: [
           const LiveIndicator(),
-          IconButton(tooltip: 'Actualiser', onPressed: _load, icon: const Icon(Icons.refresh)),
+          IconButton(tooltip: tr('Actualiser'), onPressed: _load, icon: const Icon(Icons.refresh)),
         ],
       ),
       body: AsyncBody<_Overview>(
@@ -176,32 +176,32 @@ class _StaffHomeState extends State<StaffHome> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
               Text(
-                'Bonjour ${auth.identity?.firstName ?? ''}',
+                tr('Bonjour {0}', [auth.identity?.firstName ?? '']),
                 style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
               ),
               Text(auth.identity?.current?.schoolName ?? '', style: TextStyle(color: Tokens.textSecondary)),
-              const _Title('Mes fonctions'),
+              _Title(tr('Mes fonctions')),
               if (data.me == null || data.me!.functions.isEmpty)
-                Text('Aucune fonction attribuée.', style: TextStyle(color: Tokens.textSecondary))
+                Text(tr('Aucune fonction attribuée.'), style: TextStyle(color: Tokens.textSecondary))
               else
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
                   children: [for (final f in data.me!.functions) StatusChip(f.label, tone: Tone.info)],
                 ),
-              const _Title('Aujourd\'hui dans l\'établissement'),
+              _Title(tr('Aujourd\'hui dans l\'établissement')),
               Card(
                 child: ListTile(
                   key: const Key('home.today'),
                   leading: Icon(Icons.calendar_today, color: Tokens.primary),
-                  title: Text('${data.today.length} séance(s) au planning'),
-                  subtitle: Text(cancelled == 0 ? 'Aucune annulation' : '$cancelled annulation(s)'),
+                  title: Text(tr('{0} séance(s) au planning', [data.today.length])),
+                  subtitle: Text(cancelled == 0 ? tr('Aucune annulation') : tr('{0} annulation(s)', [cancelled])),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => widget.onOpenTab(1),
                 ),
               ),
               if (data.breaks.isNotEmpty) ...[
-                const _Title('Fermetures à venir'),
+                _Title(tr('Fermetures à venir')),
                 for (final b in data.breaks)
                   Card(
                     child: ListTile(
@@ -214,9 +214,9 @@ class _StaffHomeState extends State<StaffHome> {
                     ),
                   ),
               ],
-              const _Title('Dernières notifications'),
+              _Title(tr('Dernières notifications')),
               if (data.notifications.isEmpty)
-                Text('Aucune notification.', style: TextStyle(color: Tokens.textSecondary)),
+                Text(tr('Aucune notification.'), style: TextStyle(color: Tokens.textSecondary)),
               for (final n in data.notifications)
                 Card(
                   child: ListTile(
@@ -282,15 +282,15 @@ class _StaffPlanningState extends State<StaffPlanning> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Planning'), actions: const [LiveIndicator()]),
+      appBar: AppBar(title: Text(tr('Planning')), actions: const [LiveIndicator()]),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: SegmentedButton<bool>(
-              segments: const [
-                ButtonSegment(value: false, label: Text('Aujourd\'hui'), icon: Icon(Icons.today)),
-                ButtonSegment(value: true, label: Text('Semaine'), icon: Icon(Icons.view_week)),
+              segments: [
+                ButtonSegment(value: false, label: Text(tr('Aujourd\'hui')), icon: Icon(Icons.today)),
+                ButtonSegment(value: true, label: Text(tr('Semaine')), icon: Icon(Icons.view_week)),
               ],
               selected: {_week},
               onSelectionChanged: (value) {
@@ -314,14 +314,14 @@ class _StaffPlanningState extends State<StaffPlanning> {
                     if (data.sessions.isEmpty)
                       Padding(
                         padding: EdgeInsets.all(12),
-                        child: Text('Aucune séance.', style: TextStyle(color: Tokens.textSecondary)),
+                        child: Text(tr('Aucune séance.'), style: TextStyle(color: Tokens.textSecondary)),
                       ),
                     for (final entry in days.entries) ...[
                       if (_week) _Title(entry.key),
                       for (final s in entry.value) _SessionTile(session: s),
                     ],
                     if (data.changes.isNotEmpty) ...[
-                      const _Title('Changements récents'),
+                      _Title(tr('Changements récents')),
                       for (final c in data.changes)
                         Card(
                           child: ListTile(
@@ -329,9 +329,9 @@ class _StaffPlanningState extends State<StaffPlanning> {
                             title: Text(c.typeLabel),
                             subtitle: Text(
                               [
-                                if (c.date != null) 'Séance du ${c.date}',
+                                if (c.date != null) tr('Séance du {0}', [c.date]),
                                 if ((c.reason ?? '').isNotEmpty) c.reason!,
-                                if (c.at != null) 'le ${dateTime.format(c.at!)}',
+                                if (c.at != null) tr('le {0}', [dateTime.format(c.at!)]),
                               ].join(' · '),
                             ),
                           ),
@@ -356,7 +356,7 @@ class _SessionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = session;
-    final room = s.room == null ? 'Salle non attribuée' : 'Salle ${s.room!.label}';
+    final room = s.room == null ? tr('Salle non attribuée') : tr('Salle {0}', [s.room!.label]);
     return Card(
       child: ListTile(
         leading: SizedBox(
@@ -372,7 +372,9 @@ class _SessionTile extends StatelessWidget {
         ),
         subtitle: Text('${s.teacher.label} · $room'),
         trailing: StatusChip(
-          s.cancelled ? 'Annulée' : (s.substituted ? 'Remplacement' : (s.moved ? 'Déplacée' : s.statusLabel)),
+          s.cancelled
+              ? tr('Annulée')
+              : (s.substituted ? tr('Remplacement') : (s.moved ? tr('Déplacée') : s.statusLabel)),
           tone: s.cancelled ? Tone.danger : (s.substituted || s.moved ? Tone.warning : Tone.info),
         ),
       ),
@@ -404,7 +406,7 @@ class _StaffProfileState extends State<StaffProfile> {
     final identity = auth.identity;
     if (identity == null) return const SizedBox.shrink();
     return Scaffold(
-      appBar: AppBar(title: const Text('Profil')),
+      appBar: AppBar(title: Text(tr('Profil'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -432,7 +434,7 @@ class _StaffProfileState extends State<StaffProfile> {
                       return Padding(
                         padding: const EdgeInsets.only(top: 6),
                         child: Text(
-                          'Matricule ${me.employeeNumber} · ${me.functions.map((f) => f.label).join(', ')}',
+                          tr('Matricule {0} · {1}', [me.employeeNumber, me.functions.map((f) => f.label).join(', ')]),
                           textAlign: TextAlign.center,
                         ),
                       );
@@ -447,27 +449,27 @@ class _StaffProfileState extends State<StaffProfile> {
               children: [
                 ListTile(
                   leading: const Icon(Icons.school_outlined),
-                  title: const Text('Établissement'),
+                  title: Text(tr('Établissement')),
                   subtitle: Text(identity.current?.schoolName ?? '—'),
                 ),
                 ListTile(
                   key: const Key('profile.scans'),
                   leading: const Icon(Icons.history),
-                  title: const Text('Mes passages enregistrés'),
+                  title: Text(tr('Mes passages enregistrés')),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => openAbove<void>(context, const MyScansScreen()),
                 ),
                 ListTile(
                   key: const Key('profile.pay'),
                   leading: const Icon(Icons.payments_outlined),
-                  title: const Text('Ma rémunération'),
+                  title: Text(tr('Ma rémunération')),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => openAbove<void>(context, const PayslipsScreen()),
                 ),
-                const ListTile(
+                ListTile(
                   leading: Icon(Icons.badge_outlined),
-                  title: Text('Présence du personnel'),
-                  subtitle: Text('Pas encore disponible : l\'établissement ne la suit pas dans l\'application.'),
+                  title: Text(tr('Présence du personnel')),
+                  subtitle: Text(tr('Pas encore disponible : l\'établissement ne la suit pas dans l\'application.')),
                 ),
               ],
             ),
@@ -476,8 +478,8 @@ class _StaffProfileState extends State<StaffProfile> {
             child: ListTile(
               key: const Key('profile.account'),
               leading: const Icon(Icons.manage_accounts_outlined),
-              title: const Text('Mon compte et paramètres'),
-              subtitle: const Text('Photo, coordonnées, mot de passe, appareils'),
+              title: Text(tr('Mon compte et paramètres')),
+              subtitle: Text(tr('Photo, coordonnées, mot de passe, appareils')),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AccountScreen())),
             ),
@@ -493,10 +495,10 @@ class _StaffProfileState extends State<StaffProfile> {
             ),
             onPressed: () => auth.logout(),
             icon: const Icon(Icons.logout),
-            label: const Text('Se déconnecter'),
+            label: Text(tr('Se déconnecter')),
           ),
           const SizedBox(height: 28),
-          const Center(child: SoftwareBrand(size: 18, subtitle: 'Application personnel · version 0.1.0')),
+          Center(child: SoftwareBrand(size: 18, subtitle: tr('Application personnel · version 0.1.0'))),
         ],
       ),
     );
@@ -545,7 +547,7 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
               for (final line in detail.lines)
                 _Row(lineKinds[line.id] ?? line.id, formatMoney(line.label, detail.currency)),
               const Divider(),
-              _Row('Net à payer', formatMoney(detail.payable, detail.currency), strong: true),
+              _Row(tr('Net à payer'), formatMoney(detail.payable, detail.currency), strong: true),
             ],
           ),
         ),
@@ -558,12 +560,12 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Ma rémunération')),
+      appBar: AppBar(title: Text(tr('Ma rémunération'))),
       body: AsyncBody<List<Payslip>>(
         future: _future,
         onRetry: _load,
         isEmpty: (rows) => rows.isEmpty,
-        emptyText: 'Aucune paie validée pour le moment.',
+        emptyText: tr('Aucune paie validée pour le moment.'),
         builder: (context, rows) => ListView(
           padding: const EdgeInsets.all(12),
           children: [
@@ -572,7 +574,7 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
                 child: ListTile(
                   key: Key('payslip.${p.id}'),
                   title: Text(p.period, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: Text(p.paidAt == null ? p.statusLabel : 'Payée le ${dateOnly.format(p.paidAt!)}'),
+                  subtitle: Text(p.paidAt == null ? p.statusLabel : tr('Payée le {0}', [dateOnly.format(p.paidAt!)])),
                   trailing: Text(
                     formatMoney(p.payable, p.currency),
                     style: const TextStyle(fontWeight: FontWeight.w700),

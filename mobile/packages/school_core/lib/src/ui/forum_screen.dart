@@ -23,6 +23,7 @@ import '../data/forum.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import 'live_state.dart';
+import '../l10n/l10n.dart';
 
 bool _isForumEvent(Map<String, dynamic> data) =>
     (data['notification_type'] == 'FORUM' || data['notification_type'] == 'ANNOUNCEMENT') &&
@@ -137,10 +138,11 @@ class _ForumTabState extends State<ForumTab> {
     } else if (error != null) {
       body = _ErrorState(error: error, onRetry: _reload);
     } else if (_spaces.isEmpty) {
-      body = const _Empty(
+      body = _Empty(
         icon: Icons.forum_outlined,
-        text:
-            'Aucun espace de forum ne vous est ouvert pour le moment. L\'établissement les crée et choisit qui y participe.',
+        text: tr(
+          'Aucun espace de forum ne vous est ouvert pour le moment. L\'établissement les crée et choisit qui y participe.',
+        ),
       );
     } else {
       body = RefreshIndicator(
@@ -159,7 +161,7 @@ class _ForumTabState extends State<ForumTab> {
                       padding: const EdgeInsets.only(right: 6),
                       child: ChoiceChip(
                         key: const Key('forum.space.all'),
-                        label: const Text('Tous'),
+                        label: Text(tr('Tous')),
                         selected: _space == null,
                         onSelected: (_) => _filter(null),
                       ),
@@ -178,9 +180,9 @@ class _ForumTabState extends State<ForumTab> {
                 ),
               ),
             if (_threads.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(top: 48),
-                child: _Empty(icon: Icons.chat_outlined, text: 'Aucune discussion pour le moment.'),
+                child: _Empty(icon: Icons.chat_outlined, text: tr('Aucune discussion pour le moment.')),
               ),
             for (final t in _threads)
               Card(
@@ -199,7 +201,7 @@ class _ForumTabState extends State<ForumTab> {
                     ].where((x) => x.isNotEmpty).join(' · '),
                   ),
                   trailing: t.isAnnouncement
-                      ? const StatusChip('Annonce', tone: Tone.info)
+                      ? StatusChip(tr('Annonce'), tone: Tone.info)
                       : (t.isOpen ? null : StatusChip(t.statusLabel, tone: Tone.neutral)),
                   onTap: () => _open(t),
                 ),
@@ -210,7 +212,7 @@ class _ForumTabState extends State<ForumTab> {
                 child: OutlinedButton(
                   key: const Key('forum.more'),
                   onPressed: _loadingMore ? null : _more,
-                  child: Text(_loadingMore ? 'Chargement…' : 'Afficher plus de discussions'),
+                  child: Text(_loadingMore ? tr('Chargement…') : tr('Afficher plus de discussions')),
                 ),
               ),
           ],
@@ -225,7 +227,7 @@ class _ForumTabState extends State<ForumTab> {
               key: const Key('forum.new'),
               onPressed: _newThread,
               icon: const Icon(Icons.add_comment_outlined),
-              label: const Text('Nouveau sujet'),
+              label: Text(tr('Nouveau sujet')),
             ),
     );
   }
@@ -342,14 +344,14 @@ class _ForumThreadScreenState extends State<ForumThreadScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Retirer mon message ?'),
-        content: const Text('Il sera masqué pour tous les participants.'),
+        title: Text(tr('Retirer mon message ?')),
+        content: Text(tr('Il sera masqué pour tous les participants.')),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(tr('Annuler'))),
           FilledButton(
             key: const Key('forum.delete.confirm'),
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Retirer'),
+            child: Text(tr('Retirer')),
           ),
         ],
       ),
@@ -374,10 +376,10 @@ class _ForumThreadScreenState extends State<ForumThreadScreen> {
     final error = _error;
     return Scaffold(
       appBar: AppBar(
-        title: Text(thread?.title ?? 'Discussion', maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: Text(thread?.title ?? tr('Discussion'), maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
           const LiveIndicator(),
-          IconButton(tooltip: 'Actualiser', onPressed: _load, icon: const Icon(Icons.refresh)),
+          IconButton(tooltip: tr('Actualiser'), onPressed: _load, icon: const Icon(Icons.refresh)),
         ],
       ),
       body: _loading
@@ -387,18 +389,19 @@ class _ForumThreadScreenState extends State<ForumThreadScreen> {
           : Column(
               children: [
                 if (thread != null && thread.isAnnouncement)
-                  const _Banner(
+                  _Banner(
                     key: Key('forum.announcement'),
                     icon: Icons.campaign_outlined,
-                    text: 'Annonce de l\'établissement : lecture seule.',
+                    text: tr('Annonce de l\'établissement : lecture seule.'),
                   ),
                 if (thread != null && !thread.isOpen)
                   _Banner(
                     key: const Key('forum.locked'),
                     icon: Icons.lock_outline,
-                    text:
-                        'Discussion ${thread.statusLabel.toLowerCase()} par l\'établissement'
-                        '${thread.statusReason == null || thread.statusReason!.isEmpty ? '' : ' : ${thread.statusReason}'}.',
+                    text: tr('Discussion {0} par l\'établissement{1}.', [
+                      thread.statusLabel.toLowerCase(),
+                      thread.statusReason == null || thread.statusReason!.isEmpty ? '' : ' : ${thread.statusReason}',
+                    ]),
                   ),
                 Expanded(
                   child: RefreshIndicator(
@@ -418,7 +421,7 @@ class _ForumThreadScreenState extends State<ForumThreadScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      p.deleted ? 'Message retiré.' : (p.body ?? ''),
+                                      p.deleted ? tr('Message retiré.') : (p.body ?? ''),
                                       style: TextStyle(
                                         fontStyle: p.deleted ? FontStyle.italic : FontStyle.normal,
                                         color: p.deleted ? Tokens.textSecondary : Tokens.text,
@@ -438,7 +441,7 @@ class _ForumThreadScreenState extends State<ForumThreadScreen> {
                               trailing: (p.authorId == me && !p.deleted && !p.isAnnouncement)
                                   ? IconButton(
                                       key: Key('forum.delete.${p.id}'),
-                                      tooltip: 'Retirer mon message',
+                                      tooltip: tr('Retirer mon message'),
                                       icon: const Icon(Icons.delete_outline),
                                       onPressed: () => _delete(p),
                                     )
@@ -449,7 +452,7 @@ class _ForumThreadScreenState extends State<ForumThreadScreen> {
                           OutlinedButton(
                             key: const Key('forum.posts.more'),
                             onPressed: _more,
-                            child: const Text('Messages suivants'),
+                            child: Text(tr('Messages suivants')),
                           ),
                       ],
                     ),
@@ -470,12 +473,12 @@ class _ForumThreadScreenState extends State<ForumThreadScreen> {
                               maxLines: 4,
                               textCapitalization: TextCapitalization.sentences,
                               onChanged: (_) => setState(() {}),
-                              decoration: const InputDecoration(hintText: 'Votre réponse'),
+                              decoration: InputDecoration(hintText: tr('Votre réponse')),
                             ),
                           ),
                           IconButton(
                             key: const Key('forum.send'),
-                            tooltip: 'Publier',
+                            tooltip: tr('Publier'),
                             onPressed: _reply.text.trim().isEmpty || _sending ? null : _send,
                             icon: const Icon(Icons.send),
                           ),
@@ -541,13 +544,14 @@ class _NewForumThreadScreenState extends State<NewForumThreadScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Nouveau sujet')),
+      appBar: AppBar(title: Text(tr('Nouveau sujet'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            'Une discussion visible par les membres de l\'espace choisi. Pour une question personnelle, utilisez '
-            'plutôt les messages privés.',
+            tr(
+              'Une discussion visible par les membres de l\'espace choisi. Pour une question personnelle, utilisez plutôt les messages privés.',
+            ),
             style: TextStyle(color: Tokens.textSecondary),
           ),
           const SizedBox(height: 14),
@@ -555,7 +559,7 @@ class _NewForumThreadScreenState extends State<NewForumThreadScreen> {
           DropdownButtonFormField<String>(
             key: const Key('forum.new.space'),
             initialValue: _space,
-            decoration: const InputDecoration(labelText: 'Espace'),
+            decoration: InputDecoration(labelText: tr('Espace')),
             items: [for (final s in widget.spaces) DropdownMenuItem(value: s.id, child: Text(s.name))],
             onChanged: (value) => setState(() => _space = value),
           ),
@@ -566,7 +570,7 @@ class _NewForumThreadScreenState extends State<NewForumThreadScreen> {
             maxLength: 200,
             textCapitalization: TextCapitalization.sentences,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(labelText: 'Titre'),
+            decoration: InputDecoration(labelText: tr('Titre')),
           ),
           TextField(
             key: const Key('forum.new.body'),
@@ -575,14 +579,14 @@ class _NewForumThreadScreenState extends State<NewForumThreadScreen> {
             maxLines: 10,
             textCapitalization: TextCapitalization.sentences,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(labelText: 'Message'),
+            decoration: InputDecoration(labelText: tr('Message')),
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
             key: const Key('forum.new.submit'),
             onPressed: _ready ? _submit : null,
             icon: const Icon(Icons.send),
-            label: Text(_busy ? 'Publication…' : 'Publier'),
+            label: Text(_busy ? tr('Publication…') : tr('Publier')),
           ),
         ],
       ),
@@ -652,13 +656,13 @@ class _ErrorState extends StatelessWidget {
         children: [
           MessageBanner(
             error is NotFoundException
-                ? 'Cette discussion n\'existe plus ou ne vous est pas accessible.'
+                ? tr('Cette discussion n\'existe plus ou ne vous est pas accessible.')
                 : error is ForbiddenException
-                ? 'Le forum de cet espace ne vous est pas accessible.'
+                ? tr('Le forum de cet espace ne vous est pas accessible.')
                 : error.userMessage,
           ),
           const SizedBox(height: 12),
-          OutlinedButton(key: const Key('forum.retry'), onPressed: onRetry, child: const Text('Réessayer')),
+          OutlinedButton(key: const Key('forum.retry'), onPressed: onRetry, child: Text(tr('Réessayer'))),
         ],
       ),
     ),

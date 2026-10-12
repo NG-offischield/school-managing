@@ -11,6 +11,7 @@ import 'dart:typed_data';
 
 import '../config/local_network.dart';
 import 'communication.dart';
+import '../l10n/l10n.dart';
 
 class SchoolPlan {
   SchoolPlan({
@@ -74,15 +75,15 @@ class SchoolPlan {
   String get details {
     final kind = isPdf ? 'PDF' : (mimeType == 'image/png' ? 'PNG' : 'JPEG');
     final shape = isPdf
-        ? (pageCount == null ? null : '$pageCount page${pageCount! > 1 ? 's' : ''}')
-        : (width == null || height == null ? null : '$width × $height px');
+        ? (pageCount == null ? null : tr('{0} page{1}', [pageCount, pageCount! > 1 ? 's' : '']))
+        : (width == null || height == null ? null : tr('{0} × {1} px', [width, height]));
     return [kind, ?shape, sizeLabel(sizeBytes)].join(' · ');
   }
 }
 
 String sizeLabel(int bytes) {
-  if (bytes < 1024 * 1024) return '${(bytes / 1024).ceil()} Ko';
-  return '${(bytes / (1024 * 1024)).toStringAsFixed(1).replaceAll('.', ',')} Mo';
+  if (bytes < 1024 * 1024) return tr('{0} Ko', [(bytes / 1024).ceil()]);
+  return tr('{0} Mo', [(bytes / (1024 * 1024)).toStringAsFixed(1).replaceAll('.', ',')]);
 }
 
 /// Where a downloaded PDF plan goes to be shown by the phone's viewer. The

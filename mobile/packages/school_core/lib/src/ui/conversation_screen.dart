@@ -8,6 +8,7 @@ import '../data/communication.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import 'live_state.dart';
+import '../l10n/l10n.dart';
 
 /// One conversation: history, live messages (WebSocket subscribe + resync),
 /// send with a client_id kept across a network failure (no duplicate).
@@ -96,7 +97,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     } on NetworkException catch (error) {
       _pendingBody = body; // a retry reuses the same client_id
       _pendingClientId = clientId;
-      _error = '${error.userMessage} Le message sera renvoyé sans doublon.';
+      _error = tr('{0} Le message sera renvoyé sans doublon.', [error.userMessage]);
     } on ApiException catch (error) {
       _error = error.userMessage;
     } finally {
@@ -116,7 +117,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 future: _future,
                 onRetry: _load,
                 isEmpty: (_) => _messages.isEmpty,
-                emptyText: 'Aucun message.',
+                emptyText: tr('Aucun message.'),
                 builder: (context, _) => ListView.builder(
                   controller: _scroll,
                   padding: const EdgeInsets.all(12),
@@ -141,14 +142,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       minLines: 1,
                       maxLines: 4,
                       textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(hintText: 'Votre message'),
+                      decoration: InputDecoration(hintText: tr('Votre message')),
                       onChanged: (_) => setState(() {}),
                     ),
                   ),
                   const SizedBox(width: 6),
                   IconButton.filled(
                     key: const Key('conversation.send'),
-                    tooltip: 'Envoyer',
+                    tooltip: tr('Envoyer'),
                     onPressed: _text.text.trim().isEmpty || _sending ? null : _send,
                     icon: const Icon(Icons.send),
                   ),
@@ -190,7 +191,7 @@ class _Bubble extends StatelessWidget {
                 style: TextStyle(fontWeight: FontWeight.w700, color: Tokens.navy, fontSize: 13),
               ),
             Text(
-              message.body ?? '[Message masqué]',
+              message.body ?? tr('[Message masqué]'),
               style: TextStyle(
                 color: mine ? Tokens.onPrimary : Tokens.text,
                 fontStyle: message.body == null ? FontStyle.italic : null,

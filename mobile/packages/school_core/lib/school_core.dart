@@ -19,6 +19,7 @@ export 'src/data/communication.dart';
 export 'src/data/forum.dart';
 export 'src/data/school_calendar.dart';
 export 'src/data/school_plans.dart';
+export 'src/l10n/l10n.dart';
 export 'src/messages.dart';
 export 'src/realtime/realtime_client.dart';
 export 'src/theme/app_theme.dart';

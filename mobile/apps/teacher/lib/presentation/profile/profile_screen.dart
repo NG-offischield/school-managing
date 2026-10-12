@@ -13,7 +13,7 @@ class ProfileScreen extends StatelessWidget {
     if (identity == null) return const SizedBox.shrink();
     final membership = identity.current;
     return Scaffold(
-      appBar: AppBar(title: const Text('Profil')),
+      appBar: AppBar(title: Text(tr('Profil'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -43,19 +43,19 @@ class ProfileScreen extends StatelessWidget {
               children: [
                 ListTile(
                   leading: const Icon(Icons.school_outlined),
-                  title: const Text('Établissement'),
+                  title: Text(tr('Établissement')),
                   subtitle: Text(membership?.schoolName ?? '—'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.badge_outlined),
-                  title: const Text('Rôle'),
-                  subtitle: Text((membership?.roles.contains('TEACHER') ?? false) ? 'Enseignant' : '—'),
+                  title: Text(tr('Rôle')),
+                  subtitle: Text((membership?.roles.contains('TEACHER') ?? false) ? tr('Enseignant') : '—'),
                 ),
                 ListTile(
                   key: const Key('profile.plans'),
                   leading: const Icon(Icons.map_outlined),
-                  title: const Text("Plan de l'établissement"),
-                  subtitle: const Text('Bâtiments, salles et accès'),
+                  title: Text(tr('Plan de l\'établissement')),
+                  subtitle: Text(tr('Bâtiments, salles et accès')),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PlansScreen())),
                 ),
@@ -66,8 +66,8 @@ class ProfileScreen extends StatelessWidget {
             child: ListTile(
               key: const Key('profile.account'),
               leading: const Icon(Icons.manage_accounts_outlined),
-              title: const Text('Mon compte et paramètres'),
-              subtitle: const Text('Photo, coordonnées, mot de passe, appareils'),
+              title: Text(tr('Mon compte et paramètres')),
+              subtitle: Text(tr('Photo, coordonnées, mot de passe, appareils')),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AccountScreen())),
             ),
@@ -83,13 +83,13 @@ class ProfileScreen extends StatelessWidget {
             ),
             onPressed: () => auth.logout(),
             icon: const Icon(Icons.logout),
-            label: const Text('Se déconnecter'),
+            label: Text(tr('Se déconnecter')),
           ),
           const SizedBox(height: 28),
-          const Center(child: SoftwareBrand(size: 18, subtitle: 'Application enseignant · version 0.1.0')),
+          Center(child: SoftwareBrand(size: 18, subtitle: tr('Application enseignant · version 0.1.0'))),
           const SizedBox(height: 6),
           Text(
-            'Les documents officiels (bulletins, emplois du temps…) portent l\'identité de votre établissement.',
+            tr('Les documents officiels (bulletins, emplois du temps…) portent l\'identité de votre établissement.'),
             textAlign: TextAlign.center,
             style: TextStyle(color: Tokens.textSecondary, fontSize: 12.5),
           ),

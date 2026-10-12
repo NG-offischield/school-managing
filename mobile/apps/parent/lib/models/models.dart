@@ -6,7 +6,7 @@ import 'package:school_core/school_core.dart';
 
 DateTime? _date(Object? iso) => iso == null ? null : DateTime.tryParse('$iso');
 
-const relationships = {
+const _relationshipsFr = {
   'MOTHER': 'Mère',
   'FATHER': 'Père',
   'LEGAL_GUARDIAN': 'Tuteur légal',
@@ -14,14 +14,23 @@ const relationships = {
   'OTHER': 'Autre',
 };
 
-const documentTypes = {
+/// Labels in the CURRENT language (French source: [_relationshipsFr]).
+Map<String, String> get relationships => trMap(_relationshipsFr);
+
+const _documentTypesFr = {
   'CNI': 'Carte nationale d\'identité',
   'PASSPORT': 'Passeport',
   'RESIDENCE_PERMIT': 'Titre de séjour',
   'OTHER': 'Autre pièce officielle',
 };
 
-const enrollmentStatuses = {'ACTIVE': 'Scolarisé(e)', 'COMPLETED': 'Année terminée', 'WITHDRAWN': 'Retiré(e)'};
+/// Labels in the CURRENT language (French source: [_documentTypesFr]).
+Map<String, String> get documentTypes => trMap(_documentTypesFr);
+
+const _enrollmentStatusesFr = {'ACTIVE': 'Scolarisé(e)', 'COMPLETED': 'Année terminée', 'WITHDRAWN': 'Retiré(e)'};
+
+/// Labels in the CURRENT language (French source: [_enrollmentStatusesFr]).
+Map<String, String> get enrollmentStatuses => trMap(_enrollmentStatusesFr);
 
 /// A child the server lets this parent see: a VERIFIED, active link, with
 /// the rights the school granted on that link.
@@ -79,13 +88,16 @@ class Child {
   String get name => '$firstName $lastName'.trim();
 
   String get schooling {
-    if (className == null) return 'Pas d\'inscription cette année';
+    if (className == null) return tr('Pas d\'inscription cette année');
     final status = enrollmentStatuses[enrollmentStatus] ?? enrollmentStatus ?? '';
     return '$className · ${yearName ?? ''}${status.isEmpty || enrollmentStatus == 'ACTIVE' ? '' : ' · $status'}';
   }
 }
 
-const registrationStatuses = {'PENDING': 'En attente de validation', 'APPROVED': 'Validée', 'REJECTED': 'Refusée'};
+const _registrationStatusesFr = {'PENDING': 'En attente de validation', 'APPROVED': 'Validée', 'REJECTED': 'Refusée'};
+
+/// Labels in the CURRENT language (French source: [_registrationStatusesFr]).
+Map<String, String> get registrationStatuses => trMap(_registrationStatusesFr);
 
 class Registration {
   Registration({required this.status, required this.schoolName, this.submittedAt, this.rejectionReason});
@@ -105,14 +117,23 @@ class Registration {
   String get statusLabel => registrationStatuses[status] ?? status;
 }
 
-const linkStatuses = {'PENDING': 'En cours', 'APPROVED': 'Validée', 'REJECTED': 'Refusée', 'CANCELLED': 'Annulée'};
-const identityStatuses = {'PENDING': 'À vérifier à l\'école', 'VERIFIED': 'Vérifiée', 'REJECTED': 'Refusée'};
-const studentApprovals = {
+const _linkStatusesFr = {'PENDING': 'En cours', 'APPROVED': 'Validée', 'REJECTED': 'Refusée', 'CANCELLED': 'Annulée'};
+
+/// Labels in the CURRENT language (French source: [_linkStatusesFr]).
+Map<String, String> get linkStatuses => trMap(_linkStatusesFr);
+const _identityStatusesFr = {'PENDING': 'À vérifier à l\'école', 'VERIFIED': 'Vérifiée', 'REJECTED': 'Refusée'};
+
+/// Labels in the CURRENT language (French source: [_identityStatusesFr]).
+Map<String, String> get identityStatuses => trMap(_identityStatusesFr);
+const _studentApprovalsFr = {
   'PENDING': 'À confirmer par l\'élève',
   'APPROVED': 'Confirmée par l\'élève',
   'REJECTED': 'Refusée par l\'élève',
   'NOT_REQUIRED': 'Non requise',
 };
+
+/// Labels in the CURRENT language (French source: [_studentApprovalsFr]).
+Map<String, String> get studentApprovals => trMap(_studentApprovalsFr);
 
 /// « This is my child » request, as the parent may see it (never the
 /// document number: the server keeps an HMAC only).
@@ -157,23 +178,29 @@ class LinkRequest {
   bool get pending => status == 'PENDING';
   String get statusLabel => linkStatuses[status] ?? status;
   String get identityLabel =>
-      sponsored ? 'Vérifiée par parrainage' : (identityStatuses[identityStatus] ?? identityStatus);
+      sponsored ? tr('Vérifiée par parrainage') : (identityStatuses[identityStatus] ?? identityStatus);
   String get approvalLabel => studentApprovals[studentApproval] ?? studentApproval;
 }
 
-const dailyStatuses = {
+const _dailyStatusesFr = {
   'PENDING': 'En attente',
   'PRESENT': 'Présent(e)',
   'LATE': 'En retard',
   'ABSENT': 'Absent(e)',
   'EXCUSED': 'Absence justifiée',
 };
-const alertLevels = {
+
+/// Labels in the CURRENT language (French source: [_dailyStatusesFr]).
+Map<String, String> get dailyStatuses => trMap(_dailyStatusesFr);
+const _alertLevelsFr = {
   'NONE': 'Aucune alerte',
   'YELLOW': 'Alerte jaune',
   'ORANGE': 'Alerte orange',
   'RED': 'Alerte rouge',
 };
+
+/// Labels in the CURRENT language (French source: [_alertLevelsFr]).
+Map<String, String> get alertLevels => trMap(_alertLevelsFr);
 
 class AttendanceDay {
   AttendanceDay({
@@ -240,12 +267,15 @@ class Scan {
   final String result;
 }
 
-const convocationStatuses = {
+const _convocationStatusesFr = {
   'SCHEDULED': 'Programmée',
   'HELD': 'Tenue',
   'MISSED': 'Parent absent',
   'CANCELLED': 'Annulée',
 };
+
+/// Labels in the CURRENT language (French source: [_convocationStatusesFr]).
+Map<String, String> get convocationStatuses => trMap(_convocationStatusesFr);
 
 class Convocation {
   Convocation({required this.student, required this.start, required this.reason, required this.status, this.end});
@@ -267,7 +297,10 @@ class Convocation {
   String get statusLabel => convocationStatuses[status] ?? status;
 }
 
-const sessionStatuses = {'SCHEDULED': 'Prévue', 'COMPLETED': 'Réalisée', 'CANCELLED': 'Annulée'};
+const _sessionStatusesFr = {'SCHEDULED': 'Prévue', 'COMPLETED': 'Réalisée', 'CANCELLED': 'Annulée'};
+
+/// Labels in the CURRENT language (French source: [_sessionStatusesFr]).
+Map<String, String> get sessionStatuses => trMap(_sessionStatusesFr);
 
 /// A dated session of the child's class (families see what, when, where,
 /// who teaches — no internal data).
@@ -317,13 +350,19 @@ class ClassSession {
   String get subjectName => subject.extra.isNotEmpty ? subject.extra : subject.label;
 }
 
-const invoiceStatuses = {
+const _invoiceStatusesFr = {
   'ISSUED': 'À payer',
   'PARTIALLY_PAID': 'Partiellement payée',
   'PAID': 'Payée',
   'CANCELLED': 'Annulée',
 };
-const solvencies = {'UP_TO_DATE': 'À jour', 'OVERDUE': 'Échéance dépassée'};
+
+/// Labels in the CURRENT language (French source: [_invoiceStatusesFr]).
+Map<String, String> get invoiceStatuses => trMap(_invoiceStatusesFr);
+const _solvenciesFr = {'UP_TO_DATE': 'À jour', 'OVERDUE': 'Échéance dépassée'};
+
+/// Labels in the CURRENT language (French source: [_solvenciesFr]).
+Map<String, String> get solvencies => trMap(_solvenciesFr);
 
 class InvoiceLine {
   InvoiceLine({required this.label, required this.total});
@@ -454,7 +493,7 @@ class Obligations {
   String get solvencyLabel => solvencies[solvency] ?? solvency;
 }
 
-const paymentStatuses = {
+const _paymentStatusesFr = {
   'PENDING': 'En attente',
   'SUCCEEDED': 'Réussi',
   'DECLINED': 'Refusé',
@@ -466,10 +505,13 @@ const paymentStatuses = {
   'REFUNDED': 'Remboursé',
 };
 
+/// Labels in the CURRENT language (French source: [_paymentStatusesFr]).
+Map<String, String> get paymentStatuses => trMap(_paymentStatusesFr);
+
 /// What the payer is told about a payment the server answered. A failure is
 /// a RESULT recorded by the server, never computed here; a failed payment
 /// moves no money (ADR 0013 §4).
-const paymentOutcomes = {
+const _paymentOutcomesFr = {
   'SUCCEEDED': 'Paiement réussi',
   'PENDING': 'Paiement en attente de confirmation du fournisseur',
   'DECLINED': 'Paiement refusé par le fournisseur : aucun débit',
@@ -478,6 +520,9 @@ const paymentOutcomes = {
   'PROVIDER_ERROR': 'Erreur du fournisseur : aucun débit',
   'CANCELLED': 'Paiement annulé : aucun débit',
 };
+
+/// Labels in the CURRENT language (French source: [_paymentOutcomesFr]).
+Map<String, String> get paymentOutcomes => trMap(_paymentOutcomesFr);
 
 class Payment {
   Payment({

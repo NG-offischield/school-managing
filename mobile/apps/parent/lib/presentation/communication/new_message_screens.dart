@@ -75,18 +75,18 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
   Widget build(BuildContext context) {
     final child = context.watch<ChildScope>().selected;
     return Scaffold(
-      appBar: AppBar(title: const Text('Nouveau message')),
+      appBar: AppBar(title: Text(tr('Nouveau message'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           if (_error != null) ...[MessageBanner(_error!), const SizedBox(height: 12)],
           SegmentedButton<bool>(
             segments: [
-              const ButtonSegment(value: false, label: Text('Administration'), icon: Icon(Icons.apartment_outlined)),
+              ButtonSegment(value: false, label: Text(tr('Administration')), icon: Icon(Icons.apartment_outlined)),
               ButtonSegment(
                 value: true,
                 enabled: child != null,
-                label: const Text('Enseignant'),
+                label: Text(tr('Enseignant')),
                 icon: const Icon(Icons.school_outlined),
               ),
             ],
@@ -95,7 +95,7 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
           ),
           if (_toTeacher && child != null) ...[
             const SizedBox(height: 14),
-            Text('Au sujet de ${child.name}', style: TextStyle(color: Tokens.textSecondary)),
+            Text(tr('Au sujet de {0}', [child.name]), style: TextStyle(color: Tokens.textSecondary)),
             const SizedBox(height: 8),
             FutureBuilder<List<TeacherContact>>(
               future: _teachers,
@@ -103,10 +103,10 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
                 if (snapshot.connectionState != ConnectionState.done) return const LinearProgressIndicator();
                 if (snapshot.hasError) {
                   final error = snapshot.error;
-                  return MessageBanner(error is ApiException ? error.userMessage : 'Liste indisponible.');
+                  return MessageBanner(error is ApiException ? error.userMessage : tr('Liste indisponible.'));
                 }
                 final teachers = snapshot.data ?? const [];
-                if (teachers.isEmpty) return const Text('Aucun enseignant pour cette classe.');
+                if (teachers.isEmpty) return Text(tr('Aucun enseignant pour cette classe.'));
                 return Column(
                   children: [
                     for (final t in teachers)
@@ -131,7 +131,7 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
           TextField(
             key: const Key('message.title'),
             controller: _title,
-            decoration: const InputDecoration(labelText: 'Objet (facultatif)'),
+            decoration: InputDecoration(labelText: tr('Objet (facultatif)')),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -140,14 +140,14 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
             minLines: 4,
             maxLines: 8,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(labelText: 'Message', alignLabelWithHint: true),
+            decoration: InputDecoration(labelText: tr('Message'), alignLabelWithHint: true),
           ),
           const SizedBox(height: 18),
           FilledButton.icon(
             key: const Key('message.send'),
             onPressed: _ready ? _send : null,
             icon: const Icon(Icons.send),
-            label: const Text('Envoyer'),
+            label: Text(tr('Envoyer')),
           ),
         ],
       ),

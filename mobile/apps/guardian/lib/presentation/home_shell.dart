@@ -74,20 +74,20 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             selectedIndex: _tab,
             onDestinationSelected: open,
             destinations: [
-              const NavigationDestination(
+              NavigationDestination(
                 icon: Icon(Icons.home_outlined),
                 selectedIcon: Icon(Icons.home),
-                label: 'Accueil',
+                label: tr('Accueil'),
               ),
-              const NavigationDestination(
+              NavigationDestination(
                 icon: Icon(Icons.qr_code_scanner),
                 selectedIcon: Icon(Icons.qr_code_2),
-                label: 'Portail',
+                label: tr('Portail'),
               ),
-              const NavigationDestination(
+              NavigationDestination(
                 icon: Icon(Icons.history),
                 selectedIcon: Icon(Icons.history_toggle_off),
-                label: 'Passages',
+                label: tr('Passages'),
               ),
               NavigationDestination(
                 icon: Badge(
@@ -96,12 +96,12 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                   child: const Icon(Icons.chat_bubble_outline),
                 ),
                 selectedIcon: const Icon(Icons.chat_bubble),
-                label: 'Alertes',
+                label: tr('Alertes'),
               ),
-              const NavigationDestination(
+              NavigationDestination(
                 icon: Icon(Icons.person_outline),
                 selectedIcon: Icon(Icons.person),
-                label: 'Profil',
+                label: tr('Profil'),
               ),
             ],
           ),
@@ -169,10 +169,10 @@ class _GuardianHomeState extends State<GuardianHome> {
     final auth = context.watch<AuthService>();
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Accueil'),
+        title: Text(tr('Accueil')),
         actions: [
           const LiveIndicator(),
-          IconButton(tooltip: 'Actualiser', onPressed: _load, icon: const Icon(Icons.refresh)),
+          IconButton(tooltip: tr('Actualiser'), onPressed: _load, icon: const Icon(Icons.refresh)),
         ],
       ),
       body: AsyncBody<_Overview>(
@@ -184,7 +184,7 @@ class _GuardianHomeState extends State<GuardianHome> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
               Text(
-                'Bonjour ${auth.identity?.firstName ?? ''}',
+                tr('Bonjour {0}', [auth.identity?.firstName ?? '']),
                 style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
               ),
               Text(auth.identity?.current?.schoolName ?? '', style: TextStyle(color: Tokens.textSecondary)),
@@ -193,8 +193,8 @@ class _GuardianHomeState extends State<GuardianHome> {
                 child: ListTile(
                   key: const Key('home.scans'),
                   leading: Icon(Icons.how_to_reg, color: Tokens.primary),
-                  title: Text('$accepted arrivée(s) enregistrée(s) aujourd\'hui'),
-                  subtitle: Text('${data.todayScans.length} passage(s) au total, par vous'),
+                  title: Text(tr('{0} arrivée(s) enregistrée(s) aujourd\'hui', [accepted])),
+                  subtitle: Text(tr('{0} passage(s) au total, par vous', [data.todayScans.length])),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => widget.onOpenTab(2),
                 ),
@@ -204,10 +204,10 @@ class _GuardianHomeState extends State<GuardianHome> {
                 key: const Key('home.scan'),
                 onPressed: widget.onScan ?? () => widget.onOpenTab(1),
                 icon: const Icon(Icons.qr_code_scanner),
-                label: const Text('Scanner au portail'),
+                label: Text(tr('Scanner au portail')),
               ),
               if (data.breaks.isNotEmpty) ...[
-                const _Title('Fermetures à venir'),
+                _Title(tr('Fermetures à venir')),
                 for (final b in data.breaks)
                   Card(
                     child: ListTile(
@@ -220,9 +220,9 @@ class _GuardianHomeState extends State<GuardianHome> {
                     ),
                   ),
               ],
-              const _Title('Dernières notifications'),
+              _Title(tr('Dernières notifications')),
               if (data.notifications.isEmpty)
-                Text('Aucune notification.', style: TextStyle(color: Tokens.textSecondary)),
+                Text(tr('Aucune notification.'), style: TextStyle(color: Tokens.textSecondary)),
               for (final n in data.notifications)
                 Card(
                   child: ListTile(
@@ -265,7 +265,7 @@ class GuardianProfile extends StatelessWidget {
     final identity = auth.identity;
     if (identity == null) return const SizedBox.shrink();
     return Scaffold(
-      appBar: AppBar(title: const Text('Profil')),
+      appBar: AppBar(title: Text(tr('Profil'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -294,13 +294,13 @@ class GuardianProfile extends StatelessWidget {
               children: [
                 ListTile(
                   leading: const Icon(Icons.school_outlined),
-                  title: const Text('Établissement'),
+                  title: Text(tr('Établissement')),
                   subtitle: Text(identity.current?.schoolName ?? '—'),
                 ),
-                const ListTile(
+                ListTile(
                   leading: Icon(Icons.shield_outlined),
-                  title: Text('Rôle'),
-                  subtitle: Text('Gardien : contrôle des arrivées au portail'),
+                  title: Text(tr('Rôle')),
+                  subtitle: Text(tr('Gardien : contrôle des arrivées au portail')),
                 ),
               ],
             ),
@@ -309,8 +309,8 @@ class GuardianProfile extends StatelessWidget {
             child: ListTile(
               key: const Key('profile.account'),
               leading: const Icon(Icons.manage_accounts_outlined),
-              title: const Text('Mon compte et paramètres'),
-              subtitle: const Text('Photo, coordonnées, mot de passe, appareils'),
+              title: Text(tr('Mon compte et paramètres')),
+              subtitle: Text(tr('Photo, coordonnées, mot de passe, appareils')),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AccountScreen())),
             ),
@@ -326,10 +326,10 @@ class GuardianProfile extends StatelessWidget {
             ),
             onPressed: () => auth.logout(),
             icon: const Icon(Icons.logout),
-            label: const Text('Se déconnecter'),
+            label: Text(tr('Se déconnecter')),
           ),
           const SizedBox(height: 28),
-          const Center(child: SoftwareBrand(size: 18, subtitle: 'Application gardien · version 0.1.0')),
+          Center(child: SoftwareBrand(size: 18, subtitle: tr('Application gardien · version 0.1.0'))),
         ],
       ),
     );

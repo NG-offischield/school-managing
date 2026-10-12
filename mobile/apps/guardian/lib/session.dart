@@ -14,7 +14,7 @@ ServerSession guardianSession(AppConfig config, {http.Client? client, TokenStore
     api,
     tokens ?? SecureTokenStore(prefix: 'school_managing.guardian'),
     requiredRole: 'GUARDIAN',
-    device: const DeviceInfo(name: 'Application gardien'),
+    device: DeviceInfo(name: tr('Application gardien')),
   );
   RealtimeClient live() => channels == null
       ? RealtimeClient(api, config.socket, refresh: auth.refreshSession)

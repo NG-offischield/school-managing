@@ -13,11 +13,16 @@ import 'session.dart';
 ///   3. none: the app opens on the server settings screen.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('fr_FR');
+  await initializeDateFormatting(); // French and English formats
   final theme = await ThemeController.load(); // Système / Clair / Sombre, kept on the phone
+  final language = await LanguageController.load(); // Français / English, kept on the phone
+  L10n.use(language.language);
   runApp(
-    ChangeNotifierProvider<ThemeController>.value(
-      value: theme,
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<ThemeController>.value(value: theme),
+        ChangeNotifierProvider<LanguageController>.value(value: language),
+      ],
       child: ServerHost(
         store: PreferencesEndpointStore('school_managing.teacher'),
         buildApiUrl: const String.fromEnvironment('API_URL'),

@@ -67,8 +67,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final identity = context.watch<AuthService>().identity!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Accueil'),
-        actions: [IconButton(tooltip: 'Actualiser', icon: const Icon(Icons.refresh), onPressed: _load)],
+        title: Text(tr('Accueil')),
+        actions: [IconButton(tooltip: tr('Actualiser'), icon: const Icon(Icons.refresh), onPressed: _load)],
       ),
       body: RefreshIndicator(
         onRefresh: () async => _load(),
@@ -109,7 +109,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Bonjour ${identity.firstName}',
+                        tr('Bonjour {0}', [identity.firstName]),
                         style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w700),
                       ),
                       Text(identity.current?.schoolName ?? '', style: const TextStyle(color: Colors.white70)),
@@ -126,28 +126,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             Expanded(
               child: _Metric(
-                label: 'Séances aujourd\'hui',
+                label: tr('Séances aujourd\'hui'),
                 value: '${today.where((s) => !s.cancelled).length}',
                 onTap: () => widget.onOpenTab(1),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: _Metric(label: 'Notifications non lues', value: '$unread', onTap: () => widget.onOpenTab(2)),
+              child: _Metric(label: tr('Notifications non lues'), value: '$unread', onTap: () => widget.onOpenTab(2)),
             ),
           ],
         ),
-        SectionTitle('Prochain cours'),
+        SectionTitle(tr('Prochain cours')),
         if (next == null)
-          const EmptyState(text: 'Aucun cours prévu dans les 14 prochains jours.', icon: Icons.event_available_outlined)
+          EmptyState(text: tr('Aucun cours prévu dans les 14 prochains jours.'), icon: Icons.event_available_outlined)
         else
           SessionTile(session: next, myName: identity.fullName, showDay: true, onTap: () => _open(next)),
         SectionTitle(
-          'Aujourd\'hui',
-          trailing: TextButton(onPressed: () => widget.onOpenTab(1), child: const Text('Planning')),
+          tr('Aujourd\'hui'),
+          trailing: TextButton(onPressed: () => widget.onOpenTab(1), child: Text(tr('Planning'))),
         ),
         if (today.isEmpty)
-          const EmptyState(text: 'Aucune séance aujourd\'hui.', icon: Icons.free_breakfast_outlined)
+          EmptyState(text: tr('Aucune séance aujourd\'hui.'), icon: Icons.free_breakfast_outlined)
         else
           ...today.map(
             (s) => Padding(
@@ -155,9 +155,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: SessionTile(session: s, myName: identity.fullName, onTap: () => _open(s)),
             ),
           ),
-        SectionTitle('Mes cours (${data.courses.length})'),
+        SectionTitle(tr('Mes cours ({0})', [data.courses.length])),
         if (data.courses.isEmpty)
-          const EmptyState(text: 'Aucun cours ne vous est attribué.', icon: Icons.class_outlined)
+          EmptyState(text: tr('Aucun cours ne vous est attribué.'), icon: Icons.class_outlined)
         else
           Card(
             child: Column(
@@ -170,25 +170,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                     subtitle: Text(
-                      'Coefficient ${course.coefficient}${course.weeklyHours.isEmpty ? '' : ' · ${course.weeklyHours} h / semaine'}',
+                      tr('Coefficient {0}{1}', [
+                        course.coefficient,
+                        course.weeklyHours.isEmpty ? '' : tr(' · {0} h / semaine', [course.weeklyHours]),
+                      ]),
                     ),
                   ),
               ],
             ),
           ),
         if (data.pay != null) ...[
-          SectionTitle('Rémunération du mois'),
+          SectionTitle(tr('Rémunération du mois')),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(14),
               child: Column(
                 children: [
-                  _payRow('Programmée', data.pay!.programmed, '${data.pay!.sessions['scheduled'] ?? 0} séance(s)'),
-                  _payRow('Acquise (validée)', data.pay!.earned, '${data.pay!.sessions['validated'] ?? 0} séance(s)'),
-                  _payRow('Payée', data.pay!.paid, '${data.pay!.sessions['paid'] ?? 0} séance(s)'),
+                  _payRow(
+                    tr('Programmée'),
+                    data.pay!.programmed,
+                    tr('{0} séance(s)', [data.pay!.sessions['scheduled'] ?? 0]),
+                  ),
+                  _payRow(
+                    tr('Acquise (validée)'),
+                    data.pay!.earned,
+                    tr('{0} séance(s)', [data.pay!.sessions['validated'] ?? 0]),
+                  ),
+                  _payRow(tr('Payée'), data.pay!.paid, tr('{0} séance(s)', [data.pay!.sessions['paid'] ?? 0])),
                   const SizedBox(height: 6),
                   Text(
-                    'Calculée par l\'établissement ; une séance n\'est acquise qu\'après validation.',
+                    tr('Calculée par l\'établissement ; une séance n\'est acquise qu\'après validation.'),
                     style: TextStyle(color: Tokens.textSecondary, fontSize: 12.5),
                   ),
                 ],

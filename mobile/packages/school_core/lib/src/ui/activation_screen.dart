@@ -5,6 +5,7 @@ import '../api/api_error.dart';
 import '../auth/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
+import '../l10n/l10n.dart';
 
 /// Activation of an account created by the administration (ADR 0024):
 ///   1. code  -> POST /auth/activation/check/   (who / which school / login)
@@ -53,7 +54,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
   String? get _passwordProblem {
     if (_password.text.isEmpty) return null;
     if (_confirmation.text.isNotEmpty && _confirmation.text != _password.text) {
-      return 'Les deux mots de passe ne sont pas identiques.';
+      return tr('Les deux mots de passe ne sont pas identiques.');
     }
     return null;
   }
@@ -83,7 +84,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Activer mon compte')),
+      appBar: AppBar(title: Text(tr('Activer mon compte'))),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -111,12 +112,12 @@ class _ActivationScreenState extends State<ActivationScreen> {
 
   List<Widget> _codeStep() => [
     Text(
-      'Étape 1 sur 2',
+      tr('Étape 1 sur 2'),
       style: TextStyle(color: Tokens.textSecondary, fontWeight: FontWeight.w600),
     ),
     const SizedBox(height: 6),
-    const Text(
-      'Saisissez le code d\'activation remis par l\'administration de votre établissement.',
+    Text(
+      tr('Saisissez le code d\'activation remis par l\'administration de votre établissement.'),
       style: TextStyle(fontSize: 16),
     ),
     const SizedBox(height: 18),
@@ -127,7 +128,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
       autocorrect: false,
       enableSuggestions: false,
       style: const TextStyle(fontSize: 18, letterSpacing: 1.5, fontWeight: FontWeight.w600),
-      decoration: const InputDecoration(labelText: 'Code d\'activation', hintText: 'XXXX-XXXX-XXXX-XXXX-XXXX'),
+      decoration: InputDecoration(labelText: tr('Code d\'activation'), hintText: 'XXXX-XXXX-XXXX-XXXX-XXXX'),
       onChanged: (_) => setState(() {}),
       onSubmitted: (_) => _code.text.trim().isEmpty ? null : _check(),
     ),
@@ -135,7 +136,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
     FilledButton(
       key: const Key('activation.check'),
       onPressed: _busy || _code.text.trim().isEmpty ? null : _check,
-      child: const Text('Vérifier le code'),
+      child: Text(tr('Vérifier le code')),
     ),
   ];
 
@@ -143,23 +144,26 @@ class _ActivationScreenState extends State<ActivationScreen> {
     final preview = _preview!;
     final expires = preview.expiresAt == null
         ? ''
-        : DateFormat('dd/MM/yyyy HH:mm', 'fr_FR').format(preview.expiresAt!.toLocal());
+        : DateFormat('dd/MM/yyyy HH:mm', L10n.intl).format(preview.expiresAt!.toLocal());
     return [
       Text(
-        'Étape 2 sur 2',
+        tr('Étape 2 sur 2'),
         style: TextStyle(color: Tokens.textSecondary, fontWeight: FontWeight.w600),
       ),
       const SizedBox(height: 6),
-      Text('Bonjour ${preview.firstName},', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+      Text(tr('Bonjour {0},', [preview.firstName]), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
       const SizedBox(height: 6),
       Text(
-        'Établissement : ${preview.school}\nIdentifiant : ${preview.login}'
-        '${expires.isEmpty ? '' : '\nCode valable jusqu\'au $expires'}',
+        tr('Établissement : {0}\nIdentifiant : {1}{2}', [
+          preview.school,
+          preview.login,
+          expires.isEmpty ? '' : tr('\nCode valable jusqu\'au {0}', [expires]),
+        ]),
         style: const TextStyle(fontSize: 15, height: 1.4),
       ),
       const SizedBox(height: 18),
       Text(
-        'Choisissez votre mot de passe : au moins 10 caractères, ni trop courant, ni proche de votre nom.',
+        tr('Choisissez votre mot de passe : au moins 10 caractères, ni trop courant, ni proche de votre nom.'),
         style: TextStyle(color: Tokens.textSecondary),
       ),
       const SizedBox(height: 14),
@@ -172,9 +176,9 @@ class _ActivationScreenState extends State<ActivationScreen> {
         autofillHints: const [AutofillHints.newPassword],
         onChanged: (_) => setState(() {}),
         decoration: InputDecoration(
-          labelText: 'Nouveau mot de passe',
+          labelText: tr('Nouveau mot de passe'),
           suffixIcon: IconButton(
-            tooltip: _hidden ? 'Afficher' : 'Masquer',
+            tooltip: _hidden ? tr('Afficher') : tr('Masquer'),
             icon: Icon(_hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined),
             onPressed: () => setState(() => _hidden = !_hidden),
           ),
@@ -188,13 +192,13 @@ class _ActivationScreenState extends State<ActivationScreen> {
         enableSuggestions: false,
         autocorrect: false,
         onChanged: (_) => setState(() {}),
-        decoration: InputDecoration(labelText: 'Confirmation', errorText: _passwordProblem),
+        decoration: InputDecoration(labelText: tr('Confirmation'), errorText: _passwordProblem),
       ),
       const SizedBox(height: 20),
       FilledButton(
         key: const Key('activation.complete'),
         onPressed: _canComplete ? _complete : null,
-        child: const Text('Activer mon compte'),
+        child: Text(tr('Activer mon compte')),
       ),
     ];
   }
@@ -202,14 +206,14 @@ class _ActivationScreenState extends State<ActivationScreen> {
   List<Widget> _done() => [
     Icon(Icons.verified_user_outlined, size: 56, color: Tokens.success),
     const SizedBox(height: 12),
-    const Text(
-      'Compte activé',
+    Text(
+      tr('Compte activé'),
       textAlign: TextAlign.center,
       style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
     ),
     const SizedBox(height: 8),
     Text(
-      'Connectez-vous maintenant avec l\'identifiant $_activatedLogin et votre nouveau mot de passe.',
+      tr('Connectez-vous maintenant avec l\'identifiant {0} et votre nouveau mot de passe.', [_activatedLogin]),
       textAlign: TextAlign.center,
       style: const TextStyle(fontSize: 15),
     ),
@@ -217,7 +221,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
     FilledButton(
       key: const Key('activation.toLogin'),
       onPressed: () => Navigator.of(context).pop(_activatedLogin),
-      child: const Text('Aller à la connexion'),
+      child: Text(tr('Aller à la connexion')),
     ),
   ];
 }

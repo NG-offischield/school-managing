@@ -3,8 +3,9 @@
 library;
 
 import 'api/api_error.dart';
+import './l10n/l10n.dart';
 
-const ruleMessages = <String, String>{
+const _ruleMessagesFr = <String, String>{
   // sessions / attendance (ADR 0012, 0014)
   'session_not_started': 'La séance n\'a pas encore commencé : déclarez votre présence après le début.',
   'session_cancelled': 'Cette séance est annulée.',
@@ -42,7 +43,10 @@ const ruleMessages = <String, String>{
   'document_source_not_final': 'Ce document n\'est pas encore disponible (bulletin non validé, paiement non abouti).',
 };
 
-const codeMessages = <String, String>{
+/// Labels in the CURRENT language (French source: [_ruleMessagesFr]).
+Map<String, String> get ruleMessages => trMap(_ruleMessagesFr);
+
+const _codeMessagesFr = <String, String>{
   'INVALID_CREDENTIALS': 'Identifiant ou mot de passe incorrect (ou compte suspendu).',
   'INVALID_REFRESH_TOKEN': 'Votre session a expiré : reconnectez-vous.',
   'INVALID_ACCESS_TOKEN': 'Votre session a expiré : reconnectez-vous.',
@@ -58,10 +62,13 @@ const codeMessages = <String, String>{
   'TIMEOUT': 'Le serveur ne répond pas. Réessayez dans un instant.',
 };
 
+/// Labels in the CURRENT language (French source: [_codeMessagesFr]).
+Map<String, String> get codeMessages => trMap(_codeMessagesFr);
+
 String explain(ApiException error) {
   final rule = error.rule;
   if (rule != null && ruleMessages.containsKey(rule)) return ruleMessages[rule]!;
   if (codeMessages.containsKey(error.code)) return codeMessages[error.code]!;
-  if (error.status >= 500) return 'Le serveur a rencontré une erreur. Réessayez plus tard.';
+  if (error.status >= 500) return tr('Le serveur a rencontré une erreur. Réessayez plus tard.');
   return error.message;
 }

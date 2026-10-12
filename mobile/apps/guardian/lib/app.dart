@@ -3,6 +3,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:school_core/school_core.dart';
 
+import 'l10n/guardian_en.dart';
+
 import 'data/guardian_repository.dart';
 import 'presentation/camera/qr_camera.dart';
 import 'presentation/home_shell.dart';
@@ -22,6 +24,7 @@ class GuardianApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    L10n.register(guardianEnglish); // this app's own English texts (shared ones: school_core)
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<AuthService>.value(value: auth),
@@ -30,14 +33,14 @@ class GuardianApp extends StatelessWidget {
         Provider<GateRepository>.value(value: repository.gate),
       ],
       child: MaterialApp(
-        title: 'School Managing — Gardien',
+        title: tr('School Managing — Gardien'),
         debugShowCheckedModeBanner: false,
         theme: buildAppTheme(),
         darkTheme: buildAppTheme(brightness: Brightness.dark),
         themeMode: themeModeOf(context),
         builder: themedScreens,
-        locale: const Locale('fr', 'FR'),
-        supportedLocales: const [Locale('fr', 'FR')],
+        locale: languageOf(context).locale,
+        supportedLocales: supportedAppLocales,
         localizationsDelegates: const [
           GlobalMaterialLocalizations.delegate,
           GlobalWidgetsLocalizations.delegate,
@@ -61,10 +64,10 @@ class AuthGate extends StatelessWidget {
     return switch (auth.status) {
       AuthStatus.restoring => Scaffold(
         backgroundColor: Tokens.navy,
-        body: Center(child: SoftwareBrand(light: true, size: 30, subtitle: 'Espace gardien')),
+        body: Center(child: SoftwareBrand(light: true, size: 30, subtitle: tr('Espace gardien'))),
       ),
       AuthStatus.signedOut || AuthStatus.pending => SignInScreen(
-        subtitle: 'Espace gardien',
+        subtitle: tr('Espace gardien'),
         roleLabel: 'gardien',
         alternative: SignInAlternative.activation(),
       ),

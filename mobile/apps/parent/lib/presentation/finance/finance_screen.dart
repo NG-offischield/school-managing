@@ -23,7 +23,7 @@ class FinanceScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Scolarité et paiements'), actions: const [ChildSwitcher()]),
+      appBar: AppBar(title: Text(tr('Scolarité et paiements')), actions: const [ChildSwitcher()]),
       body: ChildBody(
         builder: (context, child) => _ChildFinance(key: ValueKey(child.id), child: child),
       ),
@@ -107,21 +107,22 @@ class _ChildFinanceState extends State<_ChildFinance> {
           children: [
             Text(widget.child.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             if (data.obligations == null)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(top: 12),
                 child: MessageBanner(
-                  'L\'établissement ne vous a pas donné accès à la situation financière de cet enfant. '
-                  'Seuls vos propres paiements sont affichés.',
+                  tr(
+                    'L\'établissement ne vous a pas donné accès à la situation financière de cet enfant. Seuls vos propres paiements sont affichés.',
+                  ),
                   tone: Tone.info,
                 ),
               )
             else
               ..._obligations(data.obligations!, data.invoices),
-            const SectionTitle('Historique des paiements'),
+            SectionTitle(tr('Historique des paiements')),
             if (data.payments.isEmpty)
               Padding(
                 padding: EdgeInsets.all(8),
-                child: Text('Aucun paiement.', style: TextStyle(color: Tokens.textSecondary)),
+                child: Text(tr('Aucun paiement.'), style: TextStyle(color: Tokens.textSecondary)),
               ),
             for (final p in data.payments)
               Card(
@@ -135,7 +136,7 @@ class _ChildFinanceState extends State<_ChildFinance> {
                       if (p.hasReceipt)
                         IconButton(
                           key: Key('receipt.${p.id}'),
-                          tooltip: 'Télécharger le reçu',
+                          tooltip: tr('Télécharger le reçu'),
                           icon: const Icon(Icons.download_outlined),
                           onPressed: () => _receipt(p),
                         ),
@@ -150,51 +151,54 @@ class _ChildFinanceState extends State<_ChildFinance> {
   }
 
   List<Widget> _obligations(Obligations o, List<Invoice> invoices) => [
-    const SectionTitle('Situation'),
+    SectionTitle(tr('Situation')),
     Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            InfoRow('Reste à payer', formatMoney(o.balanceDue, o.currency), strong: true),
-            InfoRow('Échéances', o.solvencyLabel),
+            InfoRow(tr('Reste à payer'), formatMoney(o.balanceDue, o.currency), strong: true),
+            InfoRow(tr('Échéances'), o.solvencyLabel),
             const SizedBox(height: 8),
             StatusChip(
-              o.canPay ? 'Vous pouvez payer pour cet enfant' : 'Paiement non autorisé pour votre compte',
+              o.canPay ? tr('Vous pouvez payer pour cet enfant') : tr('Paiement non autorisé pour votre compte'),
               tone: o.canPay ? Tone.success : Tone.neutral,
             ),
           ],
         ),
       ),
     ),
-    const SectionTitle('Factures'),
+    SectionTitle(tr('Factures')),
     if (invoices.isEmpty)
       Padding(
         padding: EdgeInsets.all(8),
-        child: Text('Aucune facture.', style: TextStyle(color: Tokens.textSecondary)),
+        child: Text(tr('Aucune facture.'), style: TextStyle(color: Tokens.textSecondary)),
       ),
     for (final i in invoices)
       Card(
         child: ExpansionTile(
           title: Text(i.number, style: const TextStyle(fontWeight: FontWeight.w700)),
           subtitle: Text(
-            'Échéance ${i.dueDate == null ? '—' : dateOnly.format(i.dueDate!)} · reste ${formatMoney(i.balance, i.currency)}',
+            tr('Échéance {0} · reste {1}', [
+              i.dueDate == null ? '—' : dateOnly.format(i.dueDate!),
+              formatMoney(i.balance, i.currency),
+            ]),
           ),
           trailing: StatusChip(i.statusLabel, tone: invoiceTone(i.status)),
           childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
           children: [
             for (final line in i.lines) InfoRow(line.label, formatMoney(line.total, i.currency)),
             const Divider(),
-            InfoRow('Total', formatMoney(i.total, i.currency), strong: true),
-            InfoRow('Payé', formatMoney(i.paid, i.currency)),
+            InfoRow(tr('Total'), formatMoney(i.total, i.currency), strong: true),
+            InfoRow(tr('Payé'), formatMoney(i.paid, i.currency)),
             if (o.canPay && i.payable) ...[
               const SizedBox(height: 8),
               FilledButton.icon(
                 key: Key('invoice.pay.${i.id}'),
                 onPressed: () => _pay(i),
                 icon: const Icon(Icons.payments_outlined),
-                label: Text('Payer ${formatMoney(i.balance, i.currency)}'),
+                label: Text(tr('Payer {0}', [formatMoney(i.balance, i.currency)])),
               ),
             ],
           ],

@@ -12,12 +12,14 @@ import 'package:provider/provider.dart';
 
 import '../auth/auth_service.dart';
 import '../realtime/realtime_client.dart';
+import '../l10n/l10n.dart';
 
-final hm = DateFormat('HH:mm', 'fr_FR');
-final dayLong = DateFormat('EEEE d MMMM', 'fr_FR');
-final dayShort = DateFormat('EEE d MMM', 'fr_FR');
-final dateOnly = DateFormat('dd/MM/yyyy', 'fr_FR');
-final dateTime = DateFormat('dd/MM/yyyy HH:mm', 'fr_FR');
+// Formats of the CURRENT language (dates sent to the server are never formatted here).
+DateFormat get hm => DateFormat('HH:mm', L10n.intl);
+DateFormat get dayLong => DateFormat('EEEE d MMMM', L10n.intl);
+DateFormat get dayShort => DateFormat('EEE d MMM', L10n.intl);
+DateFormat get dateOnly => DateFormat('dd/MM/yyyy', L10n.intl);
+DateFormat get dateTime => DateFormat('dd/MM/yyyy HH:mm', L10n.intl);
 
 String capitalize(String text) => text.isEmpty ? text : '${text[0].toUpperCase()}${text.substring(1)}';
 
@@ -110,7 +112,7 @@ class LiveIndicator extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: Tooltip(
-        message: online ? 'Connecté en direct' : 'Hors ligne : reconnexion automatique',
+        message: online ? tr('Connecté en direct') : tr('Hors ligne : reconnexion automatique'),
         child: Icon(online ? Icons.wifi_tethering : Icons.wifi_off, size: 20),
       ),
     );

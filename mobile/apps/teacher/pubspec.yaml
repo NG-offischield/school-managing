@@ -18,6 +18,7 @@ dependencies:
   http: ^1.6.0
 
 dev_dependencies:
+  shared_preferences: ^2.5.6 # tests: local preferences (already used by school_core)
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0

@@ -54,7 +54,7 @@ class ChildSwitcher extends StatelessWidget {
     }
     return PopupMenuButton<Child>(
       key: const Key('child.switcher'),
-      tooltip: 'Changer d\'enfant',
+      tooltip: tr('Changer d\'enfant'),
       onSelected: scope.select,
       itemBuilder: (_) => [
         for (final child in scope.children)
@@ -87,20 +87,20 @@ class ChildBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scope = context.watch<ChildScope>();
-    if (!scope.loaded) return const Center(child: CircularProgressIndicator(semanticsLabel: 'Chargement'));
+    if (!scope.loaded) return Center(child: CircularProgressIndicator(semanticsLabel: tr('Chargement')));
     final error = scope.error;
     if (error != null) {
       return ErrorState(
-        message: error is ApiException ? error.userMessage : 'Une erreur inattendue est survenue.',
+        message: error is ApiException ? error.userMessage : tr('Une erreur inattendue est survenue.'),
         offline: error is NetworkException,
         onRetry: scope.load,
       );
     }
     final child = scope.selected;
     if (child == null) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.family_restroom,
-        text: 'Aucun enfant rattaché pour le moment. Faites une demande de rattachement depuis l\'accueil.',
+        text: tr('Aucun enfant rattaché pour le moment. Faites une demande de rattachement depuis l\'accueil.'),
       );
     }
     return builder(context, child);

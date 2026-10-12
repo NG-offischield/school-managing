@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../api/api_error.dart';
 import '../theme/app_theme.dart';
+import '../l10n/l10n.dart';
 
 const softwareName = 'School Managing';
 
@@ -72,15 +73,15 @@ class AsyncBody<T> extends StatelessWidget {
       future: future,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator(semanticsLabel: 'Chargement'));
+          return Center(child: CircularProgressIndicator(semanticsLabel: tr('Chargement')));
         }
         if (snapshot.hasError) {
           final error = snapshot.error;
-          final text = error is ApiException ? error.userMessage : 'Une erreur inattendue est survenue.';
+          final text = error is ApiException ? error.userMessage : tr('Une erreur inattendue est survenue.');
           return ErrorState(message: text, offline: error is NetworkException, onRetry: onRetry);
         }
         final data = snapshot.data as T;
-        if (isEmpty?.call(data) ?? false) return EmptyState(text: emptyText);
+        if (isEmpty?.call(data) ?? false) return EmptyState(text: tr(emptyText)); // the default is French source
         return builder(context, data);
       },
     );
@@ -110,7 +111,7 @@ class ErrorState extends StatelessWidget {
               style: TextStyle(fontSize: 16, color: Tokens.text),
             ),
             const SizedBox(height: 16),
-            OutlinedButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh), label: const Text('Réessayer')),
+            OutlinedButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh), label: Text(tr('Réessayer'))),
           ],
         ),
       ),

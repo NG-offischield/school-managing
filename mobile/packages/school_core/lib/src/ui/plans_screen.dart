@@ -9,6 +9,7 @@ import '../data/school_plans.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import 'live_state.dart';
+import '../l10n/l10n.dart';
 
 /// « Plan de l'établissement » (parent and teacher apps): the published plans
 /// the server lets THIS member see — an unauthorised, withdrawn or draft plan
@@ -41,7 +42,7 @@ class _PlansScreenState extends State<PlansScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Plan de l'établissement")),
+      appBar: AppBar(title: Text(tr('Plan de l\'établissement'))),
       body: RefreshIndicator(
         onRefresh: () async {
           _load();
@@ -51,7 +52,7 @@ class _PlansScreenState extends State<PlansScreen> {
           future: _future,
           onRetry: _load,
           isEmpty: (rows) => rows.isEmpty,
-          emptyText: "Aucun plan de l'établissement n'est disponible pour le moment.",
+          emptyText: tr('Aucun plan de l\'établissement n\'est disponible pour le moment.'),
           builder: (context, rows) => ListView.separated(
             padding: const EdgeInsets.all(16),
             itemCount: rows.length,
@@ -84,7 +85,7 @@ class _PlanCard extends StatelessWidget {
             Text(
               [
                 'Version ${plan.number}',
-                if (plan.publishedAt != null) 'publiée le ${dateOnly.format(plan.publishedAt!)}',
+                if (plan.publishedAt != null) tr('publiée le {0}', [dateOnly.format(plan.publishedAt!)]),
               ].join(' · '),
               style: TextStyle(color: Tokens.textSecondary, fontSize: 13),
             ),
@@ -158,7 +159,7 @@ class _PlanViewerScreenState extends State<PlanViewerScreen> {
       _tone = opened ? Tone.info : Tone.warning;
       _message = opened
           ? null
-          : 'Aucune application de ce téléphone ne sait afficher les PDF. Installez un lecteur PDF puis réessayez.';
+          : tr('Aucune application de ce téléphone ne sait afficher les PDF. Installez un lecteur PDF puis réessayez.');
     });
   }
 
@@ -166,11 +167,11 @@ class _PlanViewerScreenState extends State<PlanViewerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.plan?.title ?? "Plan de l'établissement"),
+        title: Text(widget.plan?.title ?? tr('Plan de l\'établissement')),
         actions: [
           IconButton(
             key: const Key('plan.fit'),
-            tooltip: 'Ajuster à l\'écran',
+            tooltip: tr('Ajuster à l\'écran'),
             icon: const Icon(Icons.fit_screen_outlined),
             onPressed: () => _zoom.value = Matrix4.identity(),
           ),
@@ -180,18 +181,18 @@ class _PlanViewerScreenState extends State<PlanViewerScreen> {
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator(semanticsLabel: 'Chargement du plan'));
+            return Center(child: CircularProgressIndicator(semanticsLabel: tr('Chargement du plan')));
           }
           final error = snapshot.error;
           if (error != null) {
             if (error is NotFoundException) {
-              return const EmptyState(
+              return EmptyState(
                 icon: Icons.location_off_outlined,
-                text: "Ce plan n'est plus disponible : il a été retiré ou ne vous est plus destiné.",
+                text: tr('Ce plan n\'est plus disponible : il a été retiré ou ne vous est plus destiné.'),
               );
             }
             return ErrorState(
-              message: error is ApiException ? error.userMessage : 'Une erreur inattendue est survenue.',
+              message: error is ApiException ? error.userMessage : tr('Une erreur inattendue est survenue.'),
               offline: error is NetworkException,
               onRetry: _load,
             );
@@ -227,10 +228,10 @@ class _PlanViewerScreenState extends State<PlanViewerScreen> {
           child: Image.memory(
             loaded.bytes,
             key: const Key('plan.image'),
-            semanticLabel: 'Plan : ${loaded.plan.title}',
+            semanticLabel: tr('Plan : {0}', [loaded.plan.title]),
             gaplessPlayback: true,
             errorBuilder: (_, _, _) =>
-                const EmptyState(icon: Icons.broken_image_outlined, text: "L'image du plan n'a pas pu être affichée."),
+                EmptyState(icon: Icons.broken_image_outlined, text: tr('L\'image du plan n\'a pas pu être affichée.')),
           ),
         ),
       ),
@@ -252,11 +253,11 @@ class _PlanViewerScreenState extends State<PlanViewerScreen> {
               key: const Key('plan.openPdf'),
               onPressed: _opening ? null : () => _openPdf(loaded),
               icon: const Icon(Icons.open_in_new),
-              label: const Text('Ouvrir le plan (PDF)'),
+              label: Text(tr('Ouvrir le plan (PDF)')),
             ),
             const SizedBox(height: 8),
             Text(
-              'Le PDF s\'ouvre dans le lecteur du téléphone, où vous pouvez zoomer.',
+              tr('Le PDF s\'ouvre dans le lecteur du téléphone, où vous pouvez zoomer.'),
               textAlign: TextAlign.center,
               style: TextStyle(color: Tokens.textSecondary, fontSize: 12.5),
             ),
@@ -284,8 +285,8 @@ class _Header extends StatelessWidget {
           Text(
             [
               plan.schoolName,
-              'version ${plan.number}',
-              if (plan.publishedAt != null) 'publiée le ${dateOnly.format(plan.publishedAt!)}',
+              tr('version {0}', [plan.number]),
+              if (plan.publishedAt != null) tr('publiée le {0}', [dateOnly.format(plan.publishedAt!)]),
             ].where((p) => p.isNotEmpty).join(' · '),
             style: TextStyle(color: Tokens.textSecondary, fontSize: 13),
           ),

@@ -63,13 +63,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final live = context.watch<LiveState>();
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Accueil'),
+        title: Text(tr('Accueil')),
         actions: [
           if (live.client != null)
             Padding(
               padding: const EdgeInsets.only(right: 4),
               child: Tooltip(
-                message: live.connection == RealtimeState.online ? 'Connecté en direct' : 'Hors ligne / reconnexion',
+                message: live.connection == RealtimeState.online
+                    ? tr('Connecté en direct')
+                    : tr('Hors ligne / reconnexion'),
                 child: Icon(
                   live.connection == RealtimeState.online ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
                   color: live.connection == RealtimeState.online ? Tokens.success : Tokens.textSecondary,
@@ -78,7 +80,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           IconButton(
             key: const Key('home.profile'),
-            tooltip: 'Mon profil',
+            tooltip: tr('Mon profil'),
             onPressed: () => _push(const ProfileScreen()),
             icon: CircleAvatar(
               radius: 15,
@@ -97,25 +99,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
             Text(
-              'Bonjour ${auth.identity?.firstName ?? ''}',
+              tr('Bonjour {0}', [auth.identity?.firstName ?? '']),
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
             ),
             Text(auth.identity?.current?.schoolName ?? '', style: TextStyle(color: Tokens.textSecondary)),
             SectionTitle(
-              scope.children.length > 1 ? 'Mes enfants (${scope.children.length})' : 'Mon enfant',
+              scope.children.length > 1 ? tr('Mes enfants ({0})', [scope.children.length]) : tr('Mon enfant'),
               trailing: TextButton(
                 key: const Key('home.link'),
                 onPressed: () async {
                   await openScreen<void>(context, const LinkRequestsScreen());
                   if (context.mounted) await context.read<ChildScope>().load();
                 },
-                child: const Text('Rattacher'),
+                child: Text(tr('Rattacher')),
               ),
             ),
             ..._children(scope),
             SectionTitle(
-              'Dernières notifications',
-              trailing: TextButton(onPressed: () => widget.onOpenTab(4), child: const Text('Tout voir')),
+              tr('Dernières notifications'),
+              trailing: TextButton(onPressed: () => widget.onOpenTab(4), child: Text(tr('Tout voir'))),
             ),
             AsyncBody<_Overview>(
               future: _future,
@@ -128,14 +130,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         color: Tokens.warningBg,
                         child: ListTile(
                           leading: Icon(Icons.event_note, color: Tokens.warning),
-                          title: Text('Convocation · ${c.start == null ? '' : dateTime.format(c.start!)}'),
+                          title: Text(tr('Convocation · {0}', [c.start == null ? '' : dateTime.format(c.start!)])),
                           subtitle: Text(c.reason),
                         ),
                       ),
                   if (data.notifications.isEmpty)
                     Padding(
                       padding: EdgeInsets.all(12),
-                      child: Text('Aucune notification.', style: TextStyle(color: Tokens.textSecondary)),
+                      child: Text(tr('Aucune notification.'), style: TextStyle(color: Tokens.textSecondary)),
                     ),
                   for (final n in data.notifications)
                     Card(
@@ -151,7 +153,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
             ),
-            const SectionTitle('Raccourcis'),
+            SectionTitle(tr('Raccourcis')),
             Wrap(
               spacing: 10,
               runSpacing: 10,
@@ -159,24 +161,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _Shortcut(
                   key: const Key('home.documents'),
                   icon: Icons.description_outlined,
-                  label: 'Bulletins et documents',
+                  label: tr('Bulletins et documents'),
                   onTap: () => _push(const DocumentsScreen()),
                 ),
                 _Shortcut(
                   key: const Key('home.plans'),
                   icon: Icons.map_outlined,
-                  label: "Plan de l'établissement",
+                  label: tr('Plan de l\'établissement'),
                   onTap: () => _push(const PlansScreen()),
                 ),
-                _Shortcut(icon: Icons.fact_check_outlined, label: 'Présences', onTap: () => widget.onOpenTab(1)),
+                _Shortcut(icon: Icons.fact_check_outlined, label: tr('Présences'), onTap: () => widget.onOpenTab(1)),
                 _Shortcut(
                   icon: Icons.calendar_month_outlined,
-                  label: 'Emploi du temps',
+                  label: tr('Emploi du temps'),
                   onTap: () => widget.onOpenTab(2),
                 ),
                 _Shortcut(
                   icon: Icons.account_balance_wallet_outlined,
-                  label: 'Scolarité et paiements',
+                  label: tr('Scolarité et paiements'),
                   onTap: () => widget.onOpenTab(3),
                 ),
               ],
@@ -189,25 +191,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   List<Widget> _children(ChildScope scope) {
     if (!scope.loaded) {
-      return const [
+      return [
         Padding(
           padding: EdgeInsets.all(16),
-          child: Center(child: CircularProgressIndicator(semanticsLabel: 'Chargement')),
+          child: Center(child: CircularProgressIndicator(semanticsLabel: tr('Chargement'))),
         ),
       ];
     }
     final error = scope.error;
     if (error != null) {
-      return [MessageBanner(error is ApiException ? error.userMessage : 'Impossible de charger vos enfants.')];
+      return [MessageBanner(error is ApiException ? error.userMessage : tr('Impossible de charger vos enfants.'))];
     }
     if (scope.children.isEmpty) {
       return [
-        const Card(
+        Card(
           child: Padding(
             padding: EdgeInsets.all(16),
             child: Text(
-              'Aucun enfant rattaché. Demandez le rattachement de votre enfant : l\'établissement vérifiera votre '
-              'pièce d\'identité, puis vous verrez sa scolarité ici.',
+              tr(
+                'Aucun enfant rattaché. Demandez le rattachement de votre enfant : l\'établissement vérifiera votre pièce d\'identité, puis vous verrez sa scolarité ici.',
+              ),
             ),
           ),
         ),
@@ -235,7 +238,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             title: Text(child.name, style: const TextStyle(fontWeight: FontWeight.w700)),
             subtitle: Text(child.schooling),
             trailing: child.id == scope.selected?.id
-                ? Icon(Icons.check_circle, color: Tokens.primary, semanticLabel: 'Enfant sélectionné')
+                ? Icon(Icons.check_circle, color: Tokens.primary, semanticLabel: tr('Enfant sélectionné'))
                 : null,
           ),
         ),

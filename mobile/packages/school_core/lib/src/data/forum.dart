@@ -12,8 +12,12 @@
 library;
 
 import 'communication.dart';
+import '../l10n/l10n.dart';
 
-const threadStatuses = {'OPEN': 'Ouvert', 'LOCKED': 'Verrouillé', 'ARCHIVED': 'Archivé'};
+const _threadStatusesFr = {'OPEN': 'Ouvert', 'LOCKED': 'Verrouillé', 'ARCHIVED': 'Archivé'};
+
+/// Labels in the CURRENT language (French source: [_threadStatusesFr]).
+Map<String, String> get threadStatuses => trMap(_threadStatusesFr);
 
 class ForumSpace {
   ForumSpace({required this.id, required this.name, this.description, this.announcementsOnly = false});

@@ -19,6 +19,7 @@ import '../api/api_client.dart';
 import '../api/api_error.dart';
 import 'identity.dart';
 import 'token_store.dart';
+import '../l10n/l10n.dart';
 
 /// `pending`: signed in, but the account still waits for the school's approval
 /// (self-registered parent, membership PENDING) — only apps created with
@@ -92,13 +93,13 @@ class AuthService extends ChangeNotifier {
       await _loadIdentity();
     } on NetworkException {
       // Offline at start: keep the stored session, let the user retry.
-      _signedOut(notice: 'Serveur injoignable : vérifiez votre connexion puis reconnectez-vous.');
+      _signedOut(notice: tr('Serveur injoignable : vérifiez votre connexion puis reconnectez-vous.'));
       return;
     } on ApiException {
       await store.deleteRefreshToken();
-      _signedOut(notice: 'Votre session a expiré : reconnectez-vous.');
+      _signedOut(notice: tr('Votre session a expiré : reconnectez-vous.'));
     } on WrongRoleException {
-      _signedOut(notice: 'Ce compte n\'a pas accès à cette application.');
+      _signedOut(notice: tr('Ce compte n\'a pas accès à cette application.'));
     }
   }
 
@@ -153,7 +154,7 @@ class AuthService extends ChangeNotifier {
       // Already revoked / offline: the local session is closed anyway.
     }
     await _clear();
-    _signedOut(notice: 'Vous êtes déconnecté.');
+    _signedOut(notice: tr('Vous êtes déconnecté.'));
   }
 
   /// The user switches to ANOTHER server: the old one is told if it still
@@ -167,13 +168,13 @@ class AuthService extends ChangeNotifier {
       // Unreachable, revoked or slow: the local session is closed anyway.
     }
     await _clear();
-    _signedOut(notice: 'Serveur changé : connectez-vous sur le nouveau serveur.');
+    _signedOut(notice: tr('Serveur changé : connectez-vous sur le nouveau serveur.'));
   }
 
   /// Session refused by the server (refresh failed, suspended account...).
-  Future<void> expire([String message = 'Votre session a expiré : reconnectez-vous.']) async {
+  Future<void> expire([String? message]) async {
     await _clear();
-    _signedOut(notice: message);
+    _signedOut(notice: message ?? tr('Votre session a expiré : reconnectez-vous.'));
   }
 
   /// One refresh of the access token (e.g. after the WebSocket was closed
@@ -217,7 +218,7 @@ class AuthService extends ChangeNotifier {
         return;
       }
       await _clear();
-      throw ForbiddenException(code: 'NO_ACTIVE_MEMBERSHIP', message: 'No active membership.');
+      throw ForbiddenException(code: 'NO_ACTIVE_MEMBERSHIP', message: tr('No active membership.'));
     }
     final role = requiredRole;
     if (role != null && !me.hasRole(role)) {

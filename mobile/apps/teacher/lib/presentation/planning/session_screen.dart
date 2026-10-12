@@ -56,8 +56,8 @@ class _SessionScreenState extends State<SessionScreen> {
       await context.read<TeacherRepository>().checkIn(widget.sessionId, status);
       _tone = Tone.success;
       _message = status == 'PRESENT'
-          ? 'Présence déclarée. L\'administration la validera.'
-          : 'Absence déclarée. L\'administration en est informée.';
+          ? tr('Présence déclarée. L\'administration la validera.')
+          : tr('Absence déclarée. L\'administration en est informée.');
     } on ApiException catch (error) {
       _tone = Tone.warning;
       _message = error.userMessage;
@@ -70,7 +70,7 @@ class _SessionScreenState extends State<SessionScreen> {
   Widget build(BuildContext context) {
     final myName = context.watch<AuthService>().identity?.fullName ?? '';
     return Scaffold(
-      appBar: AppBar(title: Text(widget.preview?.title ?? 'Séance')),
+      appBar: AppBar(title: Text(widget.preview?.title ?? tr('Séance'))),
       body: AsyncBody<(TeachingSession, List<ScheduleChangeItem>)>(
         future: _future,
         onRetry: _load,
@@ -95,26 +95,26 @@ class _SessionScreenState extends State<SessionScreen> {
                       const Divider(height: 28),
                       _row(
                         Icons.event_outlined,
-                        'Date',
+                        tr('Date'),
                         session.start == null ? '—' : capitalize(dayLong.format(session.start!)),
                       ),
-                      _row(Icons.schedule, 'Horaire', hours(session)),
-                      _row(Icons.groups_outlined, 'Classe', session.schoolClass.label),
+                      _row(Icons.schedule, tr('Horaire'), hours(session)),
+                      _row(Icons.groups_outlined, tr('Classe'), session.schoolClass.label),
                       _row(
                         Icons.meeting_room_outlined,
-                        'Salle',
-                        session.room == null ? 'Non attribuée' : '${session.room!.label} — ${session.room!.extra}',
+                        tr('Salle'),
+                        session.room == null ? tr('Non attribuée') : '${session.room!.label} — ${session.room!.extra}',
                       ),
-                      _row(Icons.person_outline, 'Enseignant', session.teacher.label),
-                      if (note != null) _row(Icons.swap_horiz, 'Remplacement', note),
+                      _row(Icons.person_outline, tr('Enseignant'), session.teacher.label),
+                      if (note != null) _row(Icons.swap_horiz, tr('Remplacement'), note),
                     ],
                   ),
                 ),
               ),
               if (!session.cancelled) ...[
-                const SectionTitle('Ma présence'),
+                SectionTitle(tr('Ma présence')),
                 Text(
-                  'Déclarez votre présence une fois la séance commencée. Elle sera validée par l\'administration.',
+                  tr('Déclarez votre présence une fois la séance commencée. Elle sera validée par l\'administration.'),
                   style: TextStyle(color: Tokens.textSecondary),
                 ),
                 const SizedBox(height: 10),
@@ -125,7 +125,7 @@ class _SessionScreenState extends State<SessionScreen> {
                         key: const Key('session.present'),
                         onPressed: _busy ? null : () => _checkIn('PRESENT'),
                         icon: const Icon(Icons.check),
-                        label: const Text('Présent'),
+                        label: Text(tr('Présent')),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -134,15 +134,15 @@ class _SessionScreenState extends State<SessionScreen> {
                         key: const Key('session.absent'),
                         onPressed: _busy ? null : () => _checkIn('ABSENT'),
                         icon: const Icon(Icons.close),
-                        label: const Text('Absent'),
+                        label: Text(tr('Absent')),
                       ),
                     ),
                   ],
                 ),
               ],
-              SectionTitle('Changements (${changes.length})'),
+              SectionTitle(tr('Changements ({0})', [changes.length])),
               if (changes.isEmpty)
-                Text('Aucun changement pour cette séance.', style: TextStyle(color: Tokens.textSecondary))
+                Text(tr('Aucun changement pour cette séance.'), style: TextStyle(color: Tokens.textSecondary))
               else
                 Card(
                   child: Column(

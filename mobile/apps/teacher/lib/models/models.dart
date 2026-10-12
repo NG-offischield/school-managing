@@ -4,7 +4,10 @@ library;
 
 import 'package:school_core/school_core.dart';
 
-const sessionStatuses = {'SCHEDULED': 'Prévue', 'COMPLETED': 'Réalisée', 'CANCELLED': 'Annulée'};
+const _sessionStatusesFr = {'SCHEDULED': 'Prévue', 'COMPLETED': 'Réalisée', 'CANCELLED': 'Annulée'};
+
+/// Labels in the CURRENT language (French source: [_sessionStatusesFr]).
+Map<String, String> get sessionStatuses => trMap(_sessionStatusesFr);
 
 class TeachingSession {
   TeachingSession({
@@ -88,7 +91,9 @@ class ScheduleChangeItem {
     reason: (json['reason'] as String?) ?? '',
   );
 
-  static const labels = {
+  static Map<String, String> get labels => trMap(_labelsFr);
+
+  static const _labelsFr = {
     'SESSION_CREATED': 'Séance ajoutée',
     'SESSION_CANCELLED': 'Séance annulée',
     'SESSION_MOVED': 'Séance déplacée',
@@ -127,13 +132,16 @@ class PaySummary {
   final Map<String, dynamic> sessions;
 }
 
-const relationships = {
+const _relationshipsFr = {
   'FATHER': 'Père',
   'MOTHER': 'Mère',
   'LEGAL_GUARDIAN': 'Tuteur légal',
   'TUTOR': 'Tuteur',
   'OTHER': 'Autre',
 };
+
+/// Labels in the CURRENT language (French source: [_relationshipsFr]).
+Map<String, String> get relationships => trMap(_relationshipsFr);
 
 /// A verified parent of one of my pupils, as offered by the server.
 class ParentContact {

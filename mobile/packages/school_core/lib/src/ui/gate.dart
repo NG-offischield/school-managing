@@ -23,10 +23,11 @@ import '../data/communication.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import 'live_state.dart';
+import '../l10n/l10n.dart';
 
 final _day = DateFormat('yyyy-MM-dd');
 
-const scanResults = {
+const _scanResultsFr = {
   'ACCEPTED': 'Arrivée enregistrée',
   'ALREADY_PRESENT': 'Déjà présent(e)',
   'UNKNOWN_TOKEN': 'QR inconnu',
@@ -34,8 +35,22 @@ const scanResults = {
   'EXPIRED_TOKEN': 'QR d\'une autre année scolaire',
   'STUDENT_NOT_ENROLLED': 'Élève non inscrit ou inactif',
 };
-const arrivalStatuses = {'PRESENT': 'À l\'heure', 'LATE': 'En retard', 'ABSENT': 'Absent(e)', 'PENDING': 'En attente'};
-const solvencyLabels = {'UP_TO_DATE': 'Scolarité à jour', 'OVERDUE': 'Échéance dépassée'};
+
+/// Labels in the CURRENT language (French source: [_scanResultsFr]).
+Map<String, String> get scanResults => trMap(_scanResultsFr);
+const _arrivalStatusesFr = {
+  'PRESENT': 'À l\'heure',
+  'LATE': 'En retard',
+  'ABSENT': 'Absent(e)',
+  'PENDING': 'En attente',
+};
+
+/// Labels in the CURRENT language (French source: [_arrivalStatusesFr]).
+Map<String, String> get arrivalStatuses => trMap(_arrivalStatusesFr);
+const _solvencyLabelsFr = {'UP_TO_DATE': 'Scolarité à jour', 'OVERDUE': 'Échéance dépassée'};
+
+/// Labels in the CURRENT language (French source: [_solvencyLabelsFr]).
+Map<String, String> get solvencyLabels => trMap(_solvencyLabelsFr);
 
 bool acceptedScan(String result) => result == 'ACCEPTED' || result == 'ALREADY_PRESENT';
 
@@ -223,7 +238,7 @@ class ScanScreenState extends State<ScanScreen> {
     if (token.isEmpty) return;
     if (!looksLikeQrToken(token)) {
       setState(() {
-        _error = 'Ce code n\'est pas celui d\'une carte d\'élève.';
+        _error = tr('Ce code n\'est pas celui d\'une carte d\'élève.');
         _notice = null;
       });
       _focus.requestFocus();
@@ -237,7 +252,7 @@ class ScanScreenState extends State<ScanScreen> {
   Future<void> submit(String token) async {
     if (_guard.isRepeat(token)) {
       setState(() {
-        _notice = 'Cette carte vient d\'être lue : le résultat est affiché ci-dessous.';
+        _notice = tr('Cette carte vient d\'être lue : le résultat est affiché ci-dessous.');
         _error = null;
       });
       return;
@@ -257,8 +272,8 @@ class ScanScreenState extends State<ScanScreen> {
       _last = null;
       _pending = token; // kept in memory only, for « Réessayer »
       _error = error.timeout
-          ? 'Le serveur ne répond pas : le passage n\'est PAS enregistré.'
-          : 'Réseau indisponible : le passage n\'est PAS enregistré.';
+          ? tr('Le serveur ne répond pas : le passage n\'est PAS enregistré.')
+          : tr('Réseau indisponible : le passage n\'est PAS enregistré.');
     } on ApiException catch (error) {
       _last = null;
       _pending = null;
@@ -285,7 +300,7 @@ class ScanScreenState extends State<ScanScreen> {
         textInputAction: TextInputAction.done,
         onSubmitted: (_) => _typed(),
         onChanged: (_) => setState(() {}),
-        decoration: const InputDecoration(labelText: 'Code du QR', prefixIcon: Icon(Icons.keyboard_outlined)),
+        decoration: InputDecoration(labelText: tr('Code du QR'), prefixIcon: Icon(Icons.keyboard_outlined)),
       ),
       const SizedBox(height: 12),
       if (camera)
@@ -293,27 +308,29 @@ class ScanScreenState extends State<ScanScreen> {
           key: const Key('scan.submit'),
           onPressed: _token.text.trim().isEmpty || _busy ? null : _typed,
           icon: const Icon(Icons.how_to_reg_outlined),
-          label: const Text('Enregistrer le passage'),
+          label: Text(tr('Enregistrer le passage')),
         )
       else
         FilledButton.icon(
           key: const Key('scan.submit'),
           onPressed: _token.text.trim().isEmpty || _busy ? null : _typed,
           icon: const Icon(Icons.how_to_reg_outlined),
-          label: const Text('Enregistrer le passage'),
+          label: Text(tr('Enregistrer le passage')),
         ),
     ];
     return Scaffold(
-      appBar: AppBar(title: const Text('Portail'), actions: const [LiveIndicator()]),
+      appBar: AppBar(title: Text(tr('Portail')), actions: const [LiveIndicator()]),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Text(
             camera
-                ? 'Scannez la carte de l\'élève avec l\'appareil photo. Le serveur enregistre l\'arrivée et décide '
-                      'de ce qui vous est affiché.'
-                : 'Présentez la carte de l\'élève au lecteur, ou saisissez le code du QR. Le serveur enregistre '
-                      'l\'arrivée et décide de ce qui vous est affiché.',
+                ? tr(
+                    'Scannez la carte de l\'élève avec l\'appareil photo. Le serveur enregistre l\'arrivée et décide de ce qui vous est affiché.',
+                  )
+                : tr(
+                    'Présentez la carte de l\'élève au lecteur, ou saisissez le code du QR. Le serveur enregistre l\'arrivée et décide de ce qui vous est affiché.',
+                  ),
             style: TextStyle(color: Tokens.textSecondary),
           ),
           const SizedBox(height: 14),
@@ -323,13 +340,13 @@ class ScanScreenState extends State<ScanScreen> {
               style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
               onPressed: _busy ? null : openCamera,
               icon: const Icon(Icons.qr_code_scanner),
-              label: Text(last == null && _error == null ? 'Scanner une carte' : 'Scanner la carte suivante'),
+              label: Text(last == null && _error == null ? tr('Scanner une carte') : tr('Scanner la carte suivante')),
             ),
             const SizedBox(height: 8),
             ExpansionTile(
               key: const Key('scan.manual'),
               tilePadding: EdgeInsets.zero,
-              title: const Text('Lecteur USB / Bluetooth ou saisie du code'),
+              title: Text(tr('Lecteur USB / Bluetooth ou saisie du code')),
               childrenPadding: const EdgeInsets.only(bottom: 8),
               children: manual,
             ),
@@ -346,7 +363,7 @@ class ScanScreenState extends State<ScanScreen> {
                 key: const Key('scan.retry'),
                 onPressed: () => submit(_pending!),
                 icon: const Icon(Icons.refresh),
-                label: const Text('Réessayer l\'envoi'),
+                label: Text(tr('Réessayer l\'envoi')),
               ),
             ),
           if (last != null) ScanOutcomeCard(outcome: last),
@@ -397,7 +414,7 @@ class ScanOutcomeCard extends StatelessWidget {
                 if (o.arrival != null)
                   StatusChip(
                     o.lateMinutes > 0
-                        ? '${arrivalStatuses[o.arrival] ?? o.arrival} (${o.lateMinutes} min)'
+                        ? tr('{0} ({1} min)', [arrivalStatuses[o.arrival] ?? o.arrival, o.lateMinutes])
                         : (arrivalStatuses[o.arrival] ?? o.arrival!),
                     tone: o.arrival == 'LATE' ? Tone.warning : Tone.success,
                   ),
@@ -458,8 +475,8 @@ class _MyScansScreenState extends State<MyScansScreen> {
     final isToday = _day.year == today.year && _day.month == today.month && _day.day == today.day;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mes passages enregistrés'),
-        actions: [IconButton(tooltip: 'Actualiser', onPressed: _load, icon: const Icon(Icons.refresh))],
+        title: Text(tr('Mes passages enregistrés')),
+        actions: [IconButton(tooltip: tr('Actualiser'), onPressed: _load, icon: const Icon(Icons.refresh))],
       ),
       body: Column(
         children: [
@@ -469,7 +486,7 @@ class _MyScansScreenState extends State<MyScansScreen> {
               children: [
                 IconButton(
                   key: const Key('scans.previous'),
-                  tooltip: 'Jour précédent',
+                  tooltip: tr('Jour précédent'),
                   onPressed: () => _shift(-1),
                   icon: const Icon(Icons.chevron_left),
                 ),
@@ -481,7 +498,7 @@ class _MyScansScreenState extends State<MyScansScreen> {
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Jour suivant',
+                  tooltip: tr('Jour suivant'),
                   onPressed: isToday ? null : () => _shift(1),
                   icon: const Icon(Icons.chevron_right),
                 ),
@@ -493,14 +510,17 @@ class _MyScansScreenState extends State<MyScansScreen> {
               future: _future,
               onRetry: _load,
               isEmpty: (rows) => rows.isEmpty,
-              emptyText: 'Aucun passage enregistré par vous ce jour-là.',
+              emptyText: tr('Aucun passage enregistré par vous ce jour-là.'),
               builder: (context, rows) => ListView(
                 padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
                 children: [
                   Padding(
                     padding: const EdgeInsets.all(6),
                     child: Text(
-                      '${rows.length} passage(s), ${rows.where((r) => acceptedScan(r.result)).length} accepté(s)',
+                      tr('{0} passage(s), {1} accepté(s)', [
+                        rows.length,
+                        rows.where((r) => acceptedScan(r.result)).length,
+                      ]),
                       style: TextStyle(color: Tokens.textSecondary),
                     ),
                   ),
@@ -511,7 +531,7 @@ class _MyScansScreenState extends State<MyScansScreen> {
                           acceptedScan(r.result) ? Icons.check_circle_outline : Icons.block,
                           color: acceptedScan(r.result) ? Tokens.success : Tokens.error,
                         ),
-                        title: Text(r.studentName ?? 'QR non reconnu'),
+                        title: Text(r.studentName ?? tr('QR non reconnu')),
                         subtitle: Text('${r.at == null ? '' : hm.format(r.at!)} · ${r.resultLabel}'),
                       ),
                     ),

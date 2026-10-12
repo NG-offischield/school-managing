@@ -278,6 +278,14 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('account.password')));
     await tester.pumpAndSettle();
+    TextField field(String key) => tester.widget<TextField>(find.byKey(Key(key)));
+    expect(field('password.new').obscureText, isTrue);
+    await tester.tap(find.byKey(const Key('password.visibility')).first);
+    await tester.pump();
+    expect(field('password.new').obscureText, isFalse); // shown in clear on demand
+    await tester.tap(find.byKey(const Key('password.visibility')).first);
+    await tester.pump();
+    expect(field('password.new').obscureText, isTrue);
     await tester.enterText(find.byKey(const Key('password.current')), 'faux');
     await tester.enterText(find.byKey(const Key('password.new')), 'Nouveau-Mot-2026!');
     await tester.enterText(find.byKey(const Key('password.confirm')), 'Autre');

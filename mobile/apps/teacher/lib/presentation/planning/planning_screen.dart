@@ -56,21 +56,27 @@ class _PlanningScreenState extends State<PlanningScreen> {
   @override
   Widget build(BuildContext context) {
     final myName = context.watch<AuthService>().identity?.fullName ?? '';
-    final weekLabel =
-        'Semaine du ${dayShort.format(_monday)} au ${dayShort.format(_monday.add(const Duration(days: 6)))}';
+    final weekLabel = tr('Semaine du {0} au {1}', [
+      dayShort.format(_monday),
+      dayShort.format(_monday.add(const Duration(days: 6))),
+    ]);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Planning'),
-        actions: [IconButton(tooltip: 'Actualiser', icon: const Icon(Icons.refresh), onPressed: _load)],
+        title: Text(tr('Planning')),
+        actions: [IconButton(tooltip: tr('Actualiser'), icon: const Icon(Icons.refresh), onPressed: _load)],
       ),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: SegmentedButton<PlanningView>(
-              segments: const [
-                ButtonSegment(value: PlanningView.today, label: Text('Aujourd\'hui'), icon: Icon(Icons.today)),
-                ButtonSegment(value: PlanningView.week, label: Text('Semaine'), icon: Icon(Icons.view_week_outlined)),
+              segments: [
+                ButtonSegment(value: PlanningView.today, label: Text(tr('Aujourd\'hui')), icon: Icon(Icons.today)),
+                ButtonSegment(
+                  value: PlanningView.week,
+                  label: Text(tr('Semaine')),
+                  icon: Icon(Icons.view_week_outlined),
+                ),
               ],
               selected: {_view},
               onSelectionChanged: (value) {
@@ -85,7 +91,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    tooltip: 'Semaine précédente',
+                    tooltip: tr('Semaine précédente'),
                     icon: const Icon(Icons.chevron_left),
                     onPressed: () => _shift(-7),
                   ),
@@ -97,7 +103,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Semaine suivante',
+                    tooltip: tr('Semaine suivante'),
                     icon: const Icon(Icons.chevron_right),
                     onPressed: () => _shift(7),
                   ),
@@ -111,7 +117,9 @@ class _PlanningScreenState extends State<PlanningScreen> {
                 future: _future,
                 onRetry: _load,
                 isEmpty: (rows) => rows.isEmpty,
-                emptyText: _view == PlanningView.today ? 'Aucune séance aujourd\'hui.' : 'Aucune séance cette semaine.',
+                emptyText: _view == PlanningView.today
+                    ? tr('Aucune séance aujourd\'hui.')
+                    : tr('Aucune séance cette semaine.'),
                 builder: (context, rows) => _list(rows, myName),
               ),
             ),

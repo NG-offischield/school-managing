@@ -66,15 +66,15 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             selectedIndex: _tab,
             onDestinationSelected: open,
             destinations: [
-              const NavigationDestination(
+              NavigationDestination(
                 icon: Icon(Icons.home_outlined),
                 selectedIcon: Icon(Icons.home),
-                label: 'Accueil',
+                label: tr('Accueil'),
               ),
-              const NavigationDestination(
+              NavigationDestination(
                 icon: Icon(Icons.calendar_month_outlined),
                 selectedIcon: Icon(Icons.calendar_month),
-                label: 'Planning',
+                label: tr('Planning'),
               ),
               NavigationDestination(
                 icon: Badge(
@@ -83,12 +83,12 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                   child: const Icon(Icons.chat_bubble_outline),
                 ),
                 selectedIcon: const Icon(Icons.chat_bubble),
-                label: 'Messages',
+                label: tr('Messages'),
               ),
-              const NavigationDestination(
+              NavigationDestination(
                 icon: Icon(Icons.person_outline),
                 selectedIcon: Icon(Icons.person),
-                label: 'Profil',
+                label: tr('Profil'),
               ),
             ],
           ),

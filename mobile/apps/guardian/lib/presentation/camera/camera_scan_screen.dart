@@ -130,7 +130,7 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
     final value = raw.trim();
     if (!looksLikeQrToken(value)) {
       if (_invalid == null) {
-        setState(() => _invalid = 'Ce QR n\'est pas une carte d\'élève : il n\'est pas envoyé.');
+        setState(() => _invalid = tr('Ce QR n\'est pas une carte d\'élève : il n\'est pas envoyé.'));
         _invalidTimer?.cancel();
         _invalidTimer = Timer(const Duration(seconds: 3), () {
           if (mounted) setState(() => _invalid = null);
@@ -156,12 +156,12 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Scanner une carte'),
+        title: Text(tr('Scanner une carte')),
         actions: [
           if (_state == _State.scanning)
             IconButton(
               key: const Key('camera.torch'),
-              tooltip: _torch ? 'Éteindre la lampe' : 'Allumer la lampe (faible luminosité)',
+              tooltip: _torch ? tr('Éteindre la lampe') : tr('Allumer la lampe (faible luminosité)'),
               onPressed: _toggleTorch,
               icon: Icon(_torch ? Icons.flash_on : Icons.flash_off),
             ),
@@ -174,12 +174,12 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
           if (_state == _State.scanning || _state == _State.starting) const _Frame(),
           if (_state == _State.starting) const Center(child: CircularProgressIndicator(color: Colors.white)),
           if (_state == _State.scanning)
-            const Positioned(
+            Positioned(
               left: 24,
               right: 24,
               bottom: 32,
               child: Text(
-                'Placez le QR de la carte dans le cadre',
+                tr('Placez le QR de la carte dans le cadre'),
                 key: Key('camera.hint'),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
@@ -196,25 +196,27 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
   Widget? _panel() {
     final (String title, String text, IconData icon) = switch (_state) {
       _State.denied => (
-        'Accès à l\'appareil photo refusé',
-        'L\'application a besoin de l\'appareil photo pour lire la carte. Aucune photo n\'est enregistrée ni envoyée : '
-            'seul le code du QR est transmis. Autorisez l\'appareil photo, ou utilisez la saisie manuelle.',
+        tr('Accès à l\'appareil photo refusé'),
+        tr(
+          'L\'application a besoin de l\'appareil photo pour lire la carte. Aucune photo n\'est enregistrée ni envoyée : seul le code du QR est transmis. Autorisez l\'appareil photo, ou utilisez la saisie manuelle.',
+        ),
         Icons.no_photography_outlined,
       ),
       _State.unavailable => (
-        'Appareil photo indisponible',
-        'Aucun appareil photo utilisable (absent ou occupé par une autre application). Utilisez la saisie manuelle '
-            'ou un lecteur QR.',
+        tr('Appareil photo indisponible'),
+        tr(
+          'Aucun appareil photo utilisable (absent ou occupé par une autre application). Utilisez la saisie manuelle ou un lecteur QR.',
+        ),
         Icons.videocam_off_outlined,
       ),
       _State.failed => (
-        'L\'appareil photo ne démarre pas',
-        'Réessayez ; si le problème persiste, utilisez la saisie manuelle.',
+        tr('L\'appareil photo ne démarre pas'),
+        tr('Réessayez ; si le problème persiste, utilisez la saisie manuelle.'),
         Icons.error_outline,
       ),
       _State.timedOut => (
-        'Aucune carte détectée',
-        'L\'appareil photo a été arrêté pour économiser la batterie.',
+        tr('Aucune carte détectée'),
+        tr('L\'appareil photo a été arrêté pour économiser la batterie.'),
         Icons.timer_off_outlined,
       ),
       _ => ('', '', Icons.info),
@@ -245,7 +247,7 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
                   key: const Key('camera.retry'),
                   onPressed: _start,
                   icon: const Icon(Icons.refresh),
-                  label: Text(_state == _State.denied ? 'Autoriser l\'appareil photo' : 'Réessayer'),
+                  label: Text(_state == _State.denied ? tr('Autoriser l\'appareil photo') : tr('Réessayer')),
                 ),
               if (_state == _State.denied) ...[
                 const SizedBox(height: 8),
@@ -253,14 +255,14 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
                   key: const Key('camera.settings'),
                   onPressed: openAppSettings,
                   icon: const Icon(Icons.settings_outlined),
-                  label: const Text('Ouvrir les paramètres'),
+                  label: Text(tr('Ouvrir les paramètres')),
                 ),
               ],
               const SizedBox(height: 8),
               TextButton(
                 key: const Key('camera.manual'),
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Saisie manuelle / lecteur QR'),
+                child: Text(tr('Saisie manuelle / lecteur QR')),
               ),
             ],
           ),

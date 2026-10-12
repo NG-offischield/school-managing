@@ -19,11 +19,12 @@ class Harness {
   late final ApiClient api;
   late final AuthService auth;
 
-  Future<void> start(WidgetTester tester) async {
+  Future<void> start(WidgetTester tester, {Widget Function(Widget app)? wrap}) async {
     tester.view.physicalSize = const Size(1080, 2400); // Pixel 7a class phone
     tester.view.devicePixelRatio = 2.6;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(TeacherApp(auth: auth, repository: TeacherRepository(api)));
+    final Widget app = TeacherApp(auth: auth, repository: TeacherRepository(api));
+    await tester.pumpWidget(wrap == null ? app : wrap(app));
     await auth.restore();
     await tester.pumpAndSettle();
   }

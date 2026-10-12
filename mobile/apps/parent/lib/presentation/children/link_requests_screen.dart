@@ -37,7 +37,7 @@ class _LinkRequestsScreenState extends State<LinkRequestsScreen> {
   Future<void> _new() async {
     final created = await openScreen<LinkRequest>(context, const LinkRequestForm());
     if (created != null && mounted) {
-      showMessage(context, 'Demande envoyée : présentez votre pièce d\'identité à l\'école.');
+      showMessage(context, tr('Demande envoyée : présentez votre pièce d\'identité à l\'école.'));
       _load();
     }
   }
@@ -48,7 +48,7 @@ class _LinkRequestsScreenState extends State<LinkRequestsScreen> {
     if (code == null || code.trim().isEmpty || !mounted) return;
     try {
       await repo.sponsor(request.id, code);
-      if (mounted) showMessage(context, 'Parrainage accepté : l\'école finalisera le rattachement.');
+      if (mounted) showMessage(context, tr('Parrainage accepté : l\'école finalisera le rattachement.'));
     } on ApiException catch (error) {
       if (mounted) showMessage(context, error.userMessage);
     }
@@ -59,7 +59,7 @@ class _LinkRequestsScreenState extends State<LinkRequestsScreen> {
     final repo = context.read<ParentRepository>();
     try {
       await repo.cancelRequest(request.id);
-      if (mounted) showMessage(context, 'Demande annulée.');
+      if (mounted) showMessage(context, tr('Demande annulée.'));
     } on ApiException catch (error) {
       if (mounted) showMessage(context, error.userMessage);
     }
@@ -90,12 +90,12 @@ class _LinkRequestsScreenState extends State<LinkRequestsScreen> {
   Widget build(BuildContext context) {
     final children = context.watch<ChildScope>().children;
     return Scaffold(
-      appBar: AppBar(title: const Text('Rattachements')),
+      appBar: AppBar(title: Text(tr('Rattachements'))),
       floatingActionButton: FloatingActionButton.extended(
         key: const Key('link.new'),
         onPressed: _new,
         icon: const Icon(Icons.add),
-        label: const Text('Rattacher un enfant'),
+        label: Text(tr('Rattacher un enfant')),
       ),
       body: AsyncBody<List<LinkRequest>>(
         future: _future,
@@ -109,16 +109,16 @@ class _LinkRequestsScreenState extends State<LinkRequestsScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
             children: [
               Text(
-                'Pour voir la scolarité d\'un enfant, votre lien doit être vérifié : l\'école contrôle votre pièce '
-                'd\'identité (ou un parent déjà vérifié vous parraine avec un code), l\'élève confirme, puis '
-                'l\'établissement valide.',
+                tr(
+                  'Pour voir la scolarité d\'un enfant, votre lien doit être vérifié : l\'école contrôle votre pièce d\'identité (ou un parent déjà vérifié vous parraine avec un code), l\'élève confirme, puis l\'établissement valide.',
+                ),
                 style: TextStyle(color: Tokens.textSecondary),
               ),
-              const SectionTitle('Mes demandes'),
+              SectionTitle(tr('Mes demandes')),
               if (rows.isEmpty)
                 Padding(
                   padding: EdgeInsets.all(8),
-                  child: Text('Aucune demande.', style: TextStyle(color: Tokens.textSecondary)),
+                  child: Text(tr('Aucune demande.'), style: TextStyle(color: Tokens.textSecondary)),
                 ),
               for (final r in rows)
                 Card(
@@ -136,10 +136,10 @@ class _LinkRequestsScreenState extends State<LinkRequestsScreen> {
                           ],
                         ),
                         const SizedBox(height: 6),
-                        InfoRow('Lien', relationships[r.relationship] ?? r.relationship),
-                        InfoRow('Identité', r.identityLabel),
-                        InfoRow('Désignation par l\'élève', r.approvalLabel),
-                        if ((r.decisionReason ?? '').isNotEmpty) InfoRow('Motif', r.decisionReason!),
+                        InfoRow(tr('Lien'), relationships[r.relationship] ?? r.relationship),
+                        InfoRow(tr('Identité'), r.identityLabel),
+                        InfoRow(tr('Désignation par l\'élève'), r.approvalLabel),
+                        if ((r.decisionReason ?? '').isNotEmpty) InfoRow(tr('Motif'), r.decisionReason!),
                         if (r.pending)
                           Wrap(
                             spacing: 8,
@@ -149,12 +149,12 @@ class _LinkRequestsScreenState extends State<LinkRequestsScreen> {
                                   key: Key('link.sponsor.${r.id}'),
                                   onPressed: () => _sponsor(r),
                                   icon: const Icon(Icons.key_outlined),
-                                  label: const Text('J\'ai un code de parrainage'),
+                                  label: Text(tr('J\'ai un code de parrainage')),
                                 ),
                               TextButton(
                                 key: Key('link.cancel.${r.id}'),
                                 onPressed: () => _cancel(r),
-                                child: const Text('Annuler la demande'),
+                                child: Text(tr('Annuler la demande')),
                               ),
                             ],
                           ),
@@ -163,11 +163,11 @@ class _LinkRequestsScreenState extends State<LinkRequestsScreen> {
                   ),
                 ),
               if (children.isNotEmpty) ...[
-                const SectionTitle('Parrainer un second parent'),
+                SectionTitle(tr('Parrainer un second parent')),
                 Text(
-                  'Vous êtes parent vérifié : générez un code à usage unique (valable 10 minutes) et remettez-le en '
-                  'main propre à l\'autre parent. L\'école validera son rattachement ; il n\'aura jamais plus de '
-                  'droits financiers que vous.',
+                  tr(
+                    'Vous êtes parent vérifié : générez un code à usage unique (valable 10 minutes) et remettez-le en main propre à l\'autre parent. L\'école validera son rattachement ; il n\'aura jamais plus de droits financiers que vous.',
+                  ),
                   style: TextStyle(color: Tokens.textSecondary),
                 ),
                 for (final child in children)
@@ -184,7 +184,7 @@ class _LinkRequestsScreenState extends State<LinkRequestsScreen> {
                             // The theme's buttons are full width: sized to their label here.
                             style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
                             onPressed: () => _issueCode(child),
-                            child: const Text('Générer un code'),
+                            child: Text(tr('Générer un code')),
                           ),
                         ],
                       ),
@@ -219,23 +219,23 @@ class _SponsorCodeDialogState extends State<_SponsorCodeDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       scrollable: true,
-      title: const Text('Code de parrainage'),
+      title: Text(tr('Code de parrainage')),
       content: TextField(
         key: const Key('sponsor.code'),
         controller: _code,
         autofocus: true,
         textCapitalization: TextCapitalization.characters,
-        decoration: const InputDecoration(
-          labelText: 'Code remis par le parent vérifié',
-          helperText: 'Format XXXX-XXXX, valable 10 minutes.',
+        decoration: InputDecoration(
+          labelText: tr('Code remis par le parent vérifié'),
+          helperText: tr('Format XXXX-XXXX, valable 10 minutes.'),
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Annuler')),
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(tr('Annuler'))),
         FilledButton(
           key: const Key('sponsor.submit'),
           onPressed: () => Navigator.of(context).pop(_code.text),
-          child: const Text('Valider'),
+          child: Text(tr('Valider')),
         ),
       ],
     );
@@ -253,7 +253,7 @@ class _IssuedCodeDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       scrollable: true,
-      title: Text('Code pour ${child.firstName}'),
+      title: Text(tr('Code pour {0}', [child.firstName])),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -264,9 +264,9 @@ class _IssuedCodeDialog extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'À remettre en main propre. Valable jusqu\'à '
-            '${code.expiresAt == null ? '—' : hm.format(code.expiresAt!)}, une seule fois. '
-            'Il ne sera plus affiché.',
+            tr('À remettre en main propre. Valable jusqu\'à {0}, une seule fois. Il ne sera plus affiché.', [
+              code.expiresAt == null ? '—' : hm.format(code.expiresAt!),
+            ]),
             textAlign: TextAlign.center,
           ),
         ],
@@ -274,9 +274,9 @@ class _IssuedCodeDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Clipboard.setData(ClipboardData(text: code.code)),
-          child: const Text('Copier'),
+          child: Text(tr('Copier')),
         ),
-        FilledButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Fermer')),
+        FilledButton(onPressed: () => Navigator.of(context).pop(), child: Text(tr('Fermer'))),
       ],
     );
   }
@@ -317,7 +317,7 @@ class _LinkRequestFormState extends State<LinkRequestForm> {
       initialDate: _birth ?? DateTime(now.year - 10),
       firstDate: DateTime(now.year - 30),
       lastDate: now,
-      helpText: 'Date de naissance de l\'enfant',
+      helpText: tr('Date de naissance de l\'enfant'),
     );
     if (picked != null) setState(() => _birth = picked);
   }
@@ -348,7 +348,7 @@ class _LinkRequestFormState extends State<LinkRequestForm> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Rattacher un enfant')),
+      appBar: AppBar(title: Text(tr('Rattacher un enfant'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -359,9 +359,9 @@ class _LinkRequestFormState extends State<LinkRequestForm> {
             controller: _number,
             textCapitalization: TextCapitalization.characters,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              labelText: 'Matricule de l\'élève',
-              helperText: 'Inscrit sur la carte ou un document scolaire.',
+            decoration: InputDecoration(
+              labelText: tr('Matricule de l\'élève'),
+              helperText: tr('Inscrit sur la carte ou un document scolaire.'),
             ),
           ),
           const SizedBox(height: 12),
@@ -369,22 +369,22 @@ class _LinkRequestFormState extends State<LinkRequestForm> {
             key: const Key('link.birth'),
             onPressed: _pickBirth,
             icon: const Icon(Icons.cake_outlined),
-            label: Text(_birth == null ? 'Date de naissance' : 'Né(e) le ${dateOnly.format(_birth!)}'),
+            label: Text(_birth == null ? tr('Date de naissance') : tr('Né(e) le {0}', [dateOnly.format(_birth!)])),
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             isExpanded: true,
             key: const Key('link.relationship'),
             initialValue: _relationship,
-            decoration: const InputDecoration(labelText: 'Votre lien avec l\'enfant'),
+            decoration: InputDecoration(labelText: tr('Votre lien avec l\'enfant')),
             items: [for (final e in relationships.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
             onChanged: (value) => setState(() => _relationship = value ?? 'MOTHER'),
           ),
-          const SectionTitle('Votre pièce d\'identité'),
+          SectionTitle(tr('Votre pièce d\'identité')),
           DropdownButtonFormField<String>(
             isExpanded: true,
             initialValue: _documentType,
-            decoration: const InputDecoration(labelText: 'Type de pièce'),
+            decoration: InputDecoration(labelText: tr('Type de pièce')),
             items: [for (final e in documentTypes.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
             onChanged: (value) => setState(() => _documentType = value ?? 'CNI'),
           ),
@@ -395,11 +395,11 @@ class _LinkRequestFormState extends State<LinkRequestForm> {
             autocorrect: false,
             enableSuggestions: false,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              labelText: 'Numéro de la pièce',
-              helperText:
-                  'Seule une empreinte chiffrée est conservée. Présentez la pièce originale à l\'école pour la '
-                  'vérification.',
+            decoration: InputDecoration(
+              labelText: tr('Numéro de la pièce'),
+              helperText: tr(
+                'Seule une empreinte chiffrée est conservée. Présentez la pièce originale à l\'école pour la vérification.',
+              ),
               helperMaxLines: 3,
             ),
           ),
@@ -407,7 +407,7 @@ class _LinkRequestFormState extends State<LinkRequestForm> {
           FilledButton(
             key: const Key('link.submit'),
             onPressed: _ready ? _submit : null,
-            child: const Text('Envoyer la demande'),
+            child: Text(tr('Envoyer la demande')),
           ),
         ],
       ),

@@ -101,7 +101,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Créer mon compte')),
+      appBar: AppBar(title: Text(tr('Créer mon compte'))),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -121,15 +121,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
     children: [
       Icon(Icons.mark_email_read_outlined, size: 56, color: Tokens.success),
       const SizedBox(height: 16),
-      const Text(
-        'Demande enregistrée',
+      Text(
+        tr('Demande enregistrée'),
         textAlign: TextAlign.center,
         style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
       ),
       const SizedBox(height: 10),
       Text(
-        'L\'établissement va valider votre compte. Vous pouvez déjà vous connecter pour suivre la demande ; '
-        'vous rattacherez ensuite votre enfant (pièce d\'identité vérifiée à l\'école).',
+        tr(
+          'L\'établissement va valider votre compte. Vous pouvez déjà vous connecter pour suivre la demande ; vous rattacherez ensuite votre enfant (pièce d\'identité vérifiée à l\'école).',
+        ),
         textAlign: TextAlign.center,
         style: TextStyle(color: Tokens.textSecondary),
       ),
@@ -137,7 +138,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       FilledButton(
         key: const Key('register.back'),
         onPressed: () => Navigator.of(context).pop(_email.text.trim()),
-        child: const Text('Aller à la connexion'),
+        child: Text(tr('Aller à la connexion')),
       ),
     ],
   );
@@ -147,18 +148,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Votre compte sera validé par l\'établissement. Aucune donnée d\'élève n\'est visible avant la '
-          'vérification de votre lien avec l\'enfant.',
+          tr(
+            'Votre compte sera validé par l\'établissement. Aucune donnée d\'élève n\'est visible avant la vérification de votre lien avec l\'enfant.',
+          ),
           style: TextStyle(color: Tokens.textSecondary),
         ),
         const SizedBox(height: 16),
         if (_error != null) ...[MessageBanner(_error!), const SizedBox(height: 14)],
-        _field('first_name', _first, 'Prénom', Icons.badge_outlined, autofill: const [AutofillHints.givenName]),
-        _field('last_name', _last, 'Nom', Icons.badge_outlined, autofill: const [AutofillHints.familyName]),
+        _field('first_name', _first, tr('Prénom'), Icons.badge_outlined, autofill: const [AutofillHints.givenName]),
+        _field('last_name', _last, tr('Nom'), Icons.badge_outlined, autofill: const [AutofillHints.familyName]),
         _field(
           'email',
           _email,
-          'E-mail (identifiant)',
+          tr('E-mail (identifiant)'),
           Icons.alternate_email,
           keyboard: TextInputType.emailAddress,
           autofill: const [AutofillHints.email],
@@ -166,7 +168,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _field(
           'phone',
           _phone,
-          'Téléphone (facultatif)',
+          tr('Téléphone (facultatif)'),
           Icons.phone_outlined,
           keyboard: TextInputType.phone,
           autofill: const [AutofillHints.telephoneNumber],
@@ -180,13 +182,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
           autofillHints: const [AutofillHints.newPassword],
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
-            labelText: 'Mot de passe',
-            helperText: 'Au moins 10 caractères, pas uniquement des chiffres.',
+            labelText: tr('Mot de passe'),
+            helperText: tr('Au moins 10 caractères, pas uniquement des chiffres.'),
             errorText: _fieldError('password'),
             errorMaxLines: 3,
             prefixIcon: const Icon(Icons.lock_outline),
             suffixIcon: IconButton(
-              tooltip: _hidden ? 'Afficher le mot de passe' : 'Masquer le mot de passe',
+              tooltip: _hidden ? tr('Afficher le mot de passe') : tr('Masquer le mot de passe'),
               icon: Icon(_hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined),
               onPressed: () => setState(() => _hidden = !_hidden),
             ),
@@ -202,9 +204,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           onChanged: (_) => setState(() {}),
           onSubmitted: (_) => _submit(),
           decoration: InputDecoration(
-            labelText: 'Confirmer le mot de passe',
+            labelText: tr('Confirmer le mot de passe'),
             prefixIcon: const Icon(Icons.lock_outline),
-            errorText: _confirmation.text.isNotEmpty && !_matches ? 'Les deux mots de passe diffèrent.' : null,
+            errorText: _confirmation.text.isNotEmpty && !_matches ? tr('Les deux mots de passe diffèrent.') : null,
           ),
         ),
         const SizedBox(height: 22),
@@ -217,7 +219,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   height: 22,
                   child: CircularProgressIndicator(strokeWidth: 2.5, color: Tokens.onPrimary),
                 )
-              : const Text('Créer mon compte'),
+              : Text(tr('Créer mon compte')),
         ),
       ],
     ),

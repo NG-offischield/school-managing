@@ -17,6 +17,7 @@ import 'dart:typed_data';
 import '../api/api_client.dart';
 import 'forum.dart';
 import 'school_plans.dart';
+import '../l10n/l10n.dart';
 
 /// Server datetimes carry the school's offset ("2026-10-05T08:00:00+01:00"):
 /// the wall-clock part is shown as is — the school's time, whatever the
@@ -55,7 +56,7 @@ class Ref {
   final String extra;
 }
 
-const notificationTypes = {
+const _notificationTypesFr = {
   'ATTENDANCE_LATE': 'Retard',
   'ATTENDANCE_ABSENT': 'Absence',
   'CONVOCATION': 'Convocation',
@@ -72,13 +73,19 @@ const notificationTypes = {
   'PLAN': 'Plan de l\'établissement',
 };
 
-const complaintCategories = {
+/// Labels in the CURRENT language (French source: [_notificationTypesFr]).
+Map<String, String> get notificationTypes => trMap(_notificationTypesFr);
+
+const _complaintCategoriesFr = {
   'PEDAGOGY': 'Pédagogie',
   'BEHAVIOR': 'Comportement',
   'ADMINISTRATIVE': 'Administratif',
   'FINANCE': 'Finance',
   'OTHER': 'Autre',
 };
+
+/// Labels in the CURRENT language (French source: [_complaintCategoriesFr]).
+Map<String, String> get complaintCategories => trMap(_complaintCategoriesFr);
 
 class AppNotification {
   AppNotification({
@@ -196,7 +203,7 @@ class ChatMessage {
   final bool mine;
 }
 
-const complaintStatuses = {
+const _complaintStatusesFr = {
   'DRAFT': 'Brouillon',
   'OPEN': 'Ouverte',
   'IN_PROGRESS': 'En traitement',
@@ -204,6 +211,9 @@ const complaintStatuses = {
   'CANCELLED': 'Annulée',
   'CLOSED': 'Clôturée',
 };
+
+/// Labels in the CURRENT language (French source: [_complaintStatusesFr]).
+Map<String, String> get complaintStatuses => trMap(_complaintStatusesFr);
 
 class Complaint {
   Complaint({

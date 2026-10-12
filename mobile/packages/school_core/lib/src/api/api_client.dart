@@ -16,6 +16,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import 'api_error.dart';
+import '../l10n/l10n.dart';
 
 class ApiPage {
   ApiPage(this.rows, this.count, {this.hasNext = false});
@@ -86,9 +87,9 @@ class ApiClient {
     bool retry = true,
   }) async {
     if (auth && accessToken == null) {
-      throw UnauthorizedException(code: 'NOT_AUTHENTICATED', message: 'Authentification requise.');
+      throw UnauthorizedException(code: 'NOT_AUTHENTICATED', message: tr('Authentification requise.'));
     }
-    final headers = <String, String>{'Accept': 'application/json', 'Accept-Language': 'fr'};
+    final headers = <String, String>{'Accept': 'application/json', 'Accept-Language': L10n.language.code};
     if (body != null) headers['Content-Type'] = 'application/json';
     if (auth) headers['Authorization'] = 'Bearer $accessToken';
     final requestObject = http.Request(method, uri(path, params))..headers.addAll(headers);
@@ -114,7 +115,7 @@ class ApiClient {
         decoded = (jsonDecode(utf8.decode(response.bodyBytes)) as Map).cast<String, dynamic>();
       } on FormatException {
         if (response.statusCode >= 500) {
-          throw ServerException(status: response.statusCode, code: 'SERVER_ERROR', message: 'Erreur serveur');
+          throw ServerException(status: response.statusCode, code: 'SERVER_ERROR', message: tr('Erreur serveur'));
         }
       }
     }
@@ -126,10 +127,14 @@ class ApiClient {
   /// permission check. Same token / refresh / error handling as JSON calls.
   Future<Uint8List> download(String path, {Map<String, Object?>? params, bool retry = true}) async {
     if (accessToken == null) {
-      throw UnauthorizedException(code: 'NOT_AUTHENTICATED', message: 'Authentification requise.');
+      throw UnauthorizedException(code: 'NOT_AUTHENTICATED', message: tr('Authentification requise.'));
     }
     final requestObject = http.Request('GET', uri(path, params))
-      ..headers.addAll({'Accept': 'application/pdf, application/json', 'Authorization': 'Bearer $accessToken'});
+      ..headers.addAll({
+        'Accept': 'application/pdf, application/json',
+        'Accept-Language': L10n.language.code,
+        'Authorization': 'Bearer $accessToken',
+      });
     http.Response response;
     try {
       response = await http.Response.fromStream(await _http.send(requestObject).timeout(timeout));
@@ -163,10 +168,14 @@ class ApiClient {
     bool retry = true,
   }) async {
     if (accessToken == null) {
-      throw UnauthorizedException(code: 'NOT_AUTHENTICATED', message: 'Authentification requise.');
+      throw UnauthorizedException(code: 'NOT_AUTHENTICATED', message: tr('Authentification requise.'));
     }
     final requestObject = http.MultipartRequest('POST', uri(path))
-      ..headers.addAll({'Accept': 'application/json', 'Accept-Language': 'fr', 'Authorization': 'Bearer $accessToken'})
+      ..headers.addAll({
+        'Accept': 'application/json',
+        'Accept-Language': L10n.language.code,
+        'Authorization': 'Bearer $accessToken',
+      })
       ..files.add(http.MultipartFile.fromBytes(field, bytes, filename: filename));
     http.Response response;
     try {

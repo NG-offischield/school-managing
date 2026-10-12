@@ -20,8 +20,8 @@ Future<void> downloadReceipt(BuildContext context, Payment payment) async {
     final opened = await store.open(path);
     say(
       opened
-          ? 'Reçu ${payment.reference} ouvert.'
-          : 'Reçu ${payment.reference} enregistré dans l\'application (aucune application PDF pour l\'ouvrir).',
+          ? tr('Reçu {0} ouvert.', [payment.reference])
+          : tr('Reçu {0} enregistré dans l\'application (aucune application PDF pour l\'ouvrir).', [payment.reference]),
     );
   } on ApiException catch (error) {
     say(error.userMessage);

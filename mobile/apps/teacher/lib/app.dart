@@ -3,6 +3,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:school_core/school_core.dart';
 
+import 'l10n/teacher_en.dart';
+
 import 'data/teacher_repository.dart';
 import 'presentation/home/home_shell.dart';
 
@@ -27,6 +29,7 @@ class TeacherApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    L10n.register(teacherEnglish); // this app's own English texts (shared ones: school_core)
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<AuthService>.value(value: auth),
@@ -35,14 +38,14 @@ class TeacherApp extends StatelessWidget {
         Provider<PlanFiles>.value(value: planFiles),
       ],
       child: MaterialApp(
-        title: 'School Managing — Enseignant',
+        title: tr('School Managing — Enseignant'),
         debugShowCheckedModeBanner: false,
         theme: buildAppTheme(),
         darkTheme: buildAppTheme(brightness: Brightness.dark),
         themeMode: themeModeOf(context),
         builder: themedScreens,
-        locale: const Locale('fr', 'FR'),
-        supportedLocales: const [Locale('fr', 'FR')],
+        locale: languageOf(context).locale,
+        supportedLocales: supportedAppLocales,
         localizationsDelegates: const [
           GlobalMaterialLocalizations.delegate,
           GlobalWidgetsLocalizations.delegate,
@@ -66,7 +69,7 @@ class AuthGate extends StatelessWidget {
       AuthStatus.restoring => const SplashScreen(),
       AuthStatus.signedOut || AuthStatus.pending => SignInScreen(
         // no pending accounts here
-        subtitle: 'Espace enseignant',
+        subtitle: tr('Espace enseignant'),
         roleLabel: 'enseignant',
         alternative: SignInAlternative.activation(),
       ),
@@ -86,9 +89,9 @@ class SplashScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SoftwareBrand(light: true, size: 30, subtitle: 'Espace enseignant'),
+            SoftwareBrand(light: true, size: 30, subtitle: tr('Espace enseignant')),
             SizedBox(height: 28),
-            CircularProgressIndicator(color: Colors.white, semanticsLabel: 'Ouverture de la session'),
+            CircularProgressIndicator(color: Colors.white, semanticsLabel: tr('Ouverture de la session')),
           ],
         ),
       ),

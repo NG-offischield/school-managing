@@ -5,8 +5,12 @@ library;
 
 import '../api/api_client.dart';
 import 'communication.dart';
+import '../l10n/l10n.dart';
 
-const breakTypes = {'HOLIDAY': 'Vacances', 'PUBLIC_HOLIDAY': 'Jour férié', 'EXAM': 'Examens', 'OTHER': 'Autre'};
+const _breakTypesFr = {'HOLIDAY': 'Vacances', 'PUBLIC_HOLIDAY': 'Jour férié', 'EXAM': 'Examens', 'OTHER': 'Autre'};
+
+/// Labels in the CURRENT language (French source: [_breakTypesFr]).
+Map<String, String> get breakTypes => trMap(_breakTypesFr);
 
 class SchoolBreakItem {
   SchoolBreakItem({required this.name, required this.type, this.start, this.end});

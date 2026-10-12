@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../l10n/l10n.dart';
 
 /// One palette (light or dark): every colour the screens use.
 class Palette {
@@ -212,7 +213,10 @@ ThemeData buildAppTheme({Brightness brightness = Brightness.light}) {
 }
 
 /// Système / Clair / Sombre.
-const themeModeLabels = {ThemeMode.system: 'Système', ThemeMode.light: 'Clair', ThemeMode.dark: 'Sombre'};
+const _themeModeLabelsFr = {ThemeMode.system: 'Système', ThemeMode.light: 'Clair', ThemeMode.dark: 'Sombre'};
+
+/// Labels in the CURRENT language (French source: [_themeModeLabelsFr]).
+Map<ThemeMode, String> get themeModeLabels => trMap(_themeModeLabelsFr);
 
 /// The user's choice, kept on the phone (shared_preferences: a display
 /// preference, nothing secret). Default: follow the system.
@@ -245,7 +249,10 @@ class ThemeController extends ChangeNotifier {
 ThemeMode themeModeOf(BuildContext context) => context.watch<ThemeController?>()?.mode ?? ThemeMode.light;
 
 /// MaterialApp.builder of every app: [ThemedTokens] around the screens.
-Widget themedScreens(BuildContext context, Widget? child) => ThemedTokens(child: child ?? const SizedBox.shrink());
+Widget themedScreens(BuildContext context, Widget? child) => LocalizedScreens(
+  language: languageOf(context),
+  child: ThemedTokens(child: child ?? const SizedBox.shrink()),
+);
 
 /// Below MaterialApp (its `builder`): keeps [Tokens] on the EFFECTIVE
 /// brightness (choice, or the phone's setting in « Système ») and, when it

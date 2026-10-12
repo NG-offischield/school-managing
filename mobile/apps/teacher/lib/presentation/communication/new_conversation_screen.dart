@@ -81,17 +81,17 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Nouveau message')),
+      appBar: AppBar(title: Text(tr('Nouveau message'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           if (_error != null) ...[MessageBanner(_error!), const SizedBox(height: 12)],
           SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(value: false, label: Text('Administration'), icon: Icon(Icons.apartment_outlined)),
+            segments: [
+              ButtonSegment(value: false, label: Text(tr('Administration')), icon: Icon(Icons.apartment_outlined)),
               ButtonSegment(
                 value: true,
-                label: Text('Parent d\'élève', key: Key('compose.parent')),
+                label: Text(tr('Parent d\'élève'), key: Key('compose.parent')),
                 icon: Icon(Icons.family_restroom_outlined),
               ),
             ],
@@ -103,7 +103,7 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
           TextField(
             key: const Key('message.title'),
             controller: _title,
-            decoration: const InputDecoration(labelText: 'Objet (facultatif)'),
+            decoration: InputDecoration(labelText: tr('Objet (facultatif)')),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -112,14 +112,14 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
             minLines: 4,
             maxLines: 8,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(labelText: 'Message', alignLabelWithHint: true),
+            decoration: InputDecoration(labelText: tr('Message'), alignLabelWithHint: true),
           ),
           const SizedBox(height: 18),
           FilledButton.icon(
             key: const Key('message.send'),
             onPressed: _ready ? _send : null,
             icon: const Icon(Icons.send),
-            label: const Text('Envoyer'),
+            label: Text(tr('Envoyer')),
           ),
         ],
       ),
@@ -136,15 +136,15 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              MessageBanner(error is ApiException ? error.userMessage : 'Liste indisponible.'),
-              TextButton(key: const Key('contacts.retry'), onPressed: _reload, child: const Text('Réessayer')),
+              MessageBanner(error is ApiException ? error.userMessage : tr('Liste indisponible.')),
+              TextButton(key: const Key('contacts.retry'), onPressed: _reload, child: Text(tr('Réessayer'))),
             ],
           );
         }
         final pupils = snapshot.data ?? const [];
         if (pupils.isEmpty) {
-          return const Text(
-            'Aucun élève dans vos classes actuelles : aucun parent à contacter.',
+          return Text(
+            tr('Aucun élève dans vos classes actuelles : aucun parent à contacter.'),
             key: Key('contacts.empty'),
           );
         }
@@ -153,16 +153,16 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Parents vérifiés des élèves de vos classes.', style: TextStyle(color: Tokens.textSecondary)),
+            Text(tr('Parents vérifiés des élèves de vos classes.'), style: TextStyle(color: Tokens.textSecondary)),
             const SizedBox(height: 8),
             TextField(
               key: const Key('contacts.filter'),
               controller: _filter,
               onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(prefixIcon: Icon(Icons.search), labelText: 'Élève'),
+              decoration: InputDecoration(prefixIcon: Icon(Icons.search), labelText: tr('Élève')),
             ),
             const SizedBox(height: 8),
-            if (shown.isEmpty) const Text('Aucun élève ne correspond.'),
+            if (shown.isEmpty) Text(tr('Aucun élève ne correspond.')),
             for (final pupil in shown)
               Card(
                 key: Key('pupil.${pupil.student}'),
@@ -178,7 +178,7 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
                       if (pupil.parents.isEmpty)
                         Padding(
                           padding: EdgeInsets.fromLTRB(16, 2, 16, 8),
-                          child: Text('Aucun parent vérifié.', style: TextStyle(color: Tokens.textSecondary)),
+                          child: Text(tr('Aucun parent vérifié.'), style: TextStyle(color: Tokens.textSecondary)),
                         ),
                       for (final parent in pupil.parents)
                         ListTile(

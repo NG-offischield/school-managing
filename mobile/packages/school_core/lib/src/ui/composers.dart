@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../api/api_error.dart';
 import '../data/communication.dart';
 import '../widgets/widgets.dart';
+import '../l10n/l10n.dart';
 
 /// Message to the administration (every role may write to it; the server
 /// decides who receives it). Same client id on a resend: no duplicate.
@@ -55,7 +56,7 @@ class _AdminMessageScreenState extends State<AdminMessageScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Message à l\'administration')),
+      appBar: AppBar(title: Text(tr('Message à l\'administration'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -63,7 +64,7 @@ class _AdminMessageScreenState extends State<AdminMessageScreen> {
           TextField(
             key: const Key('message.title'),
             controller: _title,
-            decoration: const InputDecoration(labelText: 'Objet (facultatif)'),
+            decoration: InputDecoration(labelText: tr('Objet (facultatif)')),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -72,14 +73,14 @@ class _AdminMessageScreenState extends State<AdminMessageScreen> {
             minLines: 4,
             maxLines: 8,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(labelText: 'Message', alignLabelWithHint: true),
+            decoration: InputDecoration(labelText: tr('Message'), alignLabelWithHint: true),
           ),
           const SizedBox(height: 18),
           FilledButton.icon(
             key: const Key('message.send'),
             onPressed: _ready ? _send : null,
             icon: const Icon(Icons.send),
-            label: const Text('Envoyer'),
+            label: Text(tr('Envoyer')),
           ),
         ],
       ),
@@ -140,7 +141,7 @@ class _ComplaintComposerState extends State<ComplaintComposer> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Nouvelle réclamation')),
+      appBar: AppBar(title: Text(tr('Nouvelle réclamation'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -148,7 +149,7 @@ class _ComplaintComposerState extends State<ComplaintComposer> {
           DropdownButtonFormField<String>(
             isExpanded: true,
             initialValue: _category,
-            decoration: const InputDecoration(labelText: 'Catégorie'),
+            decoration: InputDecoration(labelText: tr('Catégorie')),
             items: [
               for (final entry in complaintCategories.entries)
                 DropdownMenuItem(value: entry.key, child: Text(entry.value)),
@@ -160,14 +161,14 @@ class _ComplaintComposerState extends State<ComplaintComposer> {
               contentPadding: EdgeInsets.zero,
               value: _aboutStudent,
               onChanged: (value) => setState(() => _aboutStudent = value),
-              title: Text('Concerne ${widget.studentLabel ?? 'l\'élève'}'),
+              title: Text(tr('Concerne {0}', [widget.studentLabel ?? tr('l\'élève')])),
             ),
           const SizedBox(height: 8),
           TextField(
             key: const Key('complaint.subject'),
             controller: _subject,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(labelText: 'Objet'),
+            decoration: InputDecoration(labelText: tr('Objet')),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -176,13 +177,13 @@ class _ComplaintComposerState extends State<ComplaintComposer> {
             minLines: 4,
             maxLines: 8,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(labelText: 'Description', alignLabelWithHint: true),
+            decoration: InputDecoration(labelText: tr('Description'), alignLabelWithHint: true),
           ),
           const SizedBox(height: 18),
           FilledButton(
             key: const Key('complaint.submit'),
             onPressed: _ready ? _submit : null,
-            child: const Text('Transmettre'),
+            child: Text(tr('Transmettre')),
           ),
         ],
       ),

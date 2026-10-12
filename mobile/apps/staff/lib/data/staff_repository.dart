@@ -33,7 +33,10 @@ class StaffMe {
   final List<Ref> functions; // id = code, label = name
 }
 
-const sessionStatuses = {'SCHEDULED': 'Prévue', 'COMPLETED': 'Réalisée', 'CANCELLED': 'Annulée'};
+const _sessionStatusesFr = {'SCHEDULED': 'Prévue', 'COMPLETED': 'Réalisée', 'CANCELLED': 'Annulée'};
+
+/// Labels in the CURRENT language (French source: [_sessionStatusesFr]).
+Map<String, String> get sessionStatuses => trMap(_sessionStatusesFr);
 
 class SchoolSession {
   SchoolSession({
@@ -78,7 +81,7 @@ class SchoolSession {
   String get subjectName => subject.extra.isNotEmpty ? subject.extra : subject.label;
 }
 
-const changeTypes = {
+const _changeTypesFr = {
   'SLOT_CREATED': 'Créneau ajouté',
   'SLOT_ENDED': 'Créneau arrêté',
   'SLOT_ARCHIVED': 'Créneau archivé',
@@ -91,12 +94,18 @@ const changeTypes = {
   'SESSIONS_SWAPPED': 'Séances échangées',
 };
 
-const lineKinds = {
+/// Labels in the CURRENT language (French source: [_changeTypesFr]).
+Map<String, String> get changeTypes => trMap(_changeTypesFr);
+
+const _lineKindsFr = {
   'SALARY': 'Salaire fixe',
   'ADJUSTMENT': 'Correction',
   'EARNED': 'Séance validée',
   'PROGRAMMED': 'Séance programmée',
 };
+
+/// Labels in the CURRENT language (French source: [_lineKindsFr]).
+Map<String, String> get lineKinds => trMap(_lineKindsFr);
 
 class PlanningChange {
   PlanningChange({required this.type, this.at, this.reason, this.date});
@@ -119,7 +128,10 @@ class PlanningChange {
   String get typeLabel => changeTypes[type] ?? type;
 }
 
-const payrollStatuses = {'APPROVED': 'Validée', 'PAID': 'Payée'};
+const _payrollStatusesFr = {'APPROVED': 'Validée', 'PAID': 'Payée'};
+
+/// Labels in the CURRENT language (French source: [_payrollStatusesFr]).
+Map<String, String> get payrollStatuses => trMap(_payrollStatusesFr);
 
 class Payslip {
   Payslip({

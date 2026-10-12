@@ -15,6 +15,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
@@ -22,6 +23,7 @@ import '../config/local_network.dart';
 import '../config/server_endpoint.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
+import '../l10n/l10n.dart';
 
 /// Everything an app builds for ONE server.
 class ServerSession {
@@ -151,9 +153,9 @@ class _ServerHostState extends State<ServerHost> implements ServerControl {
       var status = await widget.access.status();
       if (status.blocked && status.canAsk) status = await widget.access.request();
       if (status.blocked) {
-        return const ServerCheck(
+        return ServerCheck(
           ServerCheckKind.localNetworkDenied,
-          'Android refuse l\'accès au réseau local : autorisez « Appareils à proximité » pour cette application.',
+          tr('Android refuse l\'accès au réseau local : autorisez « Appareils à proximité » pour cette application.'),
         );
       }
     }
@@ -198,6 +200,9 @@ class _ServerHostState extends State<ServerHost> implements ServerControl {
             darkTheme: buildAppTheme(brightness: Brightness.dark),
             themeMode: themeModeOf(context),
             builder: themedScreens,
+            locale: languageOf(context).locale,
+            supportedLocales: supportedAppLocales,
+            localizationsDelegates: GlobalMaterialLocalizations.delegates,
             home: ServerSettingsScreen(control: this, firstRun: true),
           )
         : LocalNetworkGate(config: config, onReady: session.onReady, access: widget.access, child: session.app);
@@ -271,32 +276,33 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Changer de serveur ?'),
+        title: Text(tr('Changer de serveur ?')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Nouveau serveur : ${config.serverAddress}', key: const Key('server.confirm.address')),
+            Text(tr('Nouveau serveur : {0}', [config.serverAddress]), key: const Key('server.confirm.address')),
             const SizedBox(height: 10),
-            const Text(
-              'Vous serez déconnecté(e). La session et les documents enregistrés pour l\'ancien serveur '
-              'seront effacés de ce téléphone.',
+            Text(
+              tr(
+                'Vous serez déconnecté(e). La session et les documents enregistrés pour l\'ancien serveur seront effacés de ce téléphone.',
+              ),
             ),
             if (!verified) ...[
               const SizedBox(height: 10),
               Text(
-                'La connexion à ce serveur n\'a pas été vérifiée.',
+                tr('La connexion à ce serveur n\'a pas été vérifiée.'),
                 style: TextStyle(color: Tokens.warning, fontWeight: FontWeight.w600),
               ),
             ],
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(tr('Annuler'))),
           FilledButton(
             key: const Key('server.confirm.ok'),
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Changer'),
+            child: Text(tr('Changer')),
           ),
         ],
       ),
@@ -318,15 +324,19 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
     final result = _result;
     final clearText = _address.text.trim().isNotEmpty && !_address.text.trim().startsWith('https://');
     return Scaffold(
-      appBar: AppBar(title: const Text('Serveur de l\'établissement'), automaticallyImplyLeading: !widget.firstRun),
+      appBar: AppBar(title: Text(tr('Serveur de l\'établissement')), automaticallyImplyLeading: !widget.firstRun),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
           Text(
             current == null
-                ? 'Aucun serveur configuré.'
-                : 'Serveur actuel : ${current.serverAddress}'
-                      '${control.source == ServerSource.build ? ' (adresse d\'installation)' : ' (enregistré sur ce téléphone)'}',
+                ? tr('Aucun serveur configuré.')
+                : tr('Serveur actuel : {0}{1}', [
+                    current.serverAddress,
+                    control.source == ServerSource.build
+                        ? tr(' (adresse d\'installation)')
+                        : tr(' (enregistré sur ce téléphone)'),
+                  ]),
             key: const Key('server.current'),
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
@@ -338,17 +348,18 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
             keyboardType: TextInputType.url,
             autocorrect: false,
             onChanged: (_) => setState(() => _result = null),
-            decoration: const InputDecoration(
-              labelText: 'Adresse du serveur',
+            decoration: InputDecoration(
+              labelText: tr('Adresse du serveur'),
               hintText: 'http://<IPv4 du PC>:8000',
-              helperText: 'Affichée par configure_lan.ps1 sur le PC du serveur.',
+              helperText: tr('Affichée par configure_lan.ps1 sur le PC du serveur.'),
             ),
           ),
           if (clearText) ...[
             const SizedBox(height: 8),
             Text(
-              'HTTP non chiffré : réservé au réseau local de confiance de l\'établissement, '
-              'jamais pour un serveur exposé sur Internet.',
+              tr(
+                'HTTP non chiffré : réservé au réseau local de confiance de l\'établissement, jamais pour un serveur exposé sur Internet.',
+              ),
               style: TextStyle(color: Tokens.textSecondary, fontSize: 12),
             ),
           ],
@@ -357,7 +368,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
             key: const Key('server.test'),
             onPressed: _busy ? null : _test,
             icon: const Icon(Icons.network_check),
-            label: const Text('Tester la connexion'),
+            label: Text(tr('Tester la connexion')),
           ),
           if (_busy) ...[const SizedBox(height: 12), const LinearProgressIndicator()],
           if (result != null) ...[
@@ -379,14 +390,14 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
             key: const Key('server.save'),
             onPressed: _busy ? null : _save,
             icon: const Icon(Icons.save_outlined),
-            label: const Text('Enregistrer'),
+            label: Text(tr('Enregistrer')),
           ),
           if (control.source == ServerSource.saved && control.buildConfig != null) ...[
             const SizedBox(height: 8),
             TextButton(
               key: const Key('server.reset'),
               onPressed: _busy ? null : _backToBuild,
-              child: Text('Revenir à l\'adresse d\'installation (${control.buildConfig!.serverAddress})'),
+              child: Text(tr('Revenir à l\'adresse d\'installation ({0})', [control.buildConfig!.serverAddress])),
             ),
           ],
         ],
@@ -410,7 +421,7 @@ class ServerSettingsTile extends StatelessWidget {
         child: ListTile(
           key: const Key('profile.server'),
           leading: const Icon(Icons.dns_outlined),
-          title: const Text('Serveur'),
+          title: Text(tr('Serveur')),
           subtitle: Text(current.serverAddress),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => openServerSettings(context, control),

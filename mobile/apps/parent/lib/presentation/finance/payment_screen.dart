@@ -77,21 +77,25 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Confirmer le paiement'),
+        title: Text(tr('Confirmer le paiement')),
         content: Text(
-          '$amount seront débités du portefeuille ${wallet.label} pour ${widget.child.name} '
-          '(facture ${invoice.number}).',
+          tr('{0} seront débités du portefeuille {1} pour {2} (facture {3}).', [
+            amount,
+            wallet.label,
+            widget.child.name,
+            invoice.number,
+          ]),
         ),
         actions: [
           TextButton(
             key: const Key('pay.cancel'),
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Annuler'),
+            child: Text(tr('Annuler')),
           ),
           FilledButton(
             key: const Key('pay.confirm'),
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Payer $amount'),
+            child: Text(tr('Payer {0}', [amount])),
           ),
         ],
       ),
@@ -108,7 +112,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       canPop: !paying, // never leave while the debit is being decided
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Payer une facture'),
+          title: Text(tr('Payer une facture')),
           leading: BackButton(onPressed: paying ? null : () => Navigator.of(context).pop(answered)),
         ),
         body: AsyncBody<_Ready>(future: _future, onRetry: _load, builder: (context, data) => _body(data)),
@@ -131,18 +135,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
               children: [
                 Text(widget.child.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 6),
-                InfoRow('Facture', invoice.number),
-                if (invoice.reason.isNotEmpty) InfoRow('Motif', invoice.reason),
-                InfoRow('Échéance', invoice.dueDate == null ? '—' : dateOnly.format(invoice.dueDate!)),
-                InfoRow('Total', formatMoney(invoice.total, invoice.currency)),
-                InfoRow('Déjà payé', formatMoney(invoice.paid, invoice.currency)),
+                InfoRow(tr('Facture'), invoice.number),
+                if (invoice.reason.isNotEmpty) InfoRow(tr('Motif'), invoice.reason),
+                InfoRow(tr('Échéance'), invoice.dueDate == null ? '—' : dateOnly.format(invoice.dueDate!)),
+                InfoRow(tr('Total'), formatMoney(invoice.total, invoice.currency)),
+                InfoRow(tr('Déjà payé'), formatMoney(invoice.paid, invoice.currency)),
                 const SizedBox(height: 6),
                 StatusChip(invoice.statusLabel, tone: invoice.payable ? Tone.info : Tone.success),
                 const Divider(height: 24),
                 Row(
                   children: [
-                    const Expanded(
-                      child: Text('Montant à payer', style: TextStyle(fontWeight: FontWeight.w600)),
+                    Expanded(
+                      child: Text(tr('Montant à payer'), style: TextStyle(fontWeight: FontWeight.w600)),
                     ),
                     Text(
                       amount,
@@ -163,24 +167,24 @@ class _PaymentScreenState extends State<PaymentScreen> {
   List<Widget> _action(_Ready data, PaymentFlow flow, String amount) {
     final invoice = data.invoice;
     if (!data.obligations.canPay) {
-      return const [
+      return [
         SizedBox(height: 12),
         MessageBanner(
-          'L\'établissement ne vous a pas autorisé(e) à payer pour cet enfant. Vous pouvez consulter la facture.',
+          tr('L\'établissement ne vous a pas autorisé(e) à payer pour cet enfant. Vous pouvez consulter la facture.'),
           tone: Tone.info,
         ),
       ];
     }
     if (flow.state == PayState.done) return _result(flow.payment!, flow);
     if (!invoice.payable) {
-      return const [SizedBox(height: 12), MessageBanner('Cette facture est déjà réglée.', tone: Tone.success)];
+      return [SizedBox(height: 12), MessageBanner(tr('Cette facture est déjà réglée.'), tone: Tone.success)];
     }
     final usable = data.wallets.where((w) => w.active).toList();
     return [
-      const SectionTitle('Payer avec'),
+      SectionTitle(tr('Payer avec')),
       if (data.wallets.isEmpty)
-        const MessageBanner(
-          'Aucun portefeuille mobile à votre nom. L\'établissement doit d\'abord vous en ouvrir un.',
+        MessageBanner(
+          tr('Aucun portefeuille mobile à votre nom. L\'établissement doit d\'abord vous en ouvrir un.'),
           tone: Tone.info,
         ),
       RadioGroup<String>(
@@ -196,18 +200,21 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   // A blocked wallet is shown, not offered; none can change while a payment is unresolved.
                   enabled: w.active && !flow.walletLocked && flow.state != PayState.paying,
                   title: Text(w.label),
-                  subtitle: Text(w.active ? 'Solde : ${formatMoney(w.balance, w.currency)}' : 'Portefeuille bloqué'),
+                  subtitle: Text(
+                    w.active ? tr('Solde : {0}', [formatMoney(w.balance, w.currency)]) : tr('Portefeuille bloqué'),
+                  ),
                 ),
               ),
           ],
         ),
       ),
       if (flow.state == PayState.unknown)
-        const Padding(
+        Padding(
           padding: EdgeInsets.only(top: 12),
           child: MessageBanner(
-            'La réponse du serveur n\'est pas arrivée : le paiement a peut-être été enregistré. « Réessayer » '
-            'renvoie la MÊME demande : il n\'y aura jamais de second débit.',
+            tr(
+              'La réponse du serveur n\'est pas arrivée : le paiement a peut-être été enregistré. « Réessayer » renvoie la MÊME demande : il n\'y aura jamais de second débit.',
+            ),
             tone: Tone.warning,
           ),
         ),
@@ -215,7 +222,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         Padding(padding: const EdgeInsets.only(top: 12), child: MessageBanner(flow.error!.userMessage)),
       const SizedBox(height: 16),
       if (flow.state == PayState.paying)
-        const FilledButton(
+        FilledButton(
           key: Key('pay.busy'),
           onPressed: null,
           child: Row(
@@ -223,7 +230,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             children: [
               SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5)),
               SizedBox(width: 12),
-              Text('Paiement en cours…'),
+              Text(tr('Paiement en cours…')),
             ],
           ),
         )
@@ -232,21 +239,21 @@ class _PaymentScreenState extends State<PaymentScreen> {
           key: const Key('pay.retry'),
           onPressed: flow.pay, // same intent, same key
           icon: const Icon(Icons.refresh),
-          label: const Text('Réessayer'),
+          label: Text(tr('Réessayer')),
         )
       else if (flow.state == PayState.refused && flow.error is ConflictException)
         OutlinedButton.icon(
           key: const Key('pay.reload'),
           onPressed: _load, // the balance or the status changed: read them again
           icon: const Icon(Icons.refresh),
-          label: const Text('Recharger la facture'),
+          label: Text(tr('Recharger la facture')),
         )
       else
         FilledButton.icon(
           key: const Key('pay.submit'),
           onPressed: flow.wallet == null || usable.isEmpty ? null : () => _confirmAndPay(invoice),
           icon: const Icon(Icons.lock_outline),
-          label: Text('Payer $amount'),
+          label: Text(tr('Payer {0}', [amount])),
         ),
     ];
   }
@@ -273,15 +280,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 ],
               ),
               const SizedBox(height: 10),
-              InfoRow('Référence', payment.reference, strong: true),
-              InfoRow('Montant', formatMoney(payment.amount, payment.currency)),
-              if (payment.at != null) InfoRow('Date', dateTime.format(payment.at!)),
-              if (payment.failureReason != null) InfoRow('Motif du refus', payment.failureReason!),
+              InfoRow(tr('Référence'), payment.reference, strong: true),
+              InfoRow(tr('Montant'), formatMoney(payment.amount, payment.currency)),
+              if (payment.at != null) InfoRow(tr('Date'), dateTime.format(payment.at!)),
+              if (payment.failureReason != null) InfoRow(tr('Motif du refus'), payment.failureReason!),
               if (payment.replayed)
                 Padding(
                   padding: EdgeInsets.only(top: 6),
                   child: Text(
-                    'Ce paiement avait déjà été enregistré : aucun second débit.',
+                    tr('Ce paiement avait déjà été enregistré : aucun second débit.'),
                     style: TextStyle(color: Tokens.textSecondary),
                   ),
                 ),
@@ -295,20 +302,20 @@ class _PaymentScreenState extends State<PaymentScreen> {
           key: const Key('pay.receipt'),
           onPressed: () => downloadReceipt(context, payment),
           icon: const Icon(Icons.receipt_long_outlined),
-          label: const Text('Télécharger le reçu'),
+          label: Text(tr('Télécharger le reçu')),
         )
       else
         FilledButton.icon(
           key: const Key('pay.again'),
           onPressed: flow.startOver, // a NEW payment (new key)
           icon: const Icon(Icons.refresh),
-          label: const Text('Réessayer'),
+          label: Text(tr('Réessayer')),
         ),
       const SizedBox(height: 8),
       OutlinedButton(
         key: const Key('pay.close'),
         onPressed: () => Navigator.of(context).pop(true),
-        child: const Text('Retour à la scolarité'),
+        child: Text(tr('Retour à la scolarité')),
       ),
     ];
   }

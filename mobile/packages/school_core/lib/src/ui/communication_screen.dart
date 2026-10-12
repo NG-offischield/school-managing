@@ -11,6 +11,7 @@ import 'conversation_screen.dart';
 import 'forum_screen.dart';
 import 'live_state.dart';
 import 'plans_screen.dart';
+import '../l10n/l10n.dart';
 
 /// Notifications, messages and complaints of the parent (existing
 /// communication API; new notifications arrive live through the WebSocket).
@@ -47,24 +48,24 @@ class CommunicationScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tabs = <(String, Widget)>[
-      ('Notifications', const NotificationsTab()),
+      (tr('Notifications'), const NotificationsTab()),
       if (messaging)
         (
-          'Messages',
+          tr('Messages'),
           ConversationsTab(
             compose: composeConversation ?? (c) => openAbove<Conversation>(c, const AdminMessageScreen()),
           ),
         ),
       if (complaints)
         (
-          'Réclamations',
+          tr('Réclamations'),
           ComplaintsTab(compose: composeComplaint ?? (c) => openAbove<Complaint>(c, const ComplaintComposer())),
         ),
-      if (forum) ('Forum', const ForumTab()),
+      if (forum) (tr('Forum'), const ForumTab()),
     ];
     if (tabs.length == 1) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Notifications'), actions: const [LiveIndicator()]),
+        appBar: AppBar(title: Text(tr('Notifications')), actions: const [LiveIndicator()]),
         body: tabs.single.$2,
       );
     }
@@ -72,7 +73,7 @@ class CommunicationScreen extends StatelessWidget {
       length: tabs.length,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Communication'),
+          title: Text(tr('Communication')),
           actions: const [LiveIndicator()],
           bottom: TabBar(
             labelColor: Colors.white,
@@ -160,7 +161,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
                   openAbove<void>(context, ForumThreadScreen(threadId: notification.threadId!));
                 },
                 icon: const Icon(Icons.forum_outlined),
-                label: const Text('Ouvrir la discussion'),
+                label: Text(tr('Ouvrir la discussion')),
               ),
             ],
             if (notification.planId != null) ...[
@@ -172,7 +173,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
                   openAbove<void>(context, PlanViewerScreen(planId: notification.planId!));
                 },
                 icon: const Icon(Icons.map_outlined),
-                label: const Text('Ouvrir le plan'),
+                label: Text(tr('Ouvrir le plan')),
               ),
             ],
           ],
@@ -200,7 +201,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
         future: _future,
         onRetry: _load,
         isEmpty: (_) => _rows.isEmpty,
-        emptyText: 'Aucune notification.',
+        emptyText: tr('Aucune notification.'),
         builder: (context, _) => ListView(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
           children: [
@@ -209,7 +210,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
               child: TextButton.icon(
                 onPressed: _markAll,
                 icon: const Icon(Icons.done_all),
-                label: const Text('Tout marquer comme lu'),
+                label: Text(tr('Tout marquer comme lu')),
               ),
             ),
             for (final n in _rows)
@@ -223,7 +224,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
                   ),
                   title: Text(n.title, style: TextStyle(fontWeight: n.read ? FontWeight.w500 : FontWeight.w700)),
                   subtitle: Text('${n.typeLabel}${n.at == null ? '' : ' · ${dateTime.format(n.at!)}'}'),
-                  trailing: n.read ? null : const StatusChip('Non lue', tone: Tone.info),
+                  trailing: n.read ? null : StatusChip(tr('Non lue'), tone: Tone.info),
                 ),
               ),
           ],
@@ -271,7 +272,7 @@ class _ConversationsTabState extends State<ConversationsTab> {
         heroTag: 'conversations.new',
         onPressed: _new,
         icon: const Icon(Icons.edit_outlined),
-        label: const Text('Écrire'),
+        label: Text(tr('Écrire')),
       ),
       body: RefreshIndicator(
         onRefresh: () async => _load(),
@@ -279,7 +280,7 @@ class _ConversationsTabState extends State<ConversationsTab> {
           future: _future,
           onRetry: _load,
           isEmpty: (rows) => rows.isEmpty,
-          emptyText: 'Aucune conversation. Écrivez à l\'administration ou à un enseignant de votre enfant.',
+          emptyText: tr('Aucune conversation. Écrivez à l\'administration ou à un enseignant de votre enfant.'),
           builder: (context, rows) => ListView(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 88),
             children: [
@@ -348,7 +349,7 @@ class _ComplaintsTabState extends State<ComplaintsTab> {
   Future<void> _new() async {
     final created = await widget.compose(context);
     if (created != null && mounted) {
-      showMessage(context, 'Réclamation transmise à l\'établissement.');
+      showMessage(context, tr('Réclamation transmise à l\'établissement.'));
       _load();
     }
   }
@@ -361,7 +362,7 @@ class _ComplaintsTabState extends State<ComplaintsTab> {
         heroTag: 'complaints.new',
         onPressed: _new,
         icon: const Icon(Icons.report_outlined),
-        label: const Text('Réclamation'),
+        label: Text(tr('Réclamation')),
       ),
       body: RefreshIndicator(
         onRefresh: () async => _load(),
@@ -369,7 +370,7 @@ class _ComplaintsTabState extends State<ComplaintsTab> {
           future: _future,
           onRetry: _load,
           isEmpty: (rows) => rows.isEmpty,
-          emptyText: 'Aucune réclamation.',
+          emptyText: tr('Aucune réclamation.'),
           builder: (context, rows) => ListView(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 88),
             children: [

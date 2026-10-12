@@ -11,6 +11,7 @@ import '../data/account.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import 'live_state.dart';
+import '../l10n/l10n.dart';
 
 /// Chooses an image (system picker on a phone; injectable in tests).
 typedef ImageChooser = Future<PickedImage?> Function();
@@ -91,7 +92,7 @@ class _AccountScreenState extends State<AccountScreen> {
       changes['preferred_language'] = _language!;
     }
     if (changes.isEmpty) {
-      _say('Aucune modification à enregistrer.', Tone.info);
+      _say(tr('Aucune modification à enregistrer.'), Tone.info);
       return;
     }
     setState(() {
@@ -104,10 +105,10 @@ class _AccountScreenState extends State<AccountScreen> {
       setState(() {
         _future = Future.value(saved);
       });
-      _say('Coordonnées enregistrées.', Tone.success);
+      _say(tr('Coordonnées enregistrées.'), Tone.success);
     } on ApiException catch (error) {
       setState(() => _errors = error.fieldErrors);
-      _say(error.fieldErrors.isEmpty ? error.userMessage : 'Vérifiez les champs signalés.', Tone.danger);
+      _say(error.fieldErrors.isEmpty ? error.userMessage : tr('Vérifiez les champs signalés.'), Tone.danger);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -119,8 +120,8 @@ class _AccountScreenState extends State<AccountScreen> {
     if (picked.bytes == null) {
       _say(
         picked.error == 'too_large'
-            ? 'Cette image dépasse 3 Mo : choisissez-en une plus légère.'
-            : 'Cette image n\'a pas pu être lue.',
+            ? tr('Cette image dépasse 3 Mo : choisissez-en une plus légère.')
+            : tr('Cette image n\'a pas pu être lue.'),
         Tone.danger,
       );
       return;
@@ -133,7 +134,7 @@ class _AccountScreenState extends State<AccountScreen> {
         _future = Future.value(saved);
         _photo = photo;
       });
-      _say('Photo mise à jour.', Tone.success);
+      _say(tr('Photo mise à jour.'), Tone.success);
     } on ApiException catch (error) {
       _say(_photoMessage(error), Tone.danger);
     } finally {
@@ -142,10 +143,10 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   String _photoMessage(ApiException error) => switch (error.rule) {
-    'photo_invalid' => 'Ce fichier n\'est pas une image lisible.',
-    'photo_format' => 'Utilisez une photo JPEG, PNG ou WebP.',
-    'photo_too_small' => 'La photo est trop petite (120 px minimum de côté).',
-    'photo_too_large' => 'La photo est trop grande (3 Mo maximum).',
+    'photo_invalid' => tr('Ce fichier n\'est pas une image lisible.'),
+    'photo_format' => tr('Utilisez une photo JPEG, PNG ou WebP.'),
+    'photo_too_small' => tr('La photo est trop petite (120 px minimum de côté).'),
+    'photo_too_large' => tr('La photo est trop grande (3 Mo maximum).'),
     _ => error.userMessage,
   };
 
@@ -157,7 +158,7 @@ class _AccountScreenState extends State<AccountScreen> {
         _future = Future.value(saved);
         _photo = null;
       });
-      _say('Photo retirée.', Tone.success);
+      _say(tr('Photo retirée.'), Tone.success);
     } on ApiException catch (error) {
       _say(error.userMessage, Tone.danger);
     } finally {
@@ -168,7 +169,7 @@ class _AccountScreenState extends State<AccountScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Mon compte')),
+      appBar: AppBar(title: Text(tr('Mon compte'))),
       body: AsyncBody<AccountProfile>(
         future: _future,
         onRetry: _load,
@@ -184,6 +185,7 @@ class _AccountScreenState extends State<AccountScreen> {
             const SizedBox(height: 12),
             _details(profile),
             const ThemeChoice(),
+            const LanguageChoice(),
             ...widget.extra,
             const SizedBox(height: 12),
             _security(),
@@ -222,14 +224,14 @@ class _AccountScreenState extends State<AccountScreen> {
                   key: const Key('account.photo.change'),
                   onPressed: _busy ? null : _changePhoto,
                   icon: const Icon(Icons.photo_camera_outlined),
-                  label: Text(profile.hasPhoto ? 'Changer la photo' : 'Ajouter une photo'),
+                  label: Text(profile.hasPhoto ? tr('Changer la photo') : tr('Ajouter une photo')),
                 ),
                 if (profile.hasPhoto)
                   TextButton.icon(
                     key: const Key('account.photo.remove'),
                     onPressed: _busy ? null : _removePhoto,
                     icon: const Icon(Icons.delete_outline),
-                    label: const Text('Retirer'),
+                    label: Text(tr('Retirer')),
                   ),
               ],
             ),
@@ -239,7 +241,9 @@ class _AccountScreenState extends State<AccountScreen> {
             Text('${profile.rolesLabel} · ${profile.schoolName}', textAlign: TextAlign.center),
             const SizedBox(height: 6),
             Text(
-              'Le nom, l\'adresse e-mail, le rôle et l\'établissement sont gérés par l\'administration de l\'école.',
+              tr(
+                'Le nom, l\'adresse e-mail, le rôle et l\'établissement sont gérés par l\'administration de l\'école.',
+              ),
               textAlign: TextAlign.center,
               style: TextStyle(color: Tokens.textSecondary, fontSize: 12.5),
             ),
@@ -256,7 +260,7 @@ class _AccountScreenState extends State<AccountScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Mes coordonnées', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            Text(tr('Mes coordonnées'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
             for (final field in profile.editable)
               Padding(
@@ -292,7 +296,7 @@ class _AccountScreenState extends State<AccountScreen> {
               key: const Key('account.save'),
               onPressed: _busy ? null : () => _save(profile),
               icon: const Icon(Icons.save_outlined),
-              label: const Text('Enregistrer'),
+              label: Text(tr('Enregistrer')),
             ),
           ],
         ),
@@ -307,8 +311,8 @@ class _AccountScreenState extends State<AccountScreen> {
           ListTile(
             key: const Key('account.password'),
             leading: const Icon(Icons.lock_outline),
-            title: const Text('Changer mon mot de passe'),
-            subtitle: const Text('Vos autres appareils seront déconnectés.'),
+            title: Text(tr('Changer mon mot de passe')),
+            subtitle: Text(tr('Vos autres appareils seront déconnectés.')),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(
               context,
@@ -317,7 +321,7 @@ class _AccountScreenState extends State<AccountScreen> {
           ListTile(
             key: const Key('account.sessions'),
             leading: const Icon(Icons.devices_outlined),
-            title: const Text('Mes appareils connectés'),
+            title: Text(tr('Mes appareils connectés')),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
@@ -351,6 +355,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   String? _error;
   bool _busy = false;
   bool _done = false;
+  bool _visible = false; // passwords shown in clear while the user checks them
+
+  Widget _eye() => IconButton(
+    key: const Key('password.visibility'),
+    tooltip: _visible ? tr('Masquer le mot de passe') : tr('Afficher le mot de passe'),
+    icon: Icon(_visible ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+    onPressed: () => setState(() => _visible = !_visible),
+  );
 
   @override
   void dispose() {
@@ -362,11 +374,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   Future<void> _submit() async {
     if (_current.text.isEmpty || _next.text.isEmpty) {
-      setState(() => _error = 'Saisissez le mot de passe actuel et le nouveau.');
+      setState(() => _error = tr('Saisissez le mot de passe actuel et le nouveau.'));
       return;
     }
     if (_next.text != _confirm.text) {
-      setState(() => _error = 'La confirmation ne correspond pas au nouveau mot de passe.');
+      setState(() => _error = tr('La confirmation ne correspond pas au nouveau mot de passe.'));
       return;
     }
     setState(() {
@@ -390,26 +402,27 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Mot de passe')),
+      appBar: AppBar(title: Text(tr('Mot de passe'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           if (_done) ...[
-            const MessageBanner(
-              'Mot de passe changé. Vos autres appareils ont été déconnectés ; celui-ci reste connecté.',
+            MessageBanner(
+              tr('Mot de passe changé. Vos autres appareils ont été déconnectés ; celui-ci reste connecté.'),
               tone: Tone.success,
             ),
             const SizedBox(height: 16),
-            FilledButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Terminer')),
+            FilledButton(onPressed: () => Navigator.of(context).pop(), child: Text(tr('Terminer'))),
           ] else ...[
             if (_error != null) ...[MessageBanner(_error!), const SizedBox(height: 12)],
             TextField(
               key: const Key('password.current'),
               controller: _current,
-              obscureText: true,
+              obscureText: !_visible,
               enabled: !_busy,
               decoration: InputDecoration(
-                labelText: 'Mot de passe actuel',
+                labelText: tr('Mot de passe actuel'),
+                suffixIcon: _eye(),
                 errorText: _errors['current_password']?.join(' '),
               ),
             ),
@@ -417,11 +430,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             TextField(
               key: const Key('password.new'),
               controller: _next,
-              obscureText: true,
+              obscureText: !_visible,
               enabled: !_busy,
               decoration: InputDecoration(
-                labelText: 'Nouveau mot de passe',
-                helperText: '10 caractères au minimum, pas trop courant.',
+                labelText: tr('Nouveau mot de passe'),
+                suffixIcon: _eye(),
+                helperText: tr('10 caractères au minimum, pas trop courant.'),
                 errorText: _errors['new_password']?.join(' '),
               ),
             ),
@@ -429,15 +443,15 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             TextField(
               key: const Key('password.confirm'),
               controller: _confirm,
-              obscureText: true,
+              obscureText: !_visible,
               enabled: !_busy,
-              decoration: const InputDecoration(labelText: 'Confirmer le nouveau mot de passe'),
+              decoration: InputDecoration(labelText: tr('Confirmer le nouveau mot de passe'), suffixIcon: _eye()),
             ),
             const SizedBox(height: 16),
             FilledButton(
               key: const Key('password.submit'),
               onPressed: _busy ? null : _submit,
-              child: const Text('Changer le mot de passe'),
+              child: Text(tr('Changer le mot de passe')),
             ),
           ],
         ],
@@ -476,7 +490,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
   Future<void> _revoke(UserSession session) async {
     try {
       await widget.repository.revokeSession(session.id);
-      _message = '« ${session.deviceName} » est déconnecté.';
+      _message = tr('« {0} » est déconnecté.', [session.deviceName]);
       _load();
     } on ApiException catch (error) {
       setState(() => _message = error.userMessage);
@@ -488,14 +502,14 @@ class _SessionsScreenState extends State<SessionsScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Déconnecter tous les appareils ?'),
-        content: const Text('Tous vos appareils, celui-ci compris, devront se reconnecter.'),
+        title: Text(tr('Déconnecter tous les appareils ?')),
+        content: Text(tr('Tous vos appareils, celui-ci compris, devront se reconnecter.')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr('Annuler'))),
           FilledButton(
             key: const Key('sessions.revokeAll.confirm'),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Tout déconnecter'),
+            child: Text(tr('Tout déconnecter')),
           ),
         ],
       ),
@@ -513,7 +527,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Appareils connectés')),
+      appBar: AppBar(title: Text(tr('Appareils connectés'))),
       body: AsyncBody<List<UserSession>>(
         future: _future,
         onRetry: _load,
@@ -529,8 +543,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
                   title: Text(s.deviceName),
                   subtitle: Text(
                     [
-                      if (s.current) 'Cet appareil',
-                      if (s.lastUsedAt != null) 'actif le ${dateTime.format(s.lastUsedAt!)}',
+                      if (s.current) tr('Cet appareil'),
+                      if (s.lastUsedAt != null) tr('actif le {0}', [dateTime.format(s.lastUsedAt!)]),
                     ].join(' · '),
                   ),
                   trailing: s.current
@@ -538,7 +552,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                       : TextButton(
                           key: Key('session.revoke.${s.id}'),
                           onPressed: () => _revoke(s),
-                          child: const Text('Déconnecter'),
+                          child: Text(tr('Déconnecter')),
                         ),
                 ),
               ),
@@ -551,7 +565,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
               ),
               onPressed: _revokeAll,
               icon: const Icon(Icons.logout),
-              label: const Text('Déconnecter tous mes appareils'),
+              label: Text(tr('Déconnecter tous mes appareils')),
             ),
           ],
         ),
@@ -577,7 +591,7 @@ class ThemeChoice extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Apparence', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              Text(tr('Apparence'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               const SizedBox(height: 10),
               SegmentedButton<ThemeMode>(
                 key: const Key('account.theme'),
@@ -598,7 +612,52 @@ class ThemeChoice extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                '« Système » suit le réglage du téléphone.',
+                tr('« Système » suit le réglage du téléphone.'),
+                style: TextStyle(color: Tokens.textSecondary, fontSize: 12.5),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// « Langue »: Français / English, applied at once (open screens included)
+/// and kept on the phone. Hidden when the app provides no [LanguageController].
+class LanguageChoice extends StatelessWidget {
+  const LanguageChoice({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = context.watch<LanguageController?>();
+    if (controller == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(tr('Langue'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 10),
+              SegmentedButton<AppLanguage>(
+                key: const Key('account.language'),
+                segments: [
+                  for (final language in AppLanguage.values)
+                    ButtonSegment(
+                      value: language,
+                      // Each language is named in its own language.
+                      label: Text(language.label, key: Key('account.language.${language.code}')),
+                    ),
+                ],
+                selected: {controller.language},
+                onSelectionChanged: (choice) => controller.set(choice.single),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                tr('La langue s\'applique tout de suite et reste choisie sur ce téléphone.'),
                 style: TextStyle(color: Tokens.textSecondary, fontSize: 12.5),
               ),
             ],

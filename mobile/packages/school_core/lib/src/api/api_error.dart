@@ -6,6 +6,7 @@
 library;
 
 import '../messages.dart';
+import '../l10n/l10n.dart';
 
 class ApiException implements Exception {
   ApiException({required this.status, required this.code, required this.message, this.details = const {}});
@@ -74,7 +75,7 @@ class NetworkException extends ApiException {
     : super(
         status: 0,
         code: timeout ? 'TIMEOUT' : 'NETWORK',
-        message: timeout ? 'Le serveur ne répond pas.' : 'Connexion au serveur impossible.',
+        message: timeout ? tr('Le serveur ne répond pas.') : tr('Connexion au serveur impossible.'),
       );
 
   final bool timeout;
@@ -83,7 +84,7 @@ class NetworkException extends ApiException {
 ApiException errorFor(int status, Map<String, dynamic>? body) {
   final error = (body?['error'] as Map?)?.cast<String, dynamic>() ?? const {};
   final code = (error['code'] as String?) ?? 'HTTP_$status';
-  final message = (error['message'] as String?) ?? 'Erreur $status';
+  final message = (error['message'] as String?) ?? tr('Erreur {0}', [status]);
   final details = (error['details'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
   switch (status) {
     case 400:

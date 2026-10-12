@@ -3,6 +3,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:school_core/school_core.dart';
 
+import 'l10n/parent_en.dart';
+
 import 'data/parent_repository.dart';
 import 'data/pdf_store.dart';
 import 'presentation/auth/register_screen.dart';
@@ -33,6 +35,7 @@ class ParentApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    L10n.register(parentEnglish); // this app's own English texts (shared ones: school_core)
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<AuthService>.value(value: auth),
@@ -42,14 +45,14 @@ class ParentApp extends StatelessWidget {
         Provider<PlanFiles>.value(value: planFiles),
       ],
       child: MaterialApp(
-        title: 'School Managing — Parent',
+        title: tr('School Managing — Parent'),
         debugShowCheckedModeBanner: false,
         theme: buildAppTheme(),
         darkTheme: buildAppTheme(brightness: Brightness.dark),
         themeMode: themeModeOf(context),
         builder: themedScreens,
-        locale: const Locale('fr', 'FR'),
-        supportedLocales: const [Locale('fr', 'FR')],
+        locale: languageOf(context).locale,
+        supportedLocales: supportedAppLocales,
         localizationsDelegates: const [
           GlobalMaterialLocalizations.delegate,
           GlobalWidgetsLocalizations.delegate,
@@ -103,11 +106,11 @@ class _AuthGateState extends State<AuthGate> {
     return switch (auth.status) {
       AuthStatus.restoring => const SplashScreen(),
       AuthStatus.signedOut => SignInScreen(
-        subtitle: 'Espace parent',
+        subtitle: tr('Espace parent'),
         roleLabel: 'parent',
         alternative: SignInAlternative(
-          hint: 'Nouveau parent ? Créez votre compte : l\'établissement le validera.',
-          label: 'Créer mon compte',
+          hint: tr('Nouveau parent ? Créez votre compte : l\'établissement le validera.'),
+          label: tr('Créer mon compte'),
           icon: Icons.person_add_alt_1_outlined,
           key: const Key('login.register'),
           open: (context) =>
@@ -131,9 +134,9 @@ class SplashScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SoftwareBrand(light: true, size: 30, subtitle: 'Espace parent'),
+            SoftwareBrand(light: true, size: 30, subtitle: tr('Espace parent')),
             SizedBox(height: 28),
-            CircularProgressIndicator(color: Colors.white, semanticsLabel: 'Ouverture de la session'),
+            CircularProgressIndicator(color: Colors.white, semanticsLabel: tr('Ouverture de la session')),
           ],
         ),
       ),

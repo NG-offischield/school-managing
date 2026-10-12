@@ -22,15 +22,15 @@ class _PlanningScreenState extends State<PlanningScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Planning'), actions: const [ChildSwitcher()]),
+      appBar: AppBar(title: Text(tr('Planning')), actions: const [ChildSwitcher()]),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: SegmentedButton<bool>(
-              segments: const [
-                ButtonSegment(value: false, label: Text('Aujourd\'hui'), icon: Icon(Icons.today)),
-                ButtonSegment(value: true, label: Text('Semaine'), icon: Icon(Icons.view_week)),
+              segments: [
+                ButtonSegment(value: false, label: Text(tr('Aujourd\'hui')), icon: Icon(Icons.today)),
+                ButtonSegment(value: true, label: Text(tr('Semaine')), icon: Icon(Icons.view_week)),
               ],
               selected: {_week},
               onSelectionChanged: (value) => setState(() => _week = value.first),
@@ -82,7 +82,7 @@ class _SessionsState extends State<_Sessions> {
       future: _future,
       onRetry: _load,
       isEmpty: (rows) => rows.isEmpty,
-      emptyText: widget.week ? 'Aucun cours cette semaine.' : 'Aucun cours aujourd\'hui.',
+      emptyText: widget.week ? tr('Aucun cours cette semaine.') : tr('Aucun cours aujourd\'hui.'),
       builder: (context, sessions) {
         final days = <String, List<ClassSession>>{};
         for (final s in sessions) {
@@ -116,15 +116,17 @@ class SessionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = session;
-    final room = s.room == null ? 'Salle non attribuée' : 'Salle ${s.room!.label}';
+    final room = s.room == null ? tr('Salle non attribuée') : tr('Salle {0}', [s.room!.label]);
     final notes = <(String, Tone)>[
-      if (s.cancelled) ('Cours annulé', Tone.danger),
+      if (s.cancelled) (tr('Cours annulé'), Tone.danger),
       if (s.moved && !s.cancelled)
         (
-          'Déplacé${s.originalStart == null ? '' : ' (initialement ${dateTime.format(s.originalStart!)})'}',
+          tr('Déplacé{0}', [
+            s.originalStart == null ? '' : tr(' (initialement {0})', [dateTime.format(s.originalStart!)]),
+          ]),
           Tone.warning,
         ),
-      if (s.substituted && !s.cancelled) ('Enseignant remplaçant', Tone.warning),
+      if (s.substituted && !s.cancelled) (tr('Enseignant remplaçant'), Tone.warning),
     ];
     return Card(
       child: Padding(

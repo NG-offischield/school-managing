@@ -3,6 +3,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:school_core/school_core.dart';
 
+import 'l10n/staff_en.dart';
+
 import 'data/staff_repository.dart';
 import 'presentation/home_shell.dart';
 
@@ -18,6 +20,7 @@ class StaffApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    L10n.register(staffEnglish); // this app's own English texts (shared ones: school_core)
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<AuthService>.value(value: auth),
@@ -26,14 +29,14 @@ class StaffApp extends StatelessWidget {
         Provider<GateRepository>.value(value: repository.gate),
       ],
       child: MaterialApp(
-        title: 'School Managing — Personnel',
+        title: tr('School Managing — Personnel'),
         debugShowCheckedModeBanner: false,
         theme: buildAppTheme(),
         darkTheme: buildAppTheme(brightness: Brightness.dark),
         themeMode: themeModeOf(context),
         builder: themedScreens,
-        locale: const Locale('fr', 'FR'),
-        supportedLocales: const [Locale('fr', 'FR')],
+        locale: languageOf(context).locale,
+        supportedLocales: supportedAppLocales,
         localizationsDelegates: const [
           GlobalMaterialLocalizations.delegate,
           GlobalWidgetsLocalizations.delegate,
@@ -56,10 +59,10 @@ class AuthGate extends StatelessWidget {
     return switch (auth.status) {
       AuthStatus.restoring => Scaffold(
         backgroundColor: Tokens.navy,
-        body: Center(child: SoftwareBrand(light: true, size: 30, subtitle: 'Espace personnel')),
+        body: Center(child: SoftwareBrand(light: true, size: 30, subtitle: tr('Espace personnel'))),
       ),
       AuthStatus.signedOut || AuthStatus.pending => SignInScreen(
-        subtitle: 'Espace personnel',
+        subtitle: tr('Espace personnel'),
         roleLabel: 'personnel',
         alternative: SignInAlternative.activation(),
       ),

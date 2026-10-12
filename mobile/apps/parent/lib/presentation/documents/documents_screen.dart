@@ -18,11 +18,11 @@ class DocumentsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Bulletins et documents'),
+        title: Text(tr('Bulletins et documents')),
         actions: [
           IconButton(
             key: const Key('documents.verify'),
-            tooltip: 'Vérifier un document imprimé',
+            tooltip: tr('Vérifier un document imprimé'),
             icon: const Icon(Icons.verified_outlined),
             onPressed: () => _verify(context),
           ),
@@ -45,11 +45,13 @@ class DocumentsScreen extends StatelessWidget {
       showMessage(
         context,
         check.current
-            ? 'Document authentique${check.title == null ? '' : ' : ${check.title}'}.'
-            : 'Document authentique mais remplacé par une version plus récente.',
+            ? tr('Document authentique{0}.', [check.title == null ? '' : ' : ${check.title}'])
+            : tr('Document authentique mais remplacé par une version plus récente.'),
       );
     } on NotFoundException {
-      if (context.mounted) showMessage(context, 'Code inconnu : ce document n\'a pas été émis par l\'établissement.');
+      if (context.mounted) {
+        showMessage(context, tr('Code inconnu : ce document n\'a pas été émis par l\'établissement.'));
+      }
     } on ApiException catch (error) {
       if (context.mounted) showMessage(context, error.userMessage);
     }
@@ -76,17 +78,20 @@ class _CodeDialogState extends State<_CodeDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       scrollable: true,
-      title: const Text('Vérifier un document'),
+      title: Text(tr('Vérifier un document')),
       content: TextField(
         key: const Key('verify.code'),
         controller: _code,
         autofocus: true,
         textCapitalization: TextCapitalization.characters,
-        decoration: const InputDecoration(labelText: 'Code de vérification', helperText: 'Imprimé en bas du document.'),
+        decoration: InputDecoration(
+          labelText: tr('Code de vérification'),
+          helperText: tr('Imprimé en bas du document.'),
+        ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Annuler')),
-        FilledButton(onPressed: () => Navigator.of(context).pop(_code.text), child: const Text('Vérifier')),
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(tr('Annuler'))),
+        FilledButton(onPressed: () => Navigator.of(context).pop(_code.text), child: Text(tr('Vérifier'))),
       ],
     );
   }
@@ -122,7 +127,7 @@ class _ReportCardsState extends State<_ReportCards> {
     try {
       final bytes = await repo.reportCardPdf(card.id);
       await store.save('bulletin-${widget.child.studentNumber}-${card.period}.pdf', bytes);
-      if (mounted) showMessage(context, 'Bulletin « ${card.period} » enregistré dans l\'application.');
+      if (mounted) showMessage(context, tr('Bulletin « {0} » enregistré dans l\'application.', [card.period]));
     } on ApiException catch (error) {
       if (mounted) showMessage(context, error.userMessage);
     } finally {
@@ -136,12 +141,12 @@ class _ReportCardsState extends State<_ReportCards> {
       future: _future,
       onRetry: _load,
       isEmpty: (rows) => rows.isEmpty,
-      emptyText: 'Aucun bulletin validé pour le moment.',
+      emptyText: tr('Aucun bulletin validé pour le moment.'),
       builder: (context, cards) => ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
           Text(widget.child.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-          const SectionTitle('Bulletins officiels'),
+          SectionTitle(tr('Bulletins officiels')),
           for (final card in cards)
             Card(
               child: ExpansionTile(
@@ -150,14 +155,15 @@ class _ReportCardsState extends State<_ReportCards> {
                 subtitle: Text(
                   [
                     if (card.average != null)
-                      'Moyenne ${card.average}${card.scaleMax == null ? '' : ' / ${card.scaleMax}'}',
-                    if (card.rank != null) 'Rang ${card.rank}${card.classSize == null ? '' : ' / ${card.classSize}'}',
+                      tr('Moyenne {0}{1}', [card.average, card.scaleMax == null ? '' : ' / ${card.scaleMax}']),
+                    if (card.rank != null)
+                      tr('Rang {0}{1}', [card.rank, card.classSize == null ? '' : ' / ${card.classSize}']),
                   ].join(' · '),
                 ),
                 childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                 children: [
                   for (final line in card.lines)
-                    InfoRow('${line.subject} (coef. ${line.coefficient})', line.average ?? '—'),
+                    InfoRow(tr('{0} (coef. {1})', [line.subject, line.coefficient]), line.average ?? '—'),
                   const SizedBox(height: 8),
                   Align(
                     alignment: Alignment.centerRight,
@@ -167,7 +173,7 @@ class _ReportCardsState extends State<_ReportCards> {
                       icon: _downloading == card.id
                           ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.picture_as_pdf_outlined),
-                      label: const Text('Télécharger le PDF'),
+                      label: Text(tr('Télécharger le PDF')),
                     ),
                   ),
                 ],

@@ -18,6 +18,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_config.dart';
+import '../l10n/l10n.dart';
 
 abstract class EndpointStore {
   Future<String?> read();
@@ -90,7 +91,7 @@ ServerResolution resolveServer({String? saved, String buildApiUrl = '', String b
       final config = release == null ? AppConfig.server(saved) : AppConfig.server(saved, release: release);
       return ServerResolution(config, ServerSource.saved, build: build);
     } on AppConfigException catch (error) {
-      final warning = 'Adresse enregistrée ignorée : ${error.message}';
+      final warning = tr('Adresse enregistrée ignorée : {0}', [error.message]);
       if (build != null) return ServerResolution(build, ServerSource.build, warning: warning, build: build);
       return ServerResolution(null, ServerSource.none, warning: warning);
     }
@@ -131,39 +132,48 @@ Future<ServerCheck> checkServer(
       }
       final data = body is Map ? body['data'] : null;
       if (body is Map && body['success'] == true && data is Map && data['status'] == 'ok') {
-        return ServerCheck(ServerCheckKind.ok, 'Serveur joignable : ${config.serverLabel} répond.', status: 200);
+        return ServerCheck(
+          ServerCheckKind.ok,
+          tr('Serveur joignable : {0} répond.', [config.serverLabel]),
+          status: 200,
+        );
       }
       return ServerCheck(
         ServerCheckKind.unexpected,
-        'Un service répond sur ${config.serverLabel}, mais ce n\'est pas le serveur School Managing.',
+        tr('Un service répond sur {0}, mais ce n\'est pas le serveur School Managing.', [config.serverLabel]),
         status: 200,
       );
     }
     if (response.statusCode == 400) {
       return ServerCheck(
         ServerCheckKind.unexpected,
-        'Le serveur refuse cette adresse (HTTP 400) : elle n\'est pas dans ses hôtes autorisés. '
-        'Sur le PC, lancez mobile\\tools\\configure_lan.ps1 -Restart.',
+        tr(
+          'Le serveur refuse cette adresse (HTTP 400) : elle n\'est pas dans ses hôtes autorisés. Sur le PC, lancez mobile\\tools\\configure_lan.ps1 -Restart.',
+        ),
         status: 400,
       );
     }
     return ServerCheck(
       ServerCheckKind.unexpected,
-      'Réponse inattendue du serveur ${config.serverLabel} : HTTP ${response.statusCode}.',
+      tr('Réponse inattendue du serveur {0} : HTTP {1}.', [config.serverLabel, response.statusCode]),
       status: response.statusCode,
     );
   } on TimeoutException {
     return ServerCheck(
       ServerCheckKind.timeout,
-      'Délai dépassé : ${config.serverLabel} ne répond pas. Même Wi-Fi que le PC ? Pare-feu ? Serveur démarré ?',
+      tr('Délai dépassé : {0} ne répond pas. Même Wi-Fi que le PC ? Pare-feu ? Serveur démarré ?', [
+        config.serverLabel,
+      ]),
     );
   } on SocketException {
     return ServerCheck(
       ServerCheckKind.unreachable,
-      'Serveur inaccessible : ${config.serverLabel} refuse ou ignore la connexion (adresse, port, Wi-Fi, pare-feu).',
+      tr('Serveur inaccessible : {0} refuse ou ignore la connexion (adresse, port, Wi-Fi, pare-feu).', [
+        config.serverLabel,
+      ]),
     );
   } on http.ClientException {
-    return ServerCheck(ServerCheckKind.unreachable, 'Serveur inaccessible : ${config.serverLabel}.');
+    return ServerCheck(ServerCheckKind.unreachable, tr('Serveur inaccessible : {0}.', [config.serverLabel]));
   } finally {
     if (client == null) http_.close();
   }
