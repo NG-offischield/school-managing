@@ -61,6 +61,7 @@ docker exec -e DEMO_PASSWORD school-e2e python manage.py shell -c "exec(open('to
 $env:E2E_API_URL = "http://${ip}:8001"
 $env:E2E_FIXTURE = "$env:TEMP\e2e_fixture.json"
 node e2e/cross_app.mjs
+node e2e/school_plans.mjs
 desktop\.venv\Scripts\python e2e\desktop_forum.py
 desktop\.venv\Scripts\python e2e\desktop_payment.py
 ```
@@ -81,6 +82,16 @@ desktop\.venv\Scripts\python e2e\desktop_payment.py
 - que la notification se retrouve par `GET` ;
 - que la facture apparaît PAYÉE ;
 - qu'un rejeu avec la même clé d'idempotence n'ajoute aucune notification.
+
+`school_plans.mjs` vérifie les **plans de l'établissement** par le réseau, avec des fichiers **générés** par le script (un PNG dessiné, un PDF d'une page), jamais un vrai plan d'école :
+
+- formats refusés (SVG, fichier renommé) ; un brouillon reste invisible ;
+- publication AUTO : parent et enseignant notifiés en direct, gardien, agent et TEST01 jamais ;
+- téléchargement par le chemin des téléphones (empreinte SHA-256 = version publiée, `no-store`, 401 sans jeton, 403 / 404 pour gardien et agent) ;
+- isolation DEMO ↔ TEST01 ;
+- diffusion MANUELLE (parents de 6e A) : l'enseignant perd l'accès aussitôt ; public vide refusé (409) ;
+- nouvelle version PDF : seuls les lecteurs du public courant sont notifiés, une seule fois ; une modification des informations ne notifie personne ;
+- retrait : accès fermé aussitôt, sans notification.
 
 **6. Nettoyage :**
 

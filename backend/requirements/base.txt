@@ -22,3 +22,6 @@ redis~=6.0
 # PDF generation of official documents (ADR 0016): pure Python, no system
 # library, works offline on the school LAN.
 reportlab~=4.4
+# Reading (never generating) PDFs: checks that an imported school plan is a real,
+# readable, unencrypted PDF (apps/documents/plan_files.py). Pure Python.
+pypdf~=6.0

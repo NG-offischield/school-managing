@@ -70,6 +70,10 @@ CONFLICT_RULES = {
     "outside_regime",
     "duplicate_regime_name",
     "regime_in_use",
+    # school plans
+    "plan_audience_empty",
+    "plan_not_published",
+    "plan_version_other_plan",
     "course_scheduled",
     # finance (ADR 0013)
     "idempotency_conflict",

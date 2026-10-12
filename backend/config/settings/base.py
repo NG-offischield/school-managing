@@ -213,6 +213,11 @@ STORAGES = {
 # Hard ceiling for any upload; the school's own limit
 # (SchoolConfiguration.default_attachment_limit_mb) applies below it.
 ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024
+# School plans (2D maps imported by the administration, apps/documents/plan_files.py):
+# detailed enough for a whole site, small enough for a phone. One place to change them.
+SCHOOL_PLAN_MAX_BYTES = env.int("SCHOOL_PLAN_MAX_BYTES", default=20 * 1024 * 1024)
+SCHOOL_PLAN_MAX_IMAGE_SIDE = 8000  # pixels, each side
+SCHOOL_PLAN_MAX_PDF_PAGES = 50
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 2_621_440
 

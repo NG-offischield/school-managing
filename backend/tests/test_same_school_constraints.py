@@ -26,10 +26,11 @@ def composite_keys():
 def test_all_composite_keys_are_present():
     keys = composite_keys()
     # academics: 9 (0002) + 1 (0005) + 1 (0007) + 3 (0008: timetable regimes) ; people: 25 (0002) + 7 (0004) ;
+    # documents: + 7 (0004: school plans, incl. current_version -> one of the plan's own versions) ;
     # gradebook: 22 (0002) + 3 (0005) ;
     # attendance: 17 (0002) + 1 (0004) ; scheduling: 34 (0002) ; finance: 32 (0002) ; payroll: 37 (0002) ;
     # communication: 29 (0002) + 1 hand-written (message sender is a participant) ; documents: 9 (0002) + 1 (0003).
-    assert len(keys) == 232
+    assert len(keys) == 239
     assert {shared for _, _, shared in keys} == {
         "school_id",
         "academic_year_id",
@@ -49,6 +50,8 @@ def test_all_composite_keys_are_present():
         "teacher_payroll_id",
         # communication (ADR 0015): message(conversation, sender) -> participant(conversation, membership)
         "sender_id",
+        # school plans: (current_version, id) -> version(id, plan): a plan points to ITS OWN version
+        "id",
     }
 
 

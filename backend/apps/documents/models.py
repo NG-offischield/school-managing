@@ -143,3 +143,150 @@ class DocumentDownload(TenantModel):
 
     class Meta:
         ordering = ["-downloaded_at"]
+
+
+# =============================================================================
+# School plans (2D maps of the premises, drawn elsewhere, imported here)
+# =============================================================================
+#
+# NOT the Document registry above (documents GENERATED from business data):
+# a plan is a file an architect produced; the school imports it, publishes a
+# version and chooses who may see it. Files live in the private storage and
+# are only streamed after a permission check (plans.py, plans_api.py).
+
+
+class PlanStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Brouillon"
+    PUBLISHED = "PUBLISHED", "Publié"
+    WITHDRAWN = "WITHDRAWN", "Retiré"
+
+
+class PlanDistribution(models.TextChoices):
+    AUTO = "AUTO", "Automatique (parents vérifiés et enseignants de l'école)"
+    MANUAL = "MANUAL", "Manuelle (publics choisis)"
+
+
+class PlanVersionStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Importée, jamais publiée"
+    PUBLISHED = "PUBLISHED", "Publiée (version courante)"
+    SUPERSEDED = "SUPERSEDED", "Remplacée"
+
+
+class SchoolPlan(TenantModel):
+    """One plan of the school (a building, a floor, the whole site...).
+    Building and floor are optional: a small school has a single plan."""
+
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+    building = models.CharField(max_length=100, blank=True, default="")
+    floor = models.CharField(max_length=60, blank=True, default="")
+    display_order = models.PositiveIntegerField(default=0)
+    status = models.CharField(max_length=20, choices=PlanStatus.choices, default=PlanStatus.DRAFT, db_index=True)
+    distribution = models.CharField(max_length=10, choices=PlanDistribution.choices, default=PlanDistribution.AUTO)
+    current_version = models.ForeignKey(
+        "SchoolPlanVersion", on_delete=models.PROTECT, blank=True, null=True, related_name="+"
+    )
+    created_by = models.ForeignKey("accounts.SchoolMembership", on_delete=models.PROTECT, related_name="+")
+    published_by = models.ForeignKey(
+        "accounts.SchoolMembership", on_delete=models.PROTECT, blank=True, null=True, related_name="+"
+    )
+    published_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ["display_order", "building", "floor", "title"]
+        constraints = [
+            models.CheckConstraint(condition=Q(status__in=PlanStatus.values), name="plan_status_valid"),
+            models.CheckConstraint(
+                condition=Q(distribution__in=PlanDistribution.values), name="plan_distribution_valid"
+            ),
+            # Published = a current version and a publication date (never a published empty plan).
+            models.CheckConstraint(
+                condition=~Q(status=PlanStatus.PUBLISHED)
+                | Q(current_version__isnull=False, published_at__isnull=False),
+                name="plan_published_has_version",
+            ),
+        ]
+
+    def __str__(self):
+        return self.title
+
+
+class SchoolPlanVersion(TenantModel):
+    """One imported file of a plan. Never edited nor deleted: a new file is a
+    new version; publishing it supersedes the previous published one."""
+
+    plan = models.ForeignKey(SchoolPlan, on_delete=models.PROTECT, related_name="versions")
+    number = models.PositiveIntegerField()
+    status = models.CharField(
+        max_length=20, choices=PlanVersionStatus.choices, default=PlanVersionStatus.DRAFT, db_index=True
+    )
+    original_name = models.CharField(max_length=255)  # metadata only (never a path)
+    stored_name = models.CharField(max_length=80)  # random
+    storage_path = models.TextField()  # private storage, never sent to clients
+    mime_type = models.CharField(max_length=50)
+    size_bytes = models.BigIntegerField()
+    sha256 = models.CharField(max_length=64)
+    width = models.PositiveIntegerField(blank=True, null=True)  # images
+    height = models.PositiveIntegerField(blank=True, null=True)
+    page_count = models.PositiveIntegerField(blank=True, null=True)  # PDF
+    uploaded_by = models.ForeignKey("accounts.SchoolMembership", on_delete=models.PROTECT, related_name="+")
+    published_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ["plan", "-number"]
+        constraints = [
+            models.UniqueConstraint(fields=["plan", "number"], name="plan_version_number_unique"),
+            models.UniqueConstraint(fields=["storage_path"], name="plan_version_path_unique"),
+            models.UniqueConstraint(
+                fields=["plan"],
+                condition=Q(status=PlanVersionStatus.PUBLISHED),
+                name="plan_one_published_version",
+            ),
+            models.CheckConstraint(condition=Q(status__in=PlanVersionStatus.values), name="plan_version_status_valid"),
+            models.CheckConstraint(
+                condition=Q(mime_type__in=["application/pdf", "image/png", "image/jpeg"]),
+                name="plan_version_mime_allowed",
+            ),
+            models.CheckConstraint(condition=Q(size_bytes__gt=0), name="plan_version_size_positive"),
+            models.CheckConstraint(condition=Q(number__gte=1), name="plan_version_number_positive"),
+        ]
+
+    def __str__(self):
+        return f"{self.plan} — v{self.number}"
+
+
+class PlanAudienceTarget(models.TextChoices):
+    SCHOOL_PARENTS = "SCHOOL_PARENTS", "Tous les parents vérifiés de l'école"
+    SCHOOL_TEACHERS = "SCHOOL_TEACHERS", "Tous les enseignants actifs de l'école"
+    CLASS_PARENTS = "CLASS_PARENTS", "Parents vérifiés des élèves d'une classe"
+    CLASS_TEACHERS = "CLASS_TEACHERS", "Enseignants d'une classe"
+
+
+CLASS_TARGETS = (PlanAudienceTarget.CLASS_PARENTS, PlanAudienceTarget.CLASS_TEACHERS)
+
+
+class SchoolPlanAudience(TenantModel):
+    """MANUAL distribution: who may see the plan, as relations the school
+    already has (classes, roles) — never a free list of people or e-mails.
+    Resolved at each read by plans.can_view."""
+
+    plan = models.ForeignKey(SchoolPlan, on_delete=models.CASCADE, related_name="audience")
+    target = models.CharField(max_length=30, choices=PlanAudienceTarget.choices)
+    school_class = models.ForeignKey(
+        "academics.SchoolClass", on_delete=models.PROTECT, blank=True, null=True, related_name="+"
+    )
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(target__in=PlanAudienceTarget.values), name="plan_audience_target_valid"
+            ),
+            models.CheckConstraint(
+                condition=(Q(target__in=CLASS_TARGETS) & Q(school_class__isnull=False))
+                | (~Q(target__in=CLASS_TARGETS) & Q(school_class__isnull=True)),
+                name="plan_audience_class_when_needed",
+            ),
+            models.UniqueConstraint(
+                fields=["plan", "target", "school_class"], name="plan_audience_unique", nulls_distinct=False
+            ),
+        ]
