@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..i18n import Tr, tr
 from .theme import TOKENS, TYPE
 from .widgets import button, set_variant
 
@@ -255,7 +256,7 @@ class ChartCard(QFrame):
     chart, no data, error. `views` = [(label, chart)] when the card can show
     several charts (e.g. « Par niveau » / « Par classe »)."""
 
-    LOADING = "Chargement…"
+    LOADING = Tr("Chargement…")
 
     def __init__(self, title, views, parent=None):
         super().__init__(parent, objectName="card")
@@ -335,7 +336,7 @@ class ChartCard(QFrame):
         self.note.setText(data.note)
         self.note.setVisible(bool(data.note))
         if data.error:
-            self._set_status("error", f"Indisponible — {data.error}")
+            self._set_status("error", tr("Indisponible — {0}", data.error))
             self.legend.setText("")
             self.stack.setCurrentWidget(self.state)
         elif not data.points:
@@ -353,7 +354,8 @@ class ChartCard(QFrame):
 class ActivityCard(QFrame):
     """Recent administrative actions: what, on what, who, when."""
 
-    def __init__(self, title="Activité récente", parent=None):
+    def __init__(self, title=None, parent=None):
+        title = tr("Activité récente") if title is None else title  # read now: follows the language
         super().__init__(parent, objectName="card")
         self.setMinimumHeight(300)
         layout = QVBoxLayout(self)
@@ -361,7 +363,7 @@ class ActivityCard(QFrame):
         layout.setSpacing(6)
         self.title = QLabel(title, objectName="chartTitle")
         layout.addWidget(self.title)
-        note = QLabel("Dernières opérations d'administration de l'école.", objectName="help")
+        note = QLabel(tr("Dernières opérations d'administration de l'école."), objectName="help")
         layout.addWidget(note)
         self.state = QLabel(ChartCard.LOADING, objectName="chartState", alignment=Qt.AlignCenter)
         self.state.setWordWrap(True)
@@ -392,7 +394,7 @@ class ActivityCard(QFrame):
         self.state.setObjectName("chartError")
         self.state.style().unpolish(self.state)
         self.state.style().polish(self.state)
-        self.state.setText(f"Indisponible — {text}")
+        self.state.setText(tr("Indisponible — {0}", text))
         self.state.show()
 
     def set_items(self, items):
@@ -401,7 +403,7 @@ class ActivityCard(QFrame):
         if not items:
             self.status = "empty"
             self.state.setObjectName("chartState")
-            self.state.setText("Aucune opération enregistrée pour le moment.")
+            self.state.setText(tr("Aucune opération enregistrée pour le moment."))
             self.state.show()
             return
         self.status = "data"

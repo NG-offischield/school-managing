@@ -15,6 +15,7 @@ screens show its figures and its answers. Amounts: Decimal, never floats.
 
 from PySide6.QtWidgets import QDialog, QLabel, QTabWidget
 
+from ...i18n import Labels, Tr, tr
 from ...models import EMPLOYEE_KINDS, PAYROLL_STATUSES, PERIOD_STATUSES
 from ...money import format_money
 from ..dialogs.payroll_dialogs import WORKFLOW, AdjustmentDialog, PayDialog, PayrollDetailDialog, PeriodDialog
@@ -25,26 +26,30 @@ from .catalog_base import STATUS_COLUMN_TITLE, CatalogPage
 from .finance_page import coloured, money_cell
 from .planning_page import _combo, _refill
 
-WARNINGS = {
-    "missing_rate": "séance(s) sans taux de vacation",
-    "missing_salary": "employé(s) sans salaire défini",
-    "adjustment_deferred": "correction(s) reportée(s) (paie insuffisante)",
-}
+WARNINGS = Labels(
+    {
+        "missing_rate": "séance(s) sans taux de vacation",
+        "missing_salary": "employé(s) sans salaire défini",
+        "adjustment_deferred": "correction(s) reportée(s) (paie insuffisante)",
+    }
+)
 PAYROLL_COLOURS = TokenColours(CALCULATED="warning", APPROVED="primary", PAID="success")
 
 
 def calculation_text(summary):
     parts = [
-        f"{summary.get('created', 0)} créée(s)",
-        f"{summary.get('recalculated', 0)} recalculée(s)",
-        f"{summary.get('unchanged', 0)} inchangée(s)",
-        f"{summary.get('frozen', 0)} déjà approuvée(s) ou payée(s), non modifiée(s)",
+        tr("{0} créée(s)", summary.get("created", 0)),
+        tr("{0} recalculée(s)", summary.get("recalculated", 0)),
+        tr("{0} inchangée(s)", summary.get("unchanged", 0)),
+        tr("{0} déjà approuvée(s) ou payée(s), non modifiée(s)", summary.get("frozen", 0)),
     ]
     counts = {}
     for warning in summary.get("warnings") or []:
         counts[warning.get("code")] = counts.get(warning.get("code"), 0) + 1
     notes = [f"{n} {WARNINGS.get(code, code)}" for code, n in counts.items()]
-    return "Calcul terminé : " + ", ".join(parts) + "." + (f" Attention : {', '.join(notes)}." if notes else "")
+    return (
+        tr("Calcul terminé : ") + ", ".join(parts) + "." + (tr(" Attention : {0}.", ", ".join(notes)) if notes else "")
+    )
 
 
 # =============================================================================
@@ -53,12 +58,15 @@ def calculation_text(summary):
 
 
 class PeriodsPage(CatalogPage):
-    title = "Périodes de paie"
-    description = WORKFLOW + ". Calculer prépare (ou met à jour) les paies de la période."
-    columns = ["Nom", "Du", "Au", STATUS_COLUMN_TITLE]
+    title = Tr("Périodes de paie")
+    description = Tr(
+        "Période → Calculer → Préparer → Vérifier → Approuver → Payer. "
+        "Calculer prépare (ou met à jour) les paies de la période."
+    )
+    columns = Tr(["Nom", "Du", "Au", STATUS_COLUMN_TITLE])
     noun = "période"
-    search_placeholder = "Rechercher une période…"
-    status_filters = [("Toutes", None), ("Ouvertes", "OPEN"), ("Clôturées", "CLOSED")]
+    search_placeholder = Tr("Rechercher une période…")
+    status_filters = Tr([("Toutes", None), ("Ouvertes", "OPEN"), ("Clôturées", "CLOSED")])
     has_toggle = False
 
     def __init__(self, payroll, references, runner, parent=None, *, show_payrolls=None, **kwargs):
@@ -66,18 +74,18 @@ class PeriodsPage(CatalogPage):
         self.show_payrolls = show_payrolls or (lambda period: None)
         super().__init__(runner, parent, **kwargs)
         self.edit_button.hide()
-        self.add_button.setText("Nouvelle période…")
+        self.add_button.setText(tr("Nouvelle période…"))
         self.calculate_button.clicked.connect(self.calculate)
         self.close_button.clicked.connect(self.close_period)
         self.payrolls_button.clicked.connect(self.open_row)
 
     def leading_actions(self):
-        self.payrolls_button = button("Voir les paies", tooltip="Paies de la période (Entrée)")
+        self.payrolls_button = button(tr("Voir les paies"), tooltip=tr("Paies de la période (Entrée)"))
         return [self.payrolls_button]
 
     def extra_actions(self):
-        self.close_button = button("Clôturer…", "danger")
-        self.calculate_button = button("Calculer", "primary")
+        self.close_button = button(tr("Clôturer…"), "danger")
+        self.calculate_button = button(tr("Calculer"), "primary")
         return [self.close_button, self.calculate_button]
 
     def update_extra_actions(self, row):
@@ -85,7 +93,7 @@ class PeriodsPage(CatalogPage):
             self.payrolls_button.setEnabled(row is not None)
             for widget in (self.calculate_button, self.close_button):
                 widget.setEnabled(row is not None and row.active)
-                widget.setToolTip("Sélectionnez une période ouverte." if not (row and row.active) else "")
+                widget.setToolTip(tr("Sélectionnez une période ouverte.") if not (row and row.active) else "")
 
     def status_cell(self, row):
         return coloured(
@@ -117,10 +125,12 @@ class PeriodsPage(CatalogPage):
             return dialog.values() if dialog.exec() == QDialog.Accepted else None
         return self.confirm(
             self,
-            f"Clôturer « {context['period'].name} » ?",
-            "Une période clôturée ne peut plus être modifiée. Le serveur refusera tant qu'une paie n'est ni payée "
-            "ni annulée.",
-            confirm_text="Clôturer",
+            tr("Clôturer « {0} » ?", context["period"].name),
+            tr(
+                "Une période clôturée ne peut plus être modifiée. Le serveur refusera tant qu'une paie n'est ni "
+                "payée ni annulée."
+            ),
+            confirm_text=tr("Clôturer"),
             danger=True,
         )
 
@@ -130,11 +140,13 @@ class PeriodsPage(CatalogPage):
             if values:
                 self.call(
                     lambda: self.payroll.create_period(**values),
-                    lambda period: self._saved(period, "créée"),
-                    action="Impossible de créer la période",
+                    lambda period: self._saved(period, tr("créée")),
+                    action=tr("Impossible de créer la période"),
                 )
 
-        self.call(lambda: self.references.years(open_only=True), open_form, action="Impossible de charger les années")
+        self.call(
+            lambda: self.references.years(open_only=True), open_form, action=tr("Impossible de charger les années")
+        )
 
     def calculate(self):
         row = self.selected()
@@ -143,7 +155,7 @@ class PeriodsPage(CatalogPage):
         self.call(
             lambda: self.payroll.calculate(row.id),
             lambda summary: (self.banner.show_message("success", calculation_text(summary)), self.show_payrolls(row)),
-            action="Impossible de calculer la période",
+            action=tr("Impossible de calculer la période"),
         )
 
     def close_period(self):
@@ -151,8 +163,8 @@ class PeriodsPage(CatalogPage):
         if row is not None and self.ask("close", period=row):
             self.call(
                 lambda: self.payroll.close_period(row.id),
-                lambda period: self._saved(period, "clôturée"),
-                action="Impossible de clôturer la période",
+                lambda period: self._saved(period, tr("clôturée")),
+                action=tr("Impossible de clôturer la période"),
             )
 
     def open_row(self):
@@ -164,9 +176,11 @@ class PeriodsPage(CatalogPage):
         self.open_row()
 
     def _saved(self, saved, verb):
-        self.success(f"Période « {saved.name} » {verb}.")
+        self.success(tr("Période « {0} » {1}.", saved.name, verb))
         self.call(
-            self.fetch, lambda rows: (self.show_rows(rows), self.select_id(saved.id)), action="Impossible de charger"
+            self.fetch,
+            lambda rows: (self.show_rows(rows), self.select_id(saved.id)),
+            action=tr("Impossible de charger"),
         )
 
 
@@ -176,12 +190,14 @@ class PeriodsPage(CatalogPage):
 
 
 class PayrollsPage(CatalogPage):
-    title = "Paies"
-    description = "Vérifier le détail, puis approuver et payer. Un paiement passe par la trésorerie, une seule fois."
-    columns = ["Employé", "Type", "Période", "Programmé", "Acquis", "Corrections", "À payer", STATUS_COLUMN_TITLE]
+    title = Tr("Paies")
+    description = Tr(
+        "Vérifier le détail, puis approuver et payer. Un paiement passe par la trésorerie, une seule fois."
+    )
+    columns = Tr(["Employé", "Type", "Période", "Programmé", "Acquis", "Corrections", "À payer", STATUS_COLUMN_TITLE])
     noun = "paie"
-    search_placeholder = "Rechercher un employé…"
-    status_filters = [("Statut : tous", None), *((label, code) for code, label in PAYROLL_STATUSES.items())]
+    search_placeholder = Tr("Rechercher un employé…")
+    status_filters = Tr([("Statut : tous", None), *((label, code) for code, label in PAYROLL_STATUSES.items())])
     narrow_hidden = (1, 5)  # type, corrections: in the payroll's detail
     has_toggle = False
 
@@ -199,18 +215,18 @@ class PayrollsPage(CatalogPage):
         return {0}
 
     def leading_actions(self):
-        self.detail_button = button("Vérifier", tooltip="Détail du calcul (Entrée)")
+        self.detail_button = button(tr("Vérifier"), tooltip=tr("Détail du calcul (Entrée)"))
         return [self.detail_button]
 
     def extra_actions(self):
-        self.cancel_button = button("Annuler…", "danger")
-        self.approve_button = button("Approuver")
-        self.pay_button = button("Payer…", "primary")
+        self.cancel_button = button(tr("Annuler…"), "danger")
+        self.approve_button = button(tr("Approuver"))
+        self.pay_button = button(tr("Payer…"), "primary")
         return [self.cancel_button, self.approve_button, self.pay_button]
 
     def add_filters(self, layout):
-        self.period_filter = _combo("Filtrer par période", "Période : toutes", 150)
-        self.kind_filter = _combo("Filtrer par type", "Type : tous", 120)
+        self.period_filter = _combo(tr("Filtrer par période"), tr("Période : toutes"), 150)
+        self.kind_filter = _combo(tr("Filtrer par type"), tr("Type : tous"), 120)
         for code, label in EMPLOYEE_KINDS.items():
             self.kind_filter.addItem(label, code)
         for combo in (self.period_filter, self.kind_filter):
@@ -224,8 +240,8 @@ class PayrollsPage(CatalogPage):
             self.approve_button.setEnabled(status == "CALCULATED")
             self.pay_button.setEnabled(status == "APPROVED")
             self.cancel_button.setEnabled(status in ("CALCULATED", "APPROVED"))
-            self.approve_button.setToolTip("Seule une paie préparée s'approuve." if status != "CALCULATED" else "")
-            self.pay_button.setToolTip("Seule une paie approuvée se paie." if status != "APPROVED" else "")
+            self.approve_button.setToolTip(tr("Seule une paie préparée s'approuve.") if status != "CALCULATED" else "")
+            self.pay_button.setToolTip(tr("Seule une paie approuvée se paie.") if status != "APPROVED" else "")
 
     def is_filtered(self):
         return super().is_filtered() or bool(self.period_filter.currentData() or self.kind_filter.currentData())
@@ -234,10 +250,10 @@ class PayrollsPage(CatalogPage):
         return coloured(row.status_label, PAYROLL_COLOURS.get(row.status, TOKENS.text_secondary))
 
     def activate(self):
-        self.call(self.payroll.periods, self._fill, action="Impossible de charger les périodes")
+        self.call(self.payroll.periods, self._fill, action=tr("Impossible de charger les périodes"))
 
     def _fill(self, periods):
-        _refill(self.period_filter, "Période : toutes", [(p.name, p.id) for p in periods])
+        _refill(self.period_filter, tr("Période : toutes"), [(p.name, p.id) for p in periods])
         self.reload()
 
     def show_period(self, period):
@@ -282,16 +298,18 @@ class PayrollsPage(CatalogPage):
         if kind == "cancel":
             return ask_reason(
                 self,
-                f"Annuler la paie de {context['payroll'].employee_name} ?",
-                "Les lignes restent dans l'historique ; un nouveau calcul reste possible.",
+                tr("Annuler la paie de {0} ?", context["payroll"].employee_name),
+                tr("Les lignes restent dans l'historique ; un nouveau calcul reste possible."),
                 danger=True,
             )
         return self.confirm(
             self,
-            f"Approuver la paie de {context['payroll'].employee_name} ?",
-            f"Montant à approuver : {format_money(context['payroll'].payable, context['payroll'].currency)}. "
-            "Le serveur vérifie d'abord que le calcul correspond toujours aux données.",
-            confirm_text="Approuver",
+            tr("Approuver la paie de {0} ?", context["payroll"].employee_name),
+            tr(
+                "Montant à approuver : {0}. Le serveur vérifie d'abord que le calcul correspond toujours aux données.",
+                format_money(context["payroll"].payable, context["payroll"].currency),
+            ),
+            confirm_text=tr("Approuver"),
         )
 
     def open_row(self):
@@ -304,7 +322,7 @@ class PayrollsPage(CatalogPage):
             if action:
                 self.run_action(action, payroll)
 
-        self.call(lambda: self.payroll.payroll(row.id), show, action="Impossible de charger la paie")
+        self.call(lambda: self.payroll.payroll(row.id), show, action=tr("Impossible de charger la paie"))
 
     def edit(self):
         self.open_row()
@@ -318,9 +336,9 @@ class PayrollsPage(CatalogPage):
                 self.call(
                     lambda: self.payroll.approve(row.id),
                     lambda saved: self._done(
-                        saved, f"Paie approuvée : {format_money(saved.approved, saved.currency)}."
+                        saved, tr("Paie approuvée : {0}.", format_money(saved.approved, saved.currency))
                     ),
-                    action="Impossible d'approuver la paie",
+                    action=tr("Impossible d'approuver la paie"),
                 )
         elif name == "pay":
 
@@ -332,26 +350,31 @@ class PayrollsPage(CatalogPage):
                         lambda: self.payroll.pay(row.id, **values),
                         lambda saved: self._done(
                             saved,
-                            f"Paie payée : {format_money(saved.approved, saved.currency)} "
-                            f"(référence {saved.payment_reference}).",
+                            tr(
+                                "Paie payée : {0} (référence {1}).",
+                                format_money(saved.approved, saved.currency),
+                                saved.payment_reference,
+                            ),
                         ),
-                        action="Impossible de payer la paie",
+                        action=tr("Impossible de payer la paie"),
                     )
 
-            self.call(self.finance.wallets, open_form, action="Impossible de charger les wallets")
+            self.call(self.finance.wallets, open_form, action=tr("Impossible de charger les wallets"))
         elif name == "cancel":
             values = self.ask("cancel", payroll=row)
             if values:
                 self.call(
                     lambda: self.payroll.cancel(row.id, values["reason"]),
-                    lambda saved: self._done(saved, "Paie annulée (historique conservé)."),
-                    action="Impossible d'annuler la paie",
+                    lambda saved: self._done(saved, tr("Paie annulée (historique conservé).")),
+                    action=tr("Impossible d'annuler la paie"),
                 )
 
     def _done(self, saved, message):
         self.success(f"{saved.employee_name} · {saved.period_name} — {message}")
         self.call(
-            self.fetch, lambda rows: (self.show_rows(rows), self.select_id(saved.id)), action="Impossible de charger"
+            self.fetch,
+            lambda rows: (self.show_rows(rows), self.select_id(saved.id)),
+            action=tr("Impossible de charger"),
         )
 
 
@@ -361,12 +384,12 @@ class PayrollsPage(CatalogPage):
 
 
 class AdjustmentsPage(CatalogPage):
-    title = "Corrections"
-    description = "Primes (+) et retenues (−) : jamais modifiées, appliquées par la prochaine paie payée."
-    columns = ["Employé", "Montant", "Motif", "Date d'effet", STATUS_COLUMN_TITLE]
+    title = Tr("Corrections")
+    description = Tr("Primes (+) et retenues (−) : jamais modifiées, appliquées par la prochaine paie payée.")
+    columns = Tr(["Employé", "Montant", "Motif", "Date d'effet", STATUS_COLUMN_TITLE])
     noun = "correction"
-    search_placeholder = "Rechercher par employé ou motif…"
-    status_filters = [("Toutes", None), ("En attente", True), ("Appliquées", False)]
+    search_placeholder = Tr("Rechercher par employé ou motif…")
+    status_filters = Tr([("Toutes", None), ("En attente", True), ("Appliquées", False)])
     has_toggle = False
 
     def __init__(self, payroll, teachers, runner, parent=None, **kwargs):
@@ -374,13 +397,15 @@ class AdjustmentsPage(CatalogPage):
         self.names = {}
         super().__init__(runner, parent, **kwargs)
         self.edit_button.hide()
-        self.add_button.setText("Nouvelle correction…")
+        self.add_button.setText(tr("Nouvelle correction…"))
 
     def stretch_columns(self):
         return {2}
 
     def status_cell(self, row):
-        return coloured("En attente" if row.active else "Appliquée", TOKENS.warning if row.active else TOKENS.success)
+        return coloured(
+            tr("En attente") if row.active else tr("Appliquée"), TOKENS.warning if row.active else TOKENS.success
+        )
 
     def _employees(self):
         names = {t.employee_id: f"{t.name} ({t.number})" for t in self.teachers.all(status=None) if t.employee_id}
@@ -422,13 +447,13 @@ class AdjustmentsPage(CatalogPage):
                 self.call(
                     lambda: self.payroll.create_adjustment(**values),
                     lambda saved: (
-                        self.success(f"Correction de {format_money(saved.amount)} enregistrée."),
+                        self.success(tr("Correction de {0} enregistrée.", format_money(saved.amount))),
                         self.reload(),
                     ),
-                    action="Impossible d'enregistrer la correction",
+                    action=tr("Impossible d'enregistrer la correction"),
                 )
 
-        self.call(self._employees, open_form, action="Impossible de charger les employés")
+        self.call(self._employees, open_form, action=tr("Impossible de charger les employés"))
 
     def open_row(self):
         pass
@@ -440,12 +465,12 @@ class AdjustmentsPage(CatalogPage):
 
 
 class PayrollPage(Page):
-    title = "Paie"
+    title = Tr("Paie")
 
     def __init__(self, payroll, finance, references, teachers, runner, parent=None, **kwargs):
         super().__init__(runner, parent, **kwargs)
         self.layout_.setContentsMargins(0, 8, 0, 0)
-        self.workflow = QLabel(WORKFLOW, objectName="subtitle")
+        self.workflow = QLabel(tr(WORKFLOW), objectName="subtitle")
         self.workflow.setContentsMargins(28, 0, 28, 0)
         self.layout_.addWidget(self.workflow)
         self.tabs = QTabWidget()
@@ -453,7 +478,11 @@ class PayrollPage(Page):
         self.periods = PeriodsPage(payroll, references, runner, show_payrolls=self.show_payrolls, **kwargs)
         self.payrolls = PayrollsPage(payroll, finance, runner, **kwargs)
         self.adjustments = AdjustmentsPage(payroll, teachers, runner, **kwargs)
-        for page, label in ((self.periods, "Périodes"), (self.payrolls, "Paies"), (self.adjustments, "Corrections")):
+        for page, label in (
+            (self.periods, tr("Périodes")),
+            (self.payrolls, tr("Paies")),
+            (self.adjustments, tr("Corrections")),
+        ):
             self.tabs.addTab(page, label)
             page.session_expired.connect(self.session_expired.emit)
         self.layout_.addWidget(self.tabs)

@@ -10,6 +10,7 @@ the only checks here are that required fields are filled before a call.
 """
 
 from ..api.errors import ValidationFailed
+from ..i18n import tr
 from ..models import AcademicYear, Level
 
 YEAR_FILTERS = {"open": ("PLANNED", "ACTIVE"), "closed": ("CLOSED", "ARCHIVED")}
@@ -39,11 +40,11 @@ class YearService:
     def _require(name, start_date, end_date):
         errors = {}
         if not (name or "").strip():
-            errors["name"] = ["Obligatoire."]
+            errors["name"] = [tr("Obligatoire.")]
         if start_date is None:
-            errors["start_date"] = ["Obligatoire."]
+            errors["start_date"] = [tr("Obligatoire.")]
         if end_date is None:
-            errors["end_date"] = ["Obligatoire."]
+            errors["end_date"] = [tr("Obligatoire.")]
         if errors:
             raise ValidationFailed("Formulaire incomplet.", details=errors)
 
@@ -78,9 +79,9 @@ class LevelService:
     def _require(code, name):
         errors = {}
         if not (code or "").strip():
-            errors["code"] = ["Obligatoire."]
+            errors["code"] = [tr("Obligatoire.")]
         if not (name or "").strip():
-            errors["name"] = ["Obligatoire."]
+            errors["name"] = [tr("Obligatoire.")]
         if errors:
             raise ValidationFailed("Formulaire incomplet.", details=errors)
 

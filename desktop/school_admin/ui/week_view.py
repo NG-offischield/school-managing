@@ -16,6 +16,7 @@ from PySide6.QtCore import QPointF, QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
 from PySide6.QtWidgets import QToolTip, QWidget
 
+from ..i18n import Texts, tr
 from ..models import WEEKDAY_NAMES
 from .theme import TOKENS, TYPE
 
@@ -29,13 +30,15 @@ STYLES = {  # (background, border, text)
     "CANCELLED": (TOKENS.field_disabled, TOKENS.field_border, TOKENS.text_secondary),
     "COMPLETED": (TOKENS.success_bg, TOKENS.success, TOKENS.text),
 }
-LEGEND = [
-    ("Planifiée", "SCHEDULED"),
-    ("Remplacée", "SUBSTITUTED"),
-    ("Déplacée", "MOVED"),
-    ("Réalisée", "COMPLETED"),
-    ("Annulée", "CANCELLED"),
-]
+LEGEND = Texts(
+    [
+        ("Planifiée", "SCHEDULED"),
+        ("Remplacée", "SUBSTITUTED"),
+        ("Déplacée", "MOVED"),
+        ("Réalisée", "COMPLETED"),
+        ("Annulée", "CANCELLED"),
+    ]
+)
 
 
 def style_key(session):
@@ -51,14 +54,14 @@ def style_key(session):
 def session_tooltip(session):
     lines = [
         f"{session.subject_code} — {session.subject_name}",
-        f"Classe : {session.class_name}",
+        tr("Classe : {0}", session.class_name),
         f"{session.date:%d/%m/%Y} · {session.hours}" if session.date else session.hours,
-        f"Salle : {session.room_code or '—'}",
-        f"Enseignant : {session.teacher_name}",
+        tr("Salle : {0}", session.room_code or "—"),
+        tr("Enseignant : {0}", session.teacher_name),
     ]
     if session.is_substituted:
-        lines.append(f"Enseignant prévu : {session.planned_teacher_name}")
-    lines.append(f"Statut : {session.status_label}")
+        lines.append(tr("Enseignant prévu : {0}", session.planned_teacher_name))
+    lines.append(tr("Statut : {0}", session.status_label))
     return "\n".join(lines)
 
 
@@ -70,7 +73,7 @@ class WeekView(QWidget):
         super().__init__(parent)
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.StrongFocus)
-        self.setAccessibleName("Planning de la semaine")
+        self.setAccessibleName(tr("Planning de la semaine"))
         self.monday = None
         self.sessions = []
         self.current = None
@@ -89,7 +92,7 @@ class WeekView(QWidget):
         if self.current is not None and self.current.id not in {s.id for s in self.sessions}:
             self.current = None
         self.setMinimumHeight(self.sizeHint().height())
-        self.setAccessibleDescription(f"{len(self.sessions)} séance(s) cette semaine")
+        self.setAccessibleDescription(tr("{0} séance(s) cette semaine", len(self.sessions)))
         self.updateGeometry()
         self.update()
 
@@ -177,7 +180,7 @@ class WeekView(QWidget):
             inner = rect.adjusted(5, 3, -4, -2)
             lines = [f"{session.subject_code} · {session.class_name}", f"{session.hours} · {session.room_code or '—'}"]
             if session.is_substituted:
-                lines.append(f"Remplaçant : {session.teacher_name}")
+                lines.append(tr("Remplaçant : {0}", session.teacher_name))
             else:
                 lines.append(session.teacher_name)
             y = inner.top()

@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...api.errors import NetworkError
+from ...i18n import Tr, tr
 from ...models import (
     COMPLAINT_CATEGORIES,
     COMPLAINT_PRIORITIES,
@@ -72,7 +73,7 @@ def _sort_key(moment):
 
 
 def ask_save_path(parent, name):
-    path, _ = QFileDialog.getSaveFileName(parent, "Enregistrer le fichier", name)
+    path, _ = QFileDialog.getSaveFileName(parent, tr("Enregistrer le fichier"), name)
     return path
 
 
@@ -87,12 +88,12 @@ def save_bytes(path, content):
 
 
 class NotificationsPage(PagedCatalogPage):
-    title = "Notifications"
-    description = "Vos notifications (paiements, réclamations, messages…). Elles arrivent en temps réel."
-    columns = ["Reçue le", "Type", "Titre", "Message", "Importance", STATUS_COLUMN_TITLE]
+    title = Tr("Notifications")
+    description = Tr("Vos notifications (paiements, réclamations, messages…). Elles arrivent en temps réel.")
+    columns = Tr(["Reçue le", "Type", "Titre", "Message", "Importance", STATUS_COLUMN_TITLE])
     noun = "notification"
-    search_placeholder = "Filtrer l'affichage par titre…"
-    status_filters = [("Toutes", None), ("Non lues", False), ("Lues", True)]
+    search_placeholder = Tr("Filtrer l'affichage par titre…")
+    status_filters = Tr([("Toutes", None), ("Non lues", False), ("Lues", True)])
     has_toggle = False
     narrow_hidden = (3, 4)
 
@@ -110,16 +111,16 @@ class NotificationsPage(PagedCatalogPage):
         return {2, 3}
 
     def leading_actions(self):
-        self.detail_button = button("Détail", tooltip="Lire la notification (Entrée)")
+        self.detail_button = button(tr("Détail"), tooltip=tr("Lire la notification (Entrée)"))
         return [self.detail_button]
 
     def extra_actions(self):
-        self.read_button = button("Marquer comme lue")
-        self.all_button = button("Tout marquer comme lu")
+        self.read_button = button(tr("Marquer comme lue"))
+        self.all_button = button(tr("Tout marquer comme lu"))
         return [self.read_button, self.all_button]
 
     def add_filters(self, layout):
-        self.type_filter = _combo("Filtrer par type", "Type : tous", 140)
+        self.type_filter = _combo(tr("Filtrer par type"), tr("Type : tous"), 140)
         for code, label in NOTIFICATION_TYPES.items():
             self.type_filter.addItem(label, code)
         self.type_filter.currentIndexChanged.connect(lambda _: self.reload_first_page())
@@ -135,7 +136,7 @@ class NotificationsPage(PagedCatalogPage):
 
     def status_cell(self, row):
         return coloured(
-            "Lue" if row.is_read else "●  Non lue", TOKENS.text_secondary if row.is_read else TOKENS.primary
+            tr("Lue") if row.is_read else tr("●  Non lue"), TOKENS.text_secondary if row.is_read else TOKENS.primary
         )
 
     def fetch(self):
@@ -176,15 +177,15 @@ class NotificationsPage(PagedCatalogPage):
         if row is not None and not row.is_read:
             self.call(
                 lambda: self.communication.mark_read(row.id),
-                lambda saved: self._reselect(saved.id, "Notification marquée comme lue."),
-                action="Impossible de marquer la notification",
+                lambda saved: self._reselect(saved.id, tr("Notification marquée comme lue.")),
+                action=tr("Impossible de marquer la notification"),
             )
 
     def mark_all(self):
         self.call(
             self.communication.mark_all_read,
-            lambda count: (self.success(f"{count} notification(s) marquée(s) comme lue(s)."), self.reload()),
-            action="Impossible de marquer les notifications",
+            lambda count: (self.success(tr("{0} notification(s) marquée(s) comme lue(s).", count)), self.reload()),
+            action=tr("Impossible de marquer les notifications"),
         )
 
     # --- real time ---
@@ -202,7 +203,7 @@ class NotificationsPage(PagedCatalogPage):
 
 
 class MessagingPage(Page):
-    title = "Messagerie"
+    title = Tr("Messagerie")
 
     def __init__(self, communication, runner, parent=None, *, realtime=None, **kwargs):
         super().__init__(runner, parent, **kwargs)
@@ -213,13 +214,13 @@ class MessagingPage(Page):
 
         head = QHBoxLayout()
         titles = QVBoxLayout()
-        titles.addWidget(QLabel("Messagerie", objectName="pageTitle"))
-        subtitle = QLabel("Conversations privées. Les pièces jointes restent privées.", objectName="subtitle")
+        titles.addWidget(QLabel(tr("Messagerie"), objectName="pageTitle"))
+        subtitle = QLabel(tr("Conversations privées. Les pièces jointes restent privées."), objectName="subtitle")
         subtitle.setWordWrap(True)
         titles.addWidget(subtitle)
         head.addLayout(titles, 1)
-        self.refresh_button = button("Actualiser", tooltip="Recharger (F5)")
-        self.new_button = button("Nouvelle conversation…", "primary")
+        self.refresh_button = button(tr("Actualiser"), tooltip=tr("Recharger (F5)"))
+        self.new_button = button(tr("Nouvelle conversation…"), "primary")
         for widget in (self.refresh_button, self.new_button):
             head.addWidget(widget, 0, Qt.AlignTop)
         self.layout_.addLayout(head)
@@ -227,35 +228,35 @@ class MessagingPage(Page):
 
         self.splitter = QSplitter(Qt.Horizontal)
         self.list = QListWidget()
-        self.list.setAccessibleName("Conversations")
+        self.list.setAccessibleName(tr("Conversations"))
         self.list.setMinimumWidth(200)
         self.list.setWordWrap(True)  # long titles wrap: no horizontal scrolling
         self.list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         right = QWidget()
         column = QVBoxLayout(right)
         column.setContentsMargins(8, 0, 0, 0)
-        self.header = QLabel("Choisissez une conversation.", objectName="sectionTitle")
+        self.header = QLabel(tr("Choisissez une conversation."), objectName="sectionTitle")
         self.header.setWordWrap(True)
         self.participants = QLabel("", objectName="help")
         self.participants.setWordWrap(True)
         self.thread = QListWidget()
-        self.thread.setAccessibleName("Messages")
+        self.thread.setAccessibleName(tr("Messages"))
         self.thread.setWordWrap(True)
         self.thread.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         tools = QHBoxLayout()
-        self.download_button = button("Télécharger la pièce jointe…")
-        self.hide_button = button("Masquer le message", "danger")
-        self.join_button = button("Ajouter un administrateur…")
+        self.download_button = button(tr("Télécharger la pièce jointe…"))
+        self.hide_button = button(tr("Masquer le message"), "danger")
+        self.join_button = button(tr("Ajouter un administrateur…"))
         for widget in (self.download_button, self.hide_button, self.join_button):
             tools.addWidget(widget)
         tools.addStretch()
-        self.compose = QPlainTextEdit(placeholderText="Votre message")
+        self.compose = QPlainTextEdit(placeholderText=tr("Votre message"))
         self.compose.setFixedHeight(64)
         self.compose.setTabChangesFocus(True)
         self.attachments = AttachmentPicker(lambda parent: self.choose_files(parent))
         send_row = QHBoxLayout()
         send_row.addWidget(self.attachments, 1)
-        self.send_button = button("Envoyer", "primary")
+        self.send_button = button(tr("Envoyer"), "primary")
         send_row.addWidget(self.send_button)
         for widget in (self.header, self.participants, self.thread):
             column.addWidget(widget, 1 if widget is self.thread else 0)
@@ -301,7 +302,9 @@ class MessagingPage(Page):
     # --- conversations ---
     def reload(self):
         self.call(
-            self.communication.conversations, self.show_conversations, action="Impossible de charger les conversations"
+            self.communication.conversations,
+            self.show_conversations,
+            action=tr("Impossible de charger les conversations"),
         )
 
     def show_conversations(self, conversations):
@@ -321,7 +324,7 @@ class MessagingPage(Page):
                 self.list.setCurrentItem(item)
         self.list.blockSignals(False)
         if not conversations:
-            self.header.setText("Aucune conversation. « Nouvelle conversation… » pour écrire.")
+            self.header.setText(tr("Aucune conversation. « Nouvelle conversation… » pour écrire."))
 
     def select(self, conversation_id):
         for index in range(self.list.count()):
@@ -338,14 +341,14 @@ class MessagingPage(Page):
             self.realtime.unwatch(self.current.id)
         self.current = conversation
         self.header.setText(f"{conversation.label} — {CONVERSATION_TYPES.get(conversation.kind, conversation.kind)}")
-        self.participants.setText("Participants : " + ", ".join(name for _, name, _ in conversation.participants))
+        self.participants.setText(tr("Participants : ") + ", ".join(name for _, name, _ in conversation.participants))
         self.call(
             lambda: (
                 self.communication.messages(conversation.id),
                 self.communication.mark_conversation_read(conversation.id),
             ),
             lambda loaded: self.show_messages(loaded[0]),
-            action="Impossible de charger les messages",
+            action=tr("Impossible de charger les messages"),
         )
 
     def show_messages(self, messages):
@@ -360,9 +363,9 @@ class MessagingPage(Page):
 
     def _append(self, message):
         files = "".join(f"\n📎 {a.name} ({a.size_label})" for a in message.attachments)
-        body = "[Message masqué]" if message.deleted and message.body is None else (message.body or "")
+        body = tr("[Message masqué]") if message.deleted and message.body is None else (message.body or "")
         if message.deleted and message.body is not None:
-            body = f"[Masqué — visible par l'administration] {body}"
+            body = tr("[Masqué — visible par l'administration] {0}", body)
         item = QListWidgetItem(f"{message.sender_name} · {_when(message.created_at)}\n{body}{files}")
         item.setData(Qt.UserRole, message.id)
         if message.deleted:
@@ -403,17 +406,17 @@ class MessagingPage(Page):
                 self.call(
                     lambda: self.communication.start_conversation(**values),
                     lambda conversation: self._started(conversation),
-                    action="Impossible de créer la conversation",
+                    action=tr("Impossible de créer la conversation"),
                 )
 
-        self.call(self.communication.members, open_form, action="Impossible de charger les membres")
+        self.call(self.communication.members, open_form, action=tr("Impossible de charger les membres"))
 
     def _started(self, conversation):
-        self.success(f"Conversation « {conversation.label} » créée.")
+        self.success(tr("Conversation « {0} » créée.", conversation.label))
         self.call(
             self.communication.conversations,
             lambda rows: (self.show_conversations(rows), self.select(conversation.id)),
-            action="Impossible de charger les conversations",
+            action=tr("Impossible de charger les conversations"),
         )
 
     def send(self):
@@ -432,13 +435,13 @@ class MessagingPage(Page):
                 self.pending = (conversation.id, body, client_id)  # resend = same client_id, no duplicate
                 raise
 
-        self.call(attempt, self._sent, action="Message non envoyé")
+        self.call(attempt, self._sent, action=tr("Message non envoyé"))
 
     def _sent(self, message):
         self.pending = None
         self.compose.clear()
         self.attachments.paths = []
-        self.attachments.label.setText("Aucun fichier")
+        self.attachments.label.setText(tr("Aucun fichier"))
         if all(m.id != message.id for m in self.messages):
             self.messages.append(message)
             self._append(message)
@@ -454,8 +457,8 @@ class MessagingPage(Page):
                 continue
             self.call(
                 lambda a=attachment: self.communication.download(a),
-                lambda content, p=path: (save_bytes(p, content), self.success("Pièce jointe enregistrée.")),
-                action="Impossible de télécharger la pièce jointe",
+                lambda content, p=path: (save_bytes(p, content), self.success(tr("Pièce jointe enregistrée."))),
+                action=tr("Impossible de télécharger la pièce jointe"),
             )
 
     def hide_message(self):
@@ -464,16 +467,16 @@ class MessagingPage(Page):
             return
         if not self.confirm(
             self,
-            "Masquer ce message ?",
-            "Il ne sera plus visible des participants. Il reste conservé pour l'administration (jamais détruit).",
-            confirm_text="Masquer",
+            tr("Masquer ce message ?"),
+            tr("Il ne sera plus visible des participants. Il reste conservé pour l'administration (jamais détruit)."),
+            confirm_text=tr("Masquer"),
             danger=True,
         ):
             return
         self.call(
             lambda: self.communication.hide_message(message.id),
-            lambda _: (self.success("Message masqué (conservé)."), self.open_current()),
-            action="Impossible de masquer le message",
+            lambda _: (self.success(tr("Message masqué (conservé).")), self.open_current()),
+            action=tr("Impossible de masquer le message"),
         )
 
     def add_participant(self):
@@ -486,12 +489,12 @@ class MessagingPage(Page):
             if values:
                 self.call(
                     lambda: self.communication.add_participant(conversation.id, values["member_id"]),
-                    lambda saved: (self.success("Participant ajouté."), self.reload()),
-                    action="Impossible d'ajouter le participant",
+                    lambda saved: (self.success(tr("Participant ajouté.")), self.reload()),
+                    action=tr("Impossible d'ajouter le participant"),
                 )
 
         self.call(
-            lambda: self.communication.members(role="ADMIN"), open_form, action="Impossible de charger les membres"
+            lambda: self.communication.members(role="ADMIN"), open_form, action=tr("Impossible de charger les membres")
         )
 
 
@@ -501,13 +504,13 @@ class MessagingPage(Page):
 
 
 class ForumPage(CatalogPage):
-    title = "Forum et annonces"
-    description = "Espaces de discussion et annonces. La modération masque un message sans le détruire."
-    columns = ["Titre", "Espace", "Type", "Auteur", "Dernier message", STATUS_COLUMN_TITLE]
+    title = Tr("Forum et annonces")
+    description = Tr("Espaces de discussion et annonces. La modération masque un message sans le détruire.")
+    columns = Tr(["Titre", "Espace", "Type", "Auteur", "Dernier message", STATUS_COLUMN_TITLE])
     noun = "sujet"
     feminine = False
-    search_placeholder = "Rechercher un sujet…"
-    status_filters = [("Statut : tous", None), *((label, code) for code, label in THREAD_STATUSES.items())]
+    search_placeholder = Tr("Rechercher un sujet…")
+    status_filters = Tr([("Statut : tous", None), *((label, code) for code, label in THREAD_STATUSES.items())])
     has_toggle = False
     narrow_hidden = (3,)
 
@@ -516,7 +519,7 @@ class ForumPage(CatalogPage):
         self.spaces = []
         super().__init__(runner, parent, **kwargs)
         self.edit_button.hide()
-        self.add_button.setText("Publier…")
+        self.add_button.setText(tr("Publier…"))
         self.open_button.clicked.connect(self.open_row)
         self.space_button.clicked.connect(self.new_space)
 
@@ -524,15 +527,15 @@ class ForumPage(CatalogPage):
         return {0}
 
     def leading_actions(self):
-        self.open_button = button("Ouvrir", tooltip="Lire, répondre, modérer (Entrée)")
+        self.open_button = button(tr("Ouvrir"), tooltip=tr("Lire, répondre, modérer (Entrée)"))
         return [self.open_button]
 
     def extra_actions(self):
-        self.space_button = button("Nouvel espace…")
+        self.space_button = button(tr("Nouvel espace…"))
         return [self.space_button]
 
     def add_filters(self, layout):
-        self.space_filter = _combo("Filtrer par espace", "Espace : tous", 150)
+        self.space_filter = _combo(tr("Filtrer par espace"), tr("Espace : tous"), 150)
         self.space_filter.currentIndexChanged.connect(lambda _: self.reload())
         layout.addWidget(self.space_filter)
 
@@ -550,7 +553,7 @@ class ForumPage(CatalogPage):
 
     def fetch(self):
         self.spaces = self.communication.spaces()
-        _refill(self.space_filter, "Espace : tous", [(s.name, s.id) for s in self.spaces])
+        _refill(self.space_filter, tr("Espace : tous"), [(s.name, s.id) for s in self.spaces])
         rows = self.communication.threads(space_id=self.space_filter.currentData())
         wanted = self.status.currentData()
         if wanted:
@@ -577,7 +580,7 @@ class ForumPage(CatalogPage):
             dialog = ThreadDialog(self.spaces, self, space_id=self.space_filter.currentData())
             return dialog.values() if dialog.exec() == QDialog.Accepted else None
         if kind == "moderate":
-            return ask_reason(self, "Masquer ce message ?", "Il reste conservé, avec le motif.", danger=True)
+            return ask_reason(self, tr("Masquer ce message ?"), tr("Il reste conservé, avec le motif."), danger=True)
         dialog = ThreadViewDialog(context["thread"], context["posts"], self)
         if dialog.exec() != QDialog.Accepted or not dialog.action:
             return None
@@ -585,14 +588,14 @@ class ForumPage(CatalogPage):
 
     def add(self):
         if not self.spaces:
-            self.banner.show_message("warning", "Créez d'abord un espace (« Nouvel espace… »).")
+            self.banner.show_message("warning", tr("Créez d'abord un espace (« Nouvel espace… »)."))
             return
         values = self.ask("publish")
         if values:
             self.call(
                 lambda: self.communication.publish(**values),
-                lambda thread: self._saved(thread, "publié"),
-                action="Impossible de publier",
+                lambda thread: self._saved(thread, tr("publié")),
+                action=tr("Impossible de publier"),
             )
 
     def new_space(self):
@@ -601,11 +604,11 @@ class ForumPage(CatalogPage):
             if values:
                 self.call(
                     lambda: self.communication.create_space(**values),
-                    lambda space: (self.success(f"Espace « {space.name} » créé."), self.reload()),
-                    action="Impossible de créer l'espace",
+                    lambda space: (self.success(tr("Espace « {0} » créé.", space.name)), self.reload()),
+                    action=tr("Impossible de créer l'espace"),
                 )
 
-        self.call(self.references.classes, open_form, action="Impossible de charger les classes")
+        self.call(self.references.classes, open_form, action=tr("Impossible de charger les classes"))
 
     def open_row(self):
         row = self.selected()
@@ -617,7 +620,7 @@ class ForumPage(CatalogPage):
             if choice:
                 self.thread_action(row, choice)
 
-        self.call(lambda: self.communication.posts(row.id), show, action="Impossible de charger le sujet")
+        self.call(lambda: self.communication.posts(row.id), show, action=tr("Impossible de charger le sujet"))
 
     def edit(self):
         self.open_row()
@@ -627,28 +630,30 @@ class ForumPage(CatalogPage):
         if action == "reply":
             self.call(
                 lambda: self.communication.reply(thread.id, choice["text"]),
-                lambda _: self._saved(thread, "complété (réponse publiée)"),
-                action="Impossible de répondre",
+                lambda _: self._saved(thread, tr("complété (réponse publiée)")),
+                action=tr("Impossible de répondre"),
             )
         elif action == "moderate":
             values = self.ask("moderate")
             if values and choice.get("post_id"):
                 self.call(
                     lambda: self.communication.moderate_post(choice["post_id"], values["reason"]),
-                    lambda _: self.success("Message masqué par la modération (conservé)."),
-                    action="Impossible de modérer le message",
+                    lambda _: self.success(tr("Message masqué par la modération (conservé).")),
+                    action=tr("Impossible de modérer le message"),
                 )
         else:
             self.call(
                 lambda: self.communication.set_thread_status(thread.id, action, choice.get("text")),
                 lambda saved: self._saved(saved, THREAD_STATUSES.get(saved.status, saved.status).lower()),
-                action="Impossible de changer le statut du sujet",
+                action=tr("Impossible de changer le statut du sujet"),
             )
 
     def _saved(self, saved, verb):
-        self.success(f"Sujet « {saved.title} » {verb}.")
+        self.success(tr("Sujet « {0} » {1}.", saved.title, verb))
         self.call(
-            self.fetch, lambda rows: (self.show_rows(rows), self.select_id(saved.id)), action="Impossible de charger"
+            self.fetch,
+            lambda rows: (self.show_rows(rows), self.select_id(saved.id)),
+            action=tr("Impossible de charger"),
         )
 
 
@@ -658,12 +663,12 @@ class ForumPage(CatalogPage):
 
 
 class ComplaintsPage(CatalogPage):
-    title = "Réclamations"
-    description = "Traitement des réclamations. Chaque changement est historisé ; rien n'est supprimé."
-    columns = ["Sujet", "Catégorie", "Priorité", "Auteur", "Créée le", STATUS_COLUMN_TITLE]
+    title = Tr("Réclamations")
+    description = Tr("Traitement des réclamations. Chaque changement est historisé ; rien n'est supprimé.")
+    columns = Tr(["Sujet", "Catégorie", "Priorité", "Auteur", "Créée le", STATUS_COLUMN_TITLE])
     noun = "réclamation"
-    search_placeholder = "Rechercher par sujet ou auteur…"
-    status_filters = [("Statut : tous", None), *((label, code) for code, label in COMPLAINT_STATUSES.items())]
+    search_placeholder = Tr("Rechercher par sujet ou auteur…")
+    status_filters = Tr([("Statut : tous", None), *((label, code) for code, label in COMPLAINT_STATUSES.items())])
     has_toggle = False
     narrow_hidden = (2, 4)
 
@@ -683,17 +688,17 @@ class ComplaintsPage(CatalogPage):
         return {0}
 
     def leading_actions(self):
-        self.detail_button = button("Détail", tooltip="Détail et historique (Entrée)")
+        self.detail_button = button(tr("Détail"), tooltip=tr("Détail et historique (Entrée)"))
         return [self.detail_button]
 
     def extra_actions(self):
-        self.cancel_button = button("Annuler…", "danger")
-        self.attach_button = button("Joindre…")
-        self.status_button = button("Changer le statut…", "primary")
+        self.cancel_button = button(tr("Annuler…"), "danger")
+        self.attach_button = button(tr("Joindre…"))
+        self.status_button = button(tr("Changer le statut…"), "primary")
         return [self.cancel_button, self.attach_button, self.status_button]
 
     def add_filters(self, layout):
-        self.category_filter = _combo("Filtrer par catégorie", "Catégorie : toutes", 150)
+        self.category_filter = _combo(tr("Filtrer par catégorie"), tr("Catégorie : toutes"), 150)
         for code, label in COMPLAINT_CATEGORIES.items():
             self.category_filter.addItem(label, code)
         self.category_filter.currentIndexChanged.connect(lambda _: self.reload())
@@ -705,7 +710,7 @@ class ComplaintsPage(CatalogPage):
             self.detail_button.setEnabled(row is not None)
             for widget in (self.status_button, self.cancel_button, self.attach_button):
                 widget.setEnabled(live)
-                widget.setToolTip("" if live else "Réclamation finale (annulée ou clôturée) : consultation seule.")
+                widget.setToolTip("" if live else tr("Réclamation finale (annulée ou clôturée) : consultation seule."))
 
     def is_filtered(self):
         return super().is_filtered() or bool(self.category_filter.currentData())
@@ -755,7 +760,7 @@ class ComplaintsPage(CatalogPage):
             dialog = ComplaintStatusDialog(context["complaint"], assignees, self)
             return dialog.values() if dialog.exec() == QDialog.Accepted else None
         if kind == "cancel":
-            return ask_reason(self, "Annuler la réclamation ?", "Elle reste dans l'historique.", danger=True)
+            return ask_reason(self, tr("Annuler la réclamation ?"), tr("Elle reste dans l'historique."), danger=True)
         return None
 
     def open_row(self):
@@ -770,7 +775,7 @@ class ComplaintsPage(CatalogPage):
             elif choice and choice["action"]:
                 self.complaint_action(choice["action"], complaint)
 
-        self.call(lambda: self.communication.complaint(row.id), show, action="Impossible de charger la réclamation")
+        self.call(lambda: self.communication.complaint(row.id), show, action=tr("Impossible de charger la réclamation"))
 
     def edit(self):
         self.open_row()
@@ -784,16 +789,20 @@ class ComplaintsPage(CatalogPage):
             if values:
                 self.call(
                     lambda: self.communication.change_status(row.id, **values),
-                    lambda saved: self._done(saved, f"Réclamation « {saved.subject} » : {saved.status_label.lower()}."),
-                    action="Impossible de changer le statut",
+                    lambda saved: self._done(
+                        saved, tr("Réclamation « {0} » : {1}.", saved.subject, saved.status_label.lower())
+                    ),
+                    action=tr("Impossible de changer le statut"),
                 )
         elif action == "cancel":
             values = self.ask("cancel", complaint=row)
             if values:
                 self.call(
                     lambda: self.communication.cancel_complaint(row.id, values["reason"]),
-                    lambda saved: self._done(saved, f"Réclamation « {saved.subject} » annulée (historique conservé)."),
-                    action="Impossible d'annuler la réclamation",
+                    lambda saved: self._done(
+                        saved, tr("Réclamation « {0} » annulée (historique conservé).", saved.subject)
+                    ),
+                    action=tr("Impossible d'annuler la réclamation"),
                 )
         elif action == "attach":
             paths = self.choose_files(self)
@@ -803,8 +812,8 @@ class ComplaintsPage(CatalogPage):
                 files = [read_attachment(p) for p in paths]
                 self.call(
                     lambda: self.communication.attach_to_complaint(row.id, files),
-                    lambda count: self.success(f"{count} pièce(s) jointe(s) ajoutée(s)."),
-                    action="Pièce jointe refusée",
+                    lambda count: self.success(tr("{0} pièce(s) jointe(s) ajoutée(s).", count)),
+                    action=tr("Pièce jointe refusée"),
                 )
 
     def download(self, attachment):
@@ -812,14 +821,16 @@ class ComplaintsPage(CatalogPage):
         if path:
             self.call(
                 lambda: self.communication.download(attachment),
-                lambda content: (save_bytes(path, content), self.success(f"« {attachment.name} » enregistré.")),
-                action="Impossible de télécharger la pièce jointe",
+                lambda content: (save_bytes(path, content), self.success(tr("« {0} » enregistré.", attachment.name))),
+                action=tr("Impossible de télécharger la pièce jointe"),
             )
 
     def _done(self, saved, message):
         self.success(message)
         self.call(
-            self.fetch, lambda rows: (self.show_rows(rows), self.select_id(saved.id)), action="Impossible de charger"
+            self.fetch,
+            lambda rows: (self.show_rows(rows), self.select_id(saved.id)),
+            action=tr("Impossible de charger"),
         )
 
 
@@ -829,7 +840,7 @@ class ComplaintsPage(CatalogPage):
 
 
 class CommunicationPage(Page):
-    title = "Communication"
+    title = Tr("Communication")
 
     def __init__(self, communication, references, runner, parent=None, *, realtime=None, **kwargs):
         super().__init__(runner, parent, **kwargs)
@@ -845,10 +856,10 @@ class CommunicationPage(Page):
         self.forum = ForumPage(communication, references, runner, **kwargs)
         self.complaints = ComplaintsPage(communication, runner, **kwargs)
         for page, label in (
-            (self.notifications, "Notifications"),
-            (self.messaging, "Messagerie"),
-            (self.forum, "Forum"),
-            (self.complaints, "Réclamations"),
+            (self.notifications, tr("Notifications")),
+            (self.messaging, tr("Messagerie")),
+            (self.forum, tr("Forum")),
+            (self.complaints, tr("Réclamations")),
         ):
             self.tabs.addTab(page, label)
             page.session_expired.connect(self.session_expired.emit)
@@ -864,17 +875,17 @@ class CommunicationPage(Page):
     def set_live(self, state):
         self.live.setText(
             {
-                "online": "● Temps réel connecté",
-                "connecting": "○ Connexion temps réel…",
-                "offline": "○ Temps réel hors ligne : nouvelle tentative automatique",
-                "expired": "○ Session expirée",
-                "disabled": "Temps réel désactivé : utilisez « Actualiser ».",
+                "online": tr("● Temps réel connecté"),
+                "connecting": tr("○ Connexion temps réel…"),
+                "offline": tr("○ Temps réel hors ligne : nouvelle tentative automatique"),
+                "expired": tr("○ Session expirée"),
+                "disabled": tr("Temps réel désactivé : utilisez « Actualiser »."),
             }.get(state, "")
         )
 
     def set_unread(self, count):
         self.notifications.unread = count
-        self.tabs.setTabText(0, f"Notifications ({count})" if count else "Notifications")
+        self.tabs.setTabText(0, tr("Notifications ({0})", count) if count else tr("Notifications"))
 
     def activate(self):
         self.tabs.currentWidget().activate()

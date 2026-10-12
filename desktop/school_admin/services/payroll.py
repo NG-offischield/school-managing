@@ -15,12 +15,13 @@ second payment. Nothing is computed here.
 """
 
 from ..api.errors import ValidationFailed
+from ..i18n import tr
 from ..models import Adjustment, Payroll, PayrollPeriod
 from ..money import amount_text, parse_amount, to_decimal
 
 
 def _require(**fields):
-    missing = {name: ["Obligatoire."] for name, value in fields.items() if value in (None, "")}
+    missing = {name: [tr("Obligatoire.")] for name, value in fields.items() if value in (None, "")}
     if missing:
         raise ValidationFailed("Formulaire incomplet.", details=missing)
 
@@ -85,7 +86,7 @@ class PayrollService:
     def create_adjustment(self, *, employee_id, amount, reason, effective_date=None):
         value = parse_amount(amount) if isinstance(amount, str) else amount
         if value is None:
-            raise ValidationFailed("Montant invalide.", details={"amount": ["Saisissez un montant (ex. -5000)."]})
+            raise ValidationFailed("Montant invalide.", details={"amount": [tr("Saisissez un montant (ex. -5000).")]})
         _require(employee=employee_id, reason=(reason or "").strip())
         payload = {"employee": employee_id, "amount": amount_text(value), "reason": reason.strip()}
         if effective_date:

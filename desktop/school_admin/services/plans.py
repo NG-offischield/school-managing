@@ -13,6 +13,7 @@ chosen file's NAME and BYTES (never a local path) and shows the answers.
 from pathlib import Path
 
 from ..api.errors import ValidationFailed
+from ..i18n import tr
 from ..models import PlanVersion, SchoolPlan
 
 FILE_TYPES = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
@@ -42,7 +43,7 @@ class PlanService:
     @staticmethod
     def _meta(title, description, building, floor, display_order):
         if not (title or "").strip():
-            raise ValidationFailed("Formulaire incomplet.", details={"title": ["Obligatoire."]})
+            raise ValidationFailed("Formulaire incomplet.", details={"title": [tr("Obligatoire.")]})
         return {
             "title": title.strip(),
             "description": (description or "").strip(),

@@ -13,10 +13,12 @@ shows it as is and adds the action that matters for each class:
     ValidationFailed 400 invalid data / business rule          -> field messages
 """
 
+from ..i18n import Tr
+
 
 class ApiError(Exception):
     status = None
-    default_message = "Erreur inattendue du serveur."
+    default_message = Tr("Erreur inattendue du serveur.")
 
     def __init__(self, message=None, *, code=None, status=None, details=None):
         self.message = message or self.default_message
@@ -39,46 +41,46 @@ class ApiError(Exception):
 
 
 class NetworkError(ApiError):
-    default_message = "Serveur injoignable. Vérifiez la connexion réseau puis réessayez."
+    default_message = Tr("Serveur injoignable. Vérifiez la connexion réseau puis réessayez.")
 
 
 class RequestTimeout(NetworkError):
-    default_message = "Le serveur ne répond pas (délai dépassé). Réessayez dans un instant."
+    default_message = Tr("Le serveur ne répond pas (délai dépassé). Réessayez dans un instant.")
 
 
 class ValidationFailed(ApiError):
     status = 400
-    default_message = "Données invalides."
+    default_message = Tr("Données invalides.")
 
 
 class Unauthorized(ApiError):
     status = 401
-    default_message = "Session expirée : veuillez vous reconnecter."
+    default_message = Tr("Session expirée : veuillez vous reconnecter.")
 
 
 class Forbidden(ApiError):
     status = 403
-    default_message = "Vous n'avez pas la permission d'effectuer cette action."
+    default_message = Tr("Vous n'avez pas la permission d'effectuer cette action.")
 
 
 class NotFound(ApiError):
     status = 404
-    default_message = "Ressource introuvable ou indisponible."
+    default_message = Tr("Ressource introuvable ou indisponible.")
 
 
 class Conflict(ApiError):
     status = 409
-    default_message = "Conflit avec l'état actuel des données."
+    default_message = Tr("Conflit avec l'état actuel des données.")
 
 
 class RateLimited(ApiError):
     status = 429
-    default_message = "Trop de tentatives. Patientez avant de réessayer."
+    default_message = Tr("Trop de tentatives. Patientez avant de réessayer.")
 
 
 class ServerError(ApiError):
     status = 500
-    default_message = "Erreur interne du serveur."
+    default_message = Tr("Erreur interne du serveur.")
 
 
 _BY_STATUS = {400: ValidationFailed, 401: Unauthorized, 403: Forbidden, 404: NotFound, 409: Conflict, 429: RateLimited}

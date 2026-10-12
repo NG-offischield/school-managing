@@ -18,6 +18,7 @@ from ..api.errors import (
     Unauthorized,
     ValidationFailed,
 )
+from ..i18n import Labels, tr
 from ..messages import RULE_MESSAGES, explain
 
 
@@ -31,7 +32,7 @@ class Feedback:
     reload: bool = False  # the list should be refreshed (stale data)
 
 
-FIELD_LABELS = {"code": "Code", "name": "Nom", "category": "Catégorie", "description": "Description"}
+FIELD_LABELS = Labels({"code": "Code", "name": "Nom", "category": "Catégorie", "description": "Description"})
 
 
 def _detail(exc):
@@ -45,36 +46,38 @@ def _detail(exc):
 def describe(exc, action=None):
     """`action`: what the user was doing, e.g. "Impossible de créer la matière"."""
     if isinstance(exc, Unauthorized):
-        return Feedback("warning", "Session expirée", exc.message, session_expired=True)
+        return Feedback("warning", tr("Session expirée"), exc.message, session_expired=True)
     if isinstance(exc, NetworkError):
-        return Feedback("error", action or "Serveur injoignable", exc.message, _detail(exc))
+        return Feedback("error", action or tr("Serveur injoignable"), exc.message, _detail(exc))
     if isinstance(exc, Forbidden):
-        return Feedback("error", action or "Permission refusée", f"Permission refusée : {exc.message}", _detail(exc))
+        return Feedback(
+            "error", action or tr("Permission refusée"), tr("Permission refusée : {0}", exc.message), _detail(exc)
+        )
     if isinstance(exc, NotFound):
         return Feedback(
             "warning",
-            action or "Ressource indisponible",
-            f"{exc.message} La liste va être actualisée.",
+            action or tr("Ressource indisponible"),
+            tr("{0} La liste va être actualisée.", exc.message),
             _detail(exc),
             reload=True,
         )
     if isinstance(exc, Conflict):
         return Feedback(
-            "warning", action or "Conflit", explain(exc), _detail(exc), reload=exc.rule != "planning_conflict"
+            "warning", action or tr("Conflit"), explain(exc), _detail(exc), reload=exc.rule != "planning_conflict"
         )
     if isinstance(exc, ValidationFailed):
         if exc.rule in RULE_MESSAGES:
-            return Feedback("warning", action or "Données invalides", explain(exc), _detail(exc))
+            return Feedback("warning", action or tr("Données invalides"), explain(exc), _detail(exc))
         lines = [f"{FIELD_LABELS.get(k, k)} : {' '.join(v)}" for k, v in exc.field_errors().items()]
         text = exc.message if not lines else f"{exc.message} " + " · ".join(lines)
-        return Feedback("warning", action or "Données invalides", text, _detail(exc))
+        return Feedback("warning", action or tr("Données invalides"), text, _detail(exc))
     if isinstance(exc, RateLimited):
-        return Feedback("warning", action or "Patientez", exc.message, _detail(exc))
+        return Feedback("warning", action or tr("Patientez"), exc.message, _detail(exc))
     if isinstance(exc, ApiError):
-        return Feedback("error", action or "Erreur du serveur", exc.message, _detail(exc))
+        return Feedback("error", action or tr("Erreur du serveur"), exc.message, _detail(exc))
     return Feedback(
         "error",
-        action or "Erreur inattendue",
-        "Une erreur imprévue est survenue. Réessayez ; si elle persiste, contactez le support.",
+        action or tr("Erreur inattendue"),
+        tr("Une erreur imprévue est survenue. Réessayez ; si elle persiste, contactez le support."),
         type(exc).__name__,
     )

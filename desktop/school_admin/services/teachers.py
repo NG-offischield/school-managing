@@ -14,16 +14,19 @@ may teach a subject.
 """
 
 from ..api.errors import ValidationFailed
+from ..i18n import Labels, tr
 from ..models import CompatibilityVerdict, Qualification, Teacher
 
-REQUIRED = {
-    "last_name": "Nom",
-    "first_name": "Prénom(s)",
-    "email": "E-mail",
-    "employee_number": "Matricule",
-    "category_id": "Catégorie pédagogique",
-    "primary_subject_id": "Matière principale",
-}
+REQUIRED = Labels(
+    {
+        "last_name": "Nom",
+        "first_name": "Prénom(s)",
+        "email": "E-mail",
+        "employee_number": "Matricule",
+        "category_id": "Catégorie pédagogique",
+        "primary_subject_id": "Matière principale",
+    }
+)
 
 
 def _payload(fields):
@@ -86,7 +89,7 @@ class TeacherService:
     @staticmethod
     def _require(fields, creating):
         errors = {
-            name: ["Obligatoire."]
+            name: [tr("Obligatoire.")]
             for name in REQUIRED
             if (creating or name in fields) and not str(fields.get(name) or "").strip()
         }
@@ -111,7 +114,7 @@ class TeacherService:
 
     def add_qualification(self, teacher_id, subject_id, level_id=None, notes=None):
         if not subject_id:
-            raise ValidationFailed("Formulaire incomplet.", details={"subject": ["Choisissez une matière."]})
+            raise ValidationFailed("Formulaire incomplet.", details={"subject": [tr("Choisissez une matière.")]})
         payload = {"subject": subject_id, "level": level_id or None, "notes": (notes or "").strip() or None}
         return Qualification.from_api(self.api.post(f"{self.PATH}{teacher_id}/qualifications/", payload))
 
@@ -120,14 +123,14 @@ class TeacherService:
 
     def reject(self, qualification_id, reason):
         if not (reason or "").strip():
-            raise ValidationFailed("Formulaire incomplet.", details={"reason": ["Indiquez le motif."]})
+            raise ValidationFailed("Formulaire incomplet.", details={"reason": [tr("Indiquez le motif.")]})
         return Qualification.from_api(
             self.api.post(f"teacher-qualifications/{qualification_id}/reject/", {"reason": reason.strip()})
         )
 
     def grant_override(self, teacher_id, subject_id, reason, *, level_id=None, expires_at=None):
         if not (reason or "").strip():
-            raise ValidationFailed("Formulaire incomplet.", details={"reason": ["Indiquez le motif."]})
+            raise ValidationFailed("Formulaire incomplet.", details={"reason": [tr("Indiquez le motif.")]})
         payload = {
             "subject": subject_id,
             "level": level_id or None,

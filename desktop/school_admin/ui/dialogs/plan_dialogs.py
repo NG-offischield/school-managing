@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ...i18n import Tr, tr
 from ...models import PLAN_AUDIENCE_TARGETS, PLAN_DISTRIBUTIONS
 from ..widgets import Banner, FormDialog, button
 
@@ -58,36 +59,43 @@ class PlanDialog(FormDialog):
     def __init__(self, parent=None, plan=None):
         editing = plan is not None
         super().__init__(
-            "Modifier le plan" if editing else "Nouveau plan",
-            "Les informations aident les familles et les enseignants à trouver le bon plan. "
-            "Changer ces informations ne notifie personne.",
+            tr("Modifier le plan") if editing else tr("Nouveau plan"),
+            tr(
+                "Les informations aident les familles et les enseignants à trouver le bon plan. Changer ces "
+                "informations ne notifie personne."
+            ),
             parent,
         )
         self.title = self.add_field(
-            "title", "Titre", QLineEdit(placeholderText="Ex. Plan général, Bâtiment A", maxLength=200), required=True
+            "title",
+            tr("Titre"),
+            QLineEdit(placeholderText=tr("Ex. Plan général, Bâtiment A"), maxLength=200),
+            required=True,
         )
         self.building = self.add_field(
             "building",
-            "Bâtiment",
-            QLineEdit(placeholderText="Ex. Bâtiment A", maxLength=100),
+            tr("Bâtiment"),
+            QLineEdit(placeholderText=tr("Ex. Bâtiment A"), maxLength=100),
             width="medium",
-            help_text="Facultatif.",
+            help_text=tr("Facultatif."),
         )
         self.floor = self.add_field(
             "floor",
-            "Niveau / étage",
-            QLineEdit(placeholderText="Ex. Rez-de-chaussée", maxLength=60),
+            tr("Niveau / étage"),
+            QLineEdit(placeholderText=tr("Ex. Rez-de-chaussée"), maxLength=60),
             width="medium",
             beside=True,
-            help_text="Facultatif.",
+            help_text=tr("Facultatif."),
         )
         order = QLineEdit(placeholderText="0", maxLength=4)
         order.setValidator(QIntValidator(0, 9999, order))
         self.order = self.add_field(
-            "display_order", "Ordre d'affichage", order, width="short", help_text="Petit = en haut."
+            "display_order", tr("Ordre d'affichage"), order, width="short", help_text=tr("Petit = en haut.")
         )
         self.description = self.add_field(
-            "description", "Description", _text("Ce que montre le plan, repères utiles (accueil, salles, blocs)…")
+            "description",
+            tr("Description"),
+            _text(tr("Ce que montre le plan, repères utiles (accueil, salles, blocs)…")),
         )
         self.distribution = None
         if not editing:
@@ -96,11 +104,12 @@ class PlanDialog(FormDialog):
                 self.distribution.addItem(label, code)
             self.add_field(
                 "distribution",
-                "Diffusion",
+                tr("Diffusion"),
                 self.distribution,
                 width="medium",
-                help_text="Automatique : parents vérifiés et enseignants de l'école. "
-                "Modifiable ensuite (« Diffusion… »).",
+                help_text=tr(
+                    "Automatique : parents vérifiés et enseignants de l'école. Modifiable ensuite (« Diffusion… »)."
+                ),
             )
         if editing:
             self.title.setText(plan.title)
@@ -113,7 +122,7 @@ class PlanDialog(FormDialog):
         self.title.setFocus()
 
     def missing_fields(self):
-        return [] if self.title.text().strip() else ["Titre"]
+        return [] if self.title.text().strip() else [tr("Titre")]
 
     def values(self):
         values = {
@@ -137,15 +146,17 @@ class VersionsDialog(FormDialog):
     """Actions call back the page (API calls off the UI thread); the page then
     refreshes this dialog with `set_versions` / `show_message`."""
 
-    COLUMNS = ["Version", "Fichier", "Format", "Importée le", "Par", "Statut"]
+    COLUMNS = Tr(["Version", "Fichier", "Format", "Importée le", "Par", "Statut"])
 
     def __init__(self, plan, versions, parent=None, *, on_import, on_preview, on_publish, on_save):
         super().__init__(
-            f"Versions — {plan.title}",
-            "Importer n'est pas publier : les lecteurs voient la version publiée tant que vous n'en publiez pas "
-            "une autre. Les anciennes versions sont conservées (consultables ici seulement).",
+            tr("Versions — {0}", plan.title),
+            tr(
+                "Importer n'est pas publier : les lecteurs voient la version publiée tant que vous n'en publiez pas "
+                "une autre. Les anciennes versions sont conservées (consultables ici seulement)."
+            ),
             parent,
-            save_text="Fermer",
+            save_text=tr("Fermer"),
             width=820,
         )
         self.plan = plan
@@ -153,10 +164,12 @@ class VersionsDialog(FormDialog):
         self.banner = Banner()
         self.body.addWidget(self.banner)
         actions = QHBoxLayout()
-        self.import_button = button("Importer une version…", "primary", tooltip="PDF, PNG ou JPEG (20 Mo au plus)")
-        self.preview_button = button("Aperçu", tooltip="Voir la version sélectionnée")
-        self.publish_button = button("Publier cette version", tooltip="Les lecteurs autorisés seront notifiés")
-        self.save_as_button = button("Enregistrer sous…")
+        self.import_button = button(
+            tr("Importer une version…"), "primary", tooltip=tr("PDF, PNG ou JPEG (20 Mo au plus)")
+        )
+        self.preview_button = button(tr("Aperçu"), tooltip=tr("Voir la version sélectionnée"))
+        self.publish_button = button(tr("Publier cette version"), tooltip=tr("Les lecteurs autorisés seront notifiés"))
+        self.save_as_button = button(tr("Enregistrer sous…"))
         for widget in (self.import_button, self.preview_button, self.publish_button, self.save_as_button):
             actions.addWidget(widget)
         actions.addStretch()
@@ -210,7 +223,7 @@ class VersionsDialog(FormDialog):
         live = version is not None and version.is_current and self.plan.status == "PUBLISHED"
         self.publish_button.setEnabled(version is not None and not live)
         self.publish_button.setToolTip(
-            "Déjà la version que voient les lecteurs." if live else "Les lecteurs autorisés seront notifiés"
+            tr("Déjà la version que voient les lecteurs.") if live else tr("Les lecteurs autorisés seront notifiés")
         )
 
     def show_message(self, kind, text, title=""):
@@ -223,7 +236,7 @@ class PreviewDialog(QDialog):
 
     def __init__(self, title, content, mime_type, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Aperçu — {title}")
+        self.setWindowTitle(tr("Aperçu — {0}", title))
         layout = QVBoxLayout(self)
         self.zoom = 1.0
         if mime_type == "application/pdf":
@@ -242,9 +255,9 @@ class PreviewDialog(QDialog):
             self.pixmap = QPixmap()
             self.pixmap.loadFromData(content)
             tools = QHBoxLayout()
-            self.zoom_out = button("−", tooltip="Réduire")
-            self.zoom_in = button("+", tooltip="Agrandir")
-            self.fit = button("Ajuster", tooltip="Voir le plan entier")
+            self.zoom_out = button("−", tooltip=tr("Réduire"))
+            self.zoom_in = button("+", tooltip=tr("Agrandir"))
+            self.fit = button(tr("Ajuster"), tooltip=tr("Voir le plan entier"))
             for widget in (self.zoom_out, self.zoom_in, self.fit):
                 tools.addWidget(widget)
             tools.addStretch()
@@ -258,7 +271,7 @@ class PreviewDialog(QDialog):
             self.zoom_out.clicked.connect(lambda: self.set_zoom(self.zoom / 1.25))
             self.fit.clicked.connect(self.fit_to_window)
             self.pages = 1
-        close = button("Fermer", "primary")
+        close = button(tr("Fermer"), "primary")
         close.clicked.connect(self.accept)
         footer = QHBoxLayout()
         footer.addStretch()
@@ -299,10 +312,12 @@ class DiffusionDialog(FormDialog):
 
     def __init__(self, plan, classes, access, parent=None):
         super().__init__(
-            f"Diffusion — {plan.title}",
-            "Qui peut consulter ce plan dans les applications Parent et Enseignant. Le serveur revérifie les droits "
-            "à chaque ouverture : un parent qui n'est plus vérifié ou un retrait du plan ferment l'accès aussitôt. "
-            "Gardiens et personnel n'y ont pas accès.",
+            tr("Diffusion — {0}", plan.title),
+            tr(
+                "Qui peut consulter ce plan dans les applications Parent et Enseignant. Le serveur revérifie les "
+                "droits à chaque ouverture : un parent qui n'est plus vérifié ou un retrait du plan ferment l'accès "
+                "aussitôt. Gardiens et personnel n'y ont pas accès."
+            ),
             parent,
             width=720,
         )
@@ -310,12 +325,12 @@ class DiffusionDialog(FormDialog):
         modes = QWidget()
         column = QVBoxLayout(modes)
         column.setContentsMargins(0, 0, 0, 0)
-        self.auto = QRadioButton("Automatique : tous les parents vérifiés et tous les enseignants en activité")
-        self.manual = QRadioButton("Manuelle : seulement les publics cochés ci-dessous")
+        self.auto = QRadioButton(tr("Automatique : tous les parents vérifiés et tous les enseignants en activité"))
+        self.manual = QRadioButton(tr("Manuelle : seulement les publics cochés ci-dessous"))
         for radio in (self.auto, self.manual):
             self.mode_group.addButton(radio)
             column.addWidget(radio)
-        self.add_field("distribution", "Mode", modes)
+        self.add_field("distribution", tr("Mode"), modes)
         audience = {(row["target"], row.get("school_class")) for row in plan.audience}
         self.school_parents = QCheckBox(PLAN_AUDIENCE_TARGETS["SCHOOL_PARENTS"])
         self.school_teachers = QCheckBox(PLAN_AUDIENCE_TARGETS["SCHOOL_TEACHERS"])
@@ -326,10 +341,10 @@ class DiffusionDialog(FormDialog):
         rows.setContentsMargins(0, 0, 0, 0)
         rows.addWidget(self.school_parents)
         rows.addWidget(self.school_teachers)
-        self.add_field("school_audience", "Toute l'école", school)
+        self.add_field("school_audience", tr("Toute l'école"), school)
         self.classes = list(classes)
         self.table = QTableWidget(len(self.classes), 3)
-        self.table.setHorizontalHeaderLabels(["Classe", "Parents", "Enseignants"])
+        self.table.setHorizontalHeaderLabels([tr("Classe"), tr("Parents"), tr("Enseignants")])
         self.table.verticalHeader().hide()
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
@@ -341,17 +356,17 @@ class DiffusionDialog(FormDialog):
                 item.setCheckState(Qt.Checked if (target, klass.id) in audience else Qt.Unchecked)
                 self.table.setItem(row, column, item)
         self.table.setMinimumHeight(min(260, 40 + 32 * max(1, len(self.classes))))
-        self.add_field("class_audience", "Par classe", self.table)
+        self.add_field("class_audience", tr("Par classe"), self.table)
         names = ", ".join(reader["name"] for reader in access.get("readers", [])[:30])
         more = access.get("count", 0) - min(30, len(access.get("readers", [])))
         summary = QLabel(
-            f"{access.get('count', 0)} personne(s) peuvent le consulter actuellement"
-            + (f" : {names}" + (f" et {more} autre(s)" if more > 0 else "") if names else ".")
-            + ("" if access.get("published") else " (une fois le plan publié)."),
+            tr("{0} personne(s) peuvent le consulter actuellement", access.get("count", 0))
+            + (f" : {names}" + (tr(" et {0} autre(s)", more) if more > 0 else "") if names else ".")
+            + ("" if access.get("published") else tr(" (une fois le plan publié).")),
             objectName="help",
         )
         summary.setWordWrap(True)
-        self.add_field("access", "Qui a accès ?", summary)
+        self.add_field("access", tr("Qui a accès ?"), summary)
         (self.manual if plan.distribution == "MANUAL" else self.auto).setChecked(True)
         for signal in (self.auto.toggled, self.school_parents.toggled, self.school_teachers.toggled):
             signal.connect(lambda *_: self._sync())
@@ -380,7 +395,7 @@ class DiffusionDialog(FormDialog):
 
     def missing_fields(self):
         if getattr(self, "manual", None) is not None and self.manual.isChecked() and not self.entries():
-            return [NO_AUDIENCE]
+            return [tr(NO_AUDIENCE)]
         return []
 
     def values(self):

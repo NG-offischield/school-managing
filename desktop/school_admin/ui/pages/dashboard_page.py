@@ -12,6 +12,7 @@ state (loading, data, no data, error) and redraws to its size.
 
 from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QScrollArea, QVBoxLayout, QWidget
 
+from ...i18n import Tr, tr
 from ...models import ChartData
 from ...services.dashboard import activity_text
 from ..charts import ActivityCard, BarChart, ChartCard, LineChart
@@ -30,7 +31,7 @@ class MetricCard(QFrame):
         self.label = QLabel(metric.label, objectName="cardLabel")
         layout.addWidget(self.label)
         if metric.error:
-            self.value = QLabel("Indisponible", objectName="cardError")
+            self.value = QLabel(tr("Indisponible"), objectName="cardError")
             detail = QLabel(metric.error, objectName="help")
         else:
             self.value = QLabel(metric.value or "—", objectName="cardValue")
@@ -44,7 +45,7 @@ class MetricCard(QFrame):
 
 
 class DashboardPage(Page):
-    title = "Tableau de bord"
+    title = Tr("Tableau de bord")
 
     def __init__(self, service, runner, parent=None, **kwargs):
         super().__init__(runner, parent, **kwargs)
@@ -63,13 +64,15 @@ class DashboardPage(Page):
         top = QHBoxLayout()
         heading = QVBoxLayout()
         heading.setSpacing(2)
-        self.heading = QLabel("Tableau de bord", objectName="pageTitle")
-        self.subheading = QLabel("Vue d'ensemble de l'école, à partir des données du serveur.", objectName="subtitle")
+        self.heading = QLabel(tr("Tableau de bord"), objectName="pageTitle")
+        self.subheading = QLabel(
+            tr("Vue d'ensemble de l'école, à partir des données du serveur."), objectName="subtitle"
+        )
         self.subheading.setWordWrap(True)
         heading.addWidget(self.heading)
         heading.addWidget(self.subheading)
         top.addLayout(heading, 1)
-        self.refresh_button = button("Actualiser", tooltip="Recharger les indicateurs (F5)")
+        self.refresh_button = button(tr("Actualiser"), tooltip=tr("Recharger les indicateurs (F5)"))
         self.refresh_button.clicked.connect(self.reload)
         top.addWidget(self.refresh_button)
         column.addLayout(top)
@@ -79,12 +82,12 @@ class DashboardPage(Page):
         self.grid.setSpacing(16)
         column.addLayout(self.grid)
 
-        self.attendance_card = ChartCard("Présences", [("Présences", LineChart())])
+        self.attendance_card = ChartCard(tr("Présences"), [(tr("Présences"), LineChart())])
         self.enrollment_card = ChartCard(
-            "Répartition des élèves", [("Par niveau", BarChart()), ("Par classe", BarChart())]
+            tr("Répartition des élèves"), [(tr("Par niveau"), BarChart()), (tr("Par classe"), BarChart())]
         )
-        self.trend_card = ChartCard("Évolution des effectifs", [("Effectifs", LineChart())])
-        self.finance_card = ChartCard("Finances", [("Paiements", BarChart()), ("Paies", BarChart())])
+        self.trend_card = ChartCard(tr("Évolution des effectifs"), [(tr("Effectifs"), LineChart())])
+        self.finance_card = ChartCard(tr("Finances"), [(tr("Paiements"), BarChart()), (tr("Paies"), BarChart())])
         self.activity_card = ActivityCard()
         self.chart_cards = [self.attendance_card, self.enrollment_card, self.trend_card, self.finance_card]
         self.chart_grid = QGridLayout()
@@ -130,7 +133,7 @@ class DashboardPage(Page):
     def reload(self):
         for card in (*self.chart_cards, self.activity_card):
             card.set_loading()
-        self.call(self.service.load, self.show_data, action="Impossible de charger le tableau de bord")
+        self.call(self.service.load, self.show_data, action=tr("Impossible de charger le tableau de bord"))
 
     def set_busy(self, busy):
         super().set_busy(busy)
@@ -140,7 +143,7 @@ class DashboardPage(Page):
         self.data = data
         parts = [v for v in (data.school_name, data.school_city) if v]
         if data.year_name:
-            parts.append(f"année scolaire {data.year_name}")
+            parts.append(tr("année scolaire {0}", data.year_name))
         self.subheading.setText(" · ".join(parts))
         for card in self.cards:
             self.grid.removeWidget(card)
@@ -148,7 +151,7 @@ class DashboardPage(Page):
         self.cards = [MetricCard(metric) for metric in data.metrics]
         self.kpi_columns = 0
         self.arrange(self.width())
-        self.call(self.service.load_charts, self.show_charts, action="Impossible de charger les graphiques")
+        self.call(self.service.load_charts, self.show_charts, action=tr("Impossible de charger les graphiques"))
 
     def show_charts(self, charts):
         self.charts = charts
@@ -166,6 +169,6 @@ class DashboardPage(Page):
         # Never leave « Chargement… » on screen after a failure.
         for card in self.chart_cards:
             if card.status == "loading":
-                card.set_data(*[ChartData(error=NO_ANSWER)] * len(card.views))
+                card.set_data(*[ChartData(error=tr(NO_ANSWER))] * len(card.views))
         if self.activity_card.status == "loading":
-            self.activity_card.set_error(NO_ANSWER)
+            self.activity_card.set_error(tr(NO_ANSWER))

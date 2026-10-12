@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
+from .i18n import Labels, tr
 from .money import ZERO, to_decimal
 
 ADMIN_ROLES = frozenset({"SUPER_ADMIN", "ADMIN"})
@@ -23,7 +24,7 @@ class Identity:
 
     @property
     def role_label(self):
-        return "Super-administrateur" if "SUPER_ADMIN" in self.roles else "Administrateur"
+        return "Super-administrateur" if "SUPER_ADMIN" in self.roles else tr("Administrateur")
 
     @classmethod
     def from_me(cls, me):
@@ -90,9 +91,9 @@ class Subject:
         )
 
 
-SUBJECT_TYPES = {"THEORETICAL": "Théorique", "PRACTICAL": "Pratique"}
+SUBJECT_TYPES = Labels({"THEORETICAL": "Théorique", "PRACTICAL": "Pratique"})
 
-YEAR_STATUSES = {"PLANNED": "planifiée", "ACTIVE": "en cours", "CLOSED": "clôturée", "ARCHIVED": "archivée"}
+YEAR_STATUSES = Labels({"PLANNED": "planifiée", "ACTIVE": "en cours", "CLOSED": "clôturée", "ARCHIVED": "archivée"})
 OPEN_YEAR_STATUSES = frozenset({"PLANNED", "ACTIVE"})  # where classes can be created / edited
 
 
@@ -113,7 +114,7 @@ class AcademicYear:
 
     @property
     def label(self):
-        suffix = " — année courante" if self.is_current else f" ({YEAR_STATUSES.get(self.status, self.status)})"
+        suffix = tr(" — année courante") if self.is_current else f" ({YEAR_STATUSES.get(self.status, self.status)})"
         return f"{self.name}{suffix}"
 
     @property
@@ -194,7 +195,7 @@ class Room:
 
     @property
     def label(self):
-        places = f" · {self.capacity} places" if self.capacity else ""
+        places = tr(" · {0} places", self.capacity) if self.capacity else ""
         return f"{self.code} — {self.name}{places}"
 
     @classmethod
@@ -341,15 +342,17 @@ class DashboardCharts:
 
 # --- students (ADR 0018) -----------------------------------------------------------
 
-SEXES = {"F": "Féminin", "M": "Masculin"}
-STUDENT_STATUSES = {
-    "ACTIVE": "Actif",
-    "SUSPENDED": "Suspendu",
-    "LEFT": "Parti",
-    "GRADUATED": "Diplômé",
-    "ARCHIVED": "Archivé",
-}
-ENROLLMENT_STATUSES = {"ACTIVE": "En cours", "COMPLETED": "Terminée", "WITHDRAWN": "Retirée"}
+SEXES = Labels({"F": "Féminin", "M": "Masculin"})
+STUDENT_STATUSES = Labels(
+    {
+        "ACTIVE": "Actif",
+        "SUSPENDED": "Suspendu",
+        "LEFT": "Parti",
+        "GRADUATED": "Diplômé",
+        "ARCHIVED": "Archivé",
+    }
+)
+ENROLLMENT_STATUSES = Labels({"ACTIVE": "En cours", "COMPLETED": "Terminée", "WITHDRAWN": "Retirée"})
 
 
 @dataclass(frozen=True)
@@ -460,30 +463,38 @@ class HistoryEntry:
 
 # --- teachers (ADR 0019) -----------------------------------------------------------
 
-PROFESSIONAL_STATUSES = {
-    "ACTIVE": "En activité",
-    "PROBATION": "Période d'essai",
-    "SUSPENDED": "Suspendu",
-    "INACTIVE": "Inactif",
-}
-EMPLOYMENT_STATUSES = {
-    "ACTIVE": "Actif",
-    "ON_LEAVE": "En congé",
-    "SUSPENDED": "Suspendu",
-    "TERMINATED": "Fin de contrat",
-}
-QUALIFICATION_STATUSES = {
-    "DECLARED": "Déclarée",
-    "PENDING": "À valider",
-    "VERIFIED": "Vérifiée",
-    "REJECTED": "Retirée / refusée",
-}
-COMPATIBILITY_RESULTS = {
-    "COMPATIBLE": "Compatible",
-    "REQUIRES_REVIEW": "À valider par l'administration",
-    "INCOMPATIBLE": "Incompatible",
-    "OVERRIDDEN": "Autorisé par dérogation",
-}
+PROFESSIONAL_STATUSES = Labels(
+    {
+        "ACTIVE": "En activité",
+        "PROBATION": "Période d'essai",
+        "SUSPENDED": "Suspendu",
+        "INACTIVE": "Inactif",
+    }
+)
+EMPLOYMENT_STATUSES = Labels(
+    {
+        "ACTIVE": "Actif",
+        "ON_LEAVE": "En congé",
+        "SUSPENDED": "Suspendu",
+        "TERMINATED": "Fin de contrat",
+    }
+)
+QUALIFICATION_STATUSES = Labels(
+    {
+        "DECLARED": "Déclarée",
+        "PENDING": "À valider",
+        "VERIFIED": "Vérifiée",
+        "REJECTED": "Retirée / refusée",
+    }
+)
+COMPATIBILITY_RESULTS = Labels(
+    {
+        "COMPATIBLE": "Compatible",
+        "REQUIRES_REVIEW": "À valider par l'administration",
+        "INCOMPATIBLE": "Incompatible",
+        "OVERRIDDEN": "Autorisé par dérogation",
+    }
+)
 
 
 def _ref_label(ref):
@@ -528,7 +539,7 @@ class Teacher:
     @property
     def status_label(self):
         if self.active:
-            return "Actif"
+            return tr("Actif")
         if self.employment_status and self.employment_status != "ACTIVE":
             return EMPLOYMENT_STATUSES.get(self.employment_status, self.employment_status)
         return PROFESSIONAL_STATUSES.get(self.professional_status, self.professional_status)
@@ -717,24 +728,28 @@ class EligibleTeacher:
 
 # --- planning (ADR 0021) -----------------------------------------------------------
 
-WEEKDAY_NAMES = {1: "Lundi", 2: "Mardi", 3: "Mercredi", 4: "Jeudi", 5: "Vendredi", 6: "Samedi", 7: "Dimanche"}
-ROOM_TYPES = {  # = academics.RoomType on the server
-    "CLASSROOM": "Salle de classe",
-    "LABORATORY": "Laboratoire",
-    "WORKSHOP": "Atelier",
-    "COMPUTER": "Salle informatique",
-    "SPORTS": "Installation sportive",
-    "OTHER": "Autre",
-}
-SESSION_STATUSES = {"SCHEDULED": "Planifiée", "COMPLETED": "Réalisée", "CANCELLED": "Annulée"}
-REQUEST_STATUSES = {
-    "PENDING": "En attente",
-    "APPROVED": "Validée",
-    "REJECTED": "Refusée",
-    "CHANGES_REQUESTED": "Modification proposée",
-    "CANCELLED": "Retirée",
-}
-BREAK_TYPES = {"HOLIDAY": "Vacances", "PUBLIC_HOLIDAY": "Jour férié", "EXAM": "Examens", "OTHER": "Autre"}
+WEEKDAY_NAMES = Labels({1: "Lundi", 2: "Mardi", 3: "Mercredi", 4: "Jeudi", 5: "Vendredi", 6: "Samedi", 7: "Dimanche"})
+ROOM_TYPES = Labels(
+    {  # = academics.RoomType on the server
+        "CLASSROOM": "Salle de classe",
+        "LABORATORY": "Laboratoire",
+        "WORKSHOP": "Atelier",
+        "COMPUTER": "Salle informatique",
+        "SPORTS": "Installation sportive",
+        "OTHER": "Autre",
+    }
+)
+SESSION_STATUSES = Labels({"SCHEDULED": "Planifiée", "COMPLETED": "Réalisée", "CANCELLED": "Annulée"})
+REQUEST_STATUSES = Labels(
+    {
+        "PENDING": "En attente",
+        "APPROVED": "Validée",
+        "REJECTED": "Refusée",
+        "CHANGES_REQUESTED": "Modification proposée",
+        "CANCELLED": "Retirée",
+    }
+)
+BREAK_TYPES = Labels({"HOLIDAY": "Vacances", "PUBLIC_HOLIDAY": "Jour férié", "EXAM": "Examens", "OTHER": "Autre"})
 
 
 def _datetime(value):
@@ -837,7 +852,7 @@ class Session:
     @property
     def status_label(self):
         label = SESSION_STATUSES.get(self.status, self.status)
-        extras = [x for x, on in (("remplacée", self.is_substituted), ("déplacée", self.is_moved)) if on]
+        extras = [x for x, on in ((tr("remplacée"), self.is_substituted), (tr("déplacée"), self.is_moved)) if on]
         return f"{label} ({', '.join(extras)})" if extras and self.status != "CANCELLED" else label
 
     @property
@@ -940,38 +955,46 @@ class SchoolBreak:
 # --- finance (backend finance/api.py, ADR 0013 / 0022) -----------------------------
 # Amounts are Decimal (from the API's strings): never floats.
 
-PAYMENT_STATUSES = {
-    "SUCCEEDED": "Réussi",
-    "PENDING": "En attente",
-    "DECLINED": "Refusé",
-    "INSUFFICIENT_FUNDS": "Fonds insuffisants",
-    "TIMEOUT": "Délai dépassé",
-    "PROVIDER_ERROR": "Erreur fournisseur",
-    "CANCELLED": "Annulé",
-    "PARTIALLY_REFUNDED": "Partiellement remboursé",
-    "REFUNDED": "Remboursé",
-}
+PAYMENT_STATUSES = Labels(
+    {
+        "SUCCEEDED": "Réussi",
+        "PENDING": "En attente",
+        "DECLINED": "Refusé",
+        "INSUFFICIENT_FUNDS": "Fonds insuffisants",
+        "TIMEOUT": "Délai dépassé",
+        "PROVIDER_ERROR": "Erreur fournisseur",
+        "CANCELLED": "Annulé",
+        "PARTIALLY_REFUNDED": "Partiellement remboursé",
+        "REFUNDED": "Remboursé",
+    }
+)
 FAILED_PAYMENTS = frozenset({"DECLINED", "INSUFFICIENT_FUNDS", "TIMEOUT", "PROVIDER_ERROR", "CANCELLED"})
-PAYMENT_METHODS = {"CASH": "Espèces (guichet)", "WALLET": "Portefeuille mobile"}
-INVOICE_STATUSES = {
-    "ISSUED": "Émise",
-    "PARTIALLY_PAID": "Partiellement payée",
-    "PAID": "Payée",
-    "CANCELLED": "Annulée",
-}
-SIMULATION_BEHAVIORS = {
-    "NORMAL": "Normal",
-    "DECLINE": "Refus systématique",
-    "TIMEOUT": "Délai dépassé",
-    "PROVIDER_ERROR": "Erreur fournisseur",
-}
-LEDGER_TYPES = {
-    "PAYMENT": "Paiement",
-    "REFUND": "Remboursement",
-    "FUNDING": "Approvisionnement",
-    "CREDIT": "Crédit",
-    "PAYROLL": "Paie",
-}
+PAYMENT_METHODS = Labels({"CASH": "Espèces (guichet)", "WALLET": "Portefeuille mobile"})
+INVOICE_STATUSES = Labels(
+    {
+        "ISSUED": "Émise",
+        "PARTIALLY_PAID": "Partiellement payée",
+        "PAID": "Payée",
+        "CANCELLED": "Annulée",
+    }
+)
+SIMULATION_BEHAVIORS = Labels(
+    {
+        "NORMAL": "Normal",
+        "DECLINE": "Refus systématique",
+        "TIMEOUT": "Délai dépassé",
+        "PROVIDER_ERROR": "Erreur fournisseur",
+    }
+)
+LEDGER_TYPES = Labels(
+    {
+        "PAYMENT": "Paiement",
+        "REFUND": "Remboursement",
+        "FUNDING": "Approvisionnement",
+        "CREDIT": "Crédit",
+        "PAYROLL": "Paie",
+    }
+)
 
 
 def _money(value):
@@ -1220,16 +1243,18 @@ class TreasuryEntry:
 
 # --- payroll (backend payroll/api.py, ADR 0014 / 0022) ------------------------------
 
-PAYROLL_STATUSES = {"CALCULATED": "Préparée", "APPROVED": "Approuvée", "PAID": "Payée", "CANCELLED": "Annulée"}
-PAYOUT_METHODS = {"CASH": "Espèces / hors système", "WALLET": "Wallet (simulation)"}
-PERIOD_STATUSES = {"OPEN": "Ouverte", "CLOSED": "Clôturée"}
-LINE_KINDS = {
-    "PROGRAMMED": "Séance programmée",
-    "EARNED": "Séance validée (acquise)",
-    "SALARY": "Salaire fixe",
-    "ADJUSTMENT": "Correction",
-}
-EMPLOYEE_KINDS = {"TEACHER": "Enseignant", "STAFF": "Personnel"}
+PAYROLL_STATUSES = Labels({"CALCULATED": "Préparée", "APPROVED": "Approuvée", "PAID": "Payée", "CANCELLED": "Annulée"})
+PAYOUT_METHODS = Labels({"CASH": "Espèces / hors système", "WALLET": "Wallet (simulation)"})
+PERIOD_STATUSES = Labels({"OPEN": "Ouverte", "CLOSED": "Clôturée"})
+LINE_KINDS = Labels(
+    {
+        "PROGRAMMED": "Séance programmée",
+        "EARNED": "Séance validée (acquise)",
+        "SALARY": "Salaire fixe",
+        "ADJUSTMENT": "Correction",
+    }
+)
+EMPLOYEE_KINDS = Labels({"TEACHER": "Enseignant", "STAFF": "Personnel"})
 
 
 @dataclass(frozen=True)
@@ -1390,48 +1415,56 @@ class Adjustment:
 
 # --- communication (backend communication/api.py, ADR 0015 / 0023) ------------------
 
-NOTIFICATION_TYPES = {
-    "ATTENDANCE_LATE": "Retard",
-    "ATTENDANCE_ABSENT": "Absence",
-    "CONVOCATION": "Convocation",
-    "SCHEDULE_CHANGE": "Planning",
-    "SUBSTITUTION": "Remplacement",
-    "PAYMENT": "Paiement",
-    "REFUND": "Remboursement",
-    "PAYROLL": "Paie",
-    "REPORT_CARD": "Bulletin",
-    "MESSAGE": "Message",
-    "ANNOUNCEMENT": "Annonce",
-    "COMPLAINT": "Réclamation",
-    "FORUM": "Forum",
-    "PLAN": "Plan de l'établissement",
-}
-SEVERITIES = {"INFO": "Information", "WARNING": "Attention", "CRITICAL": "Important"}
-CONVERSATION_TYPES = {
-    "ADMINISTRATION": "Administration",
-    "PARENT_TEACHER": "Parent – enseignant",
-    "COMPLAINT": "Réclamation",
-}
-THREAD_STATUSES = {"OPEN": "Ouvert", "LOCKED": "Verrouillé", "ARCHIVED": "Archivé"}
-THREAD_TYPES = {"GENERAL": "Discussion", "ANNOUNCEMENT": "Annonce"}
-SPACE_AUDIENCES = {"SCHOOL": "Toute l'école (rôles choisis)", "CLASS": "Communauté d'une classe"}
-FORUM_ROLES = {"TEACHER": "Enseignants", "PARENT": "Parents", "STAFF": "Personnel"}
-COMPLAINT_STATUSES = {
-    "DRAFT": "Brouillon",
-    "OPEN": "Ouverte",
-    "IN_PROGRESS": "En traitement",
-    "RESOLVED": "Résolue",
-    "CANCELLED": "Annulée",
-    "CLOSED": "Clôturée",
-}
-COMPLAINT_CATEGORIES = {
-    "PEDAGOGY": "Pédagogie",
-    "BEHAVIOR": "Comportement",
-    "ADMINISTRATIVE": "Administratif",
-    "FINANCE": "Finance",
-    "OTHER": "Autre",
-}
-COMPLAINT_PRIORITIES = {"LOW": "Basse", "NORMAL": "Normale", "HIGH": "Haute", "URGENT": "Urgente"}
+NOTIFICATION_TYPES = Labels(
+    {
+        "ATTENDANCE_LATE": "Retard",
+        "ATTENDANCE_ABSENT": "Absence",
+        "CONVOCATION": "Convocation",
+        "SCHEDULE_CHANGE": "Planning",
+        "SUBSTITUTION": "Remplacement",
+        "PAYMENT": "Paiement",
+        "REFUND": "Remboursement",
+        "PAYROLL": "Paie",
+        "REPORT_CARD": "Bulletin",
+        "MESSAGE": "Message",
+        "ANNOUNCEMENT": "Annonce",
+        "COMPLAINT": "Réclamation",
+        "FORUM": "Forum",
+        "PLAN": "Plan de l'établissement",
+    }
+)
+SEVERITIES = Labels({"INFO": "Information", "WARNING": "Attention", "CRITICAL": "Important"})
+CONVERSATION_TYPES = Labels(
+    {
+        "ADMINISTRATION": "Administration",
+        "PARENT_TEACHER": "Parent – enseignant",
+        "COMPLAINT": "Réclamation",
+    }
+)
+THREAD_STATUSES = Labels({"OPEN": "Ouvert", "LOCKED": "Verrouillé", "ARCHIVED": "Archivé"})
+THREAD_TYPES = Labels({"GENERAL": "Discussion", "ANNOUNCEMENT": "Annonce"})
+SPACE_AUDIENCES = Labels({"SCHOOL": "Toute l'école (rôles choisis)", "CLASS": "Communauté d'une classe"})
+FORUM_ROLES = Labels({"TEACHER": "Enseignants", "PARENT": "Parents", "STAFF": "Personnel"})
+COMPLAINT_STATUSES = Labels(
+    {
+        "DRAFT": "Brouillon",
+        "OPEN": "Ouverte",
+        "IN_PROGRESS": "En traitement",
+        "RESOLVED": "Résolue",
+        "CANCELLED": "Annulée",
+        "CLOSED": "Clôturée",
+    }
+)
+COMPLAINT_CATEGORIES = Labels(
+    {
+        "PEDAGOGY": "Pédagogie",
+        "BEHAVIOR": "Comportement",
+        "ADMINISTRATIVE": "Administratif",
+        "FINANCE": "Finance",
+        "OTHER": "Autre",
+    }
+)
+COMPLAINT_PRIORITIES = Labels({"LOW": "Basse", "NORMAL": "Normale", "HIGH": "Haute", "URGENT": "Urgente"})
 # Status changes the administration may request (the server decides: 409 invalid_transition otherwise).
 COMPLAINT_NEXT = {
     "OPEN": ("IN_PROGRESS", "RESOLVED"),
@@ -1534,7 +1567,7 @@ class Conversation:
     @property
     def label(self):
         names = ", ".join(name for _, name, _ in self.participants)
-        return self.title or names or "Conversation"
+        return self.title or names or tr("Conversation")
 
     @classmethod
     def from_api(cls, row):
@@ -1725,16 +1758,18 @@ class Complaint:
 
 # --- documents (backend documents/api.py, ADR 0016 / 0023) ---------------------------
 
-DOCUMENT_KINDS = {
-    "REPORT_CARD": "Bulletin scolaire",
-    "STUDENT_CARD": "Carte d'élève",
-    "TIMETABLE": "Emploi du temps",
-    "PAYMENT_RECEIPT": "Reçu de paiement",
-    "PAYSLIP": "Bulletin de paie",
-    "STUDENT_ATTENDANCE": "Relevé de présence (élève)",
-    "CLASS_ATTENDANCE": "Registre de présence (classe)",
-}
-DOCUMENT_STATUSES = {"OFFICIAL": "Officiel", "PROVISIONAL": "Provisoire", "SUPERSEDED": "Remplacé"}
+DOCUMENT_KINDS = Labels(
+    {
+        "REPORT_CARD": "Bulletin scolaire",
+        "STUDENT_CARD": "Carte d'élève",
+        "TIMETABLE": "Emploi du temps",
+        "PAYMENT_RECEIPT": "Reçu de paiement",
+        "PAYSLIP": "Bulletin de paie",
+        "STUDENT_ATTENDANCE": "Relevé de présence (élève)",
+        "CLASS_ATTENDANCE": "Registre de présence (classe)",
+    }
+)
+DOCUMENT_STATUSES = Labels({"OFFICIAL": "Officiel", "PROVISIONAL": "Provisoire", "SUPERSEDED": "Remplacé"})
 
 
 @dataclass(frozen=True)
@@ -1786,12 +1821,14 @@ class Document:
 
 # --- account lifecycle (backend accounts/activation_api.py, ADR 0024) ----------------
 
-ACCOUNT_STATES = {
-    "ACTIVE": "Compte activé",
-    "PENDING_ACTIVATION": "En attente d'activation",
-    "NOT_ACTIVATED": "Non activé",
-    "DISABLED": "Compte suspendu",
-}
+ACCOUNT_STATES = Labels(
+    {
+        "ACTIVE": "Compte activé",
+        "PENDING_ACTIVATION": "En attente d'activation",
+        "NOT_ACTIVATED": "Non activé",
+        "DISABLED": "Compte suspendu",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -1829,29 +1866,37 @@ class AccountSummary:
 # Parent registrations and verified links (backend people/parent_workflow_api.py, ADR 0026)
 # =============================================================================
 
-REGISTRATION_STATUSES = {"PENDING": "En attente", "APPROVED": "Validée", "REJECTED": "Refusée"}
-LINK_REQUEST_STATUSES = {"PENDING": "En cours", "APPROVED": "Validée", "REJECTED": "Refusée", "CANCELLED": "Annulée"}
-IDENTITY_STATUSES = {"PENDING": "À vérifier", "VERIFIED": "Vérifiée", "REJECTED": "Refusée"}
-IDENTITY_METHODS = {"ID_DOCUMENT": "Pièce d'identité", "SPONSOR_2FA": "Parrainage (code à usage unique)"}
-STUDENT_APPROVALS = {
-    "PENDING": "À confirmer par l'élève",
-    "APPROVED": "Confirmée par l'élève",
-    "REJECTED": "Refusée par l'élève",
-    "NOT_REQUIRED": "Non requise",
-}
-IDENTITY_DOCUMENTS = {
-    "CNI": "Carte nationale d'identité",
-    "PASSPORT": "Passeport",
-    "RESIDENCE_PERMIT": "Titre de séjour",
-    "OTHER": "Autre pièce officielle",
-}
-RELATIONSHIPS = {
-    "MOTHER": "Mère",
-    "FATHER": "Père",
-    "LEGAL_GUARDIAN": "Tuteur légal",
-    "TUTOR": "Tuteur",
-    "OTHER": "Autre",
-}
+REGISTRATION_STATUSES = Labels({"PENDING": "En attente", "APPROVED": "Validée", "REJECTED": "Refusée"})
+LINK_REQUEST_STATUSES = Labels(
+    {"PENDING": "En cours", "APPROVED": "Validée", "REJECTED": "Refusée", "CANCELLED": "Annulée"}
+)
+IDENTITY_STATUSES = Labels({"PENDING": "À vérifier", "VERIFIED": "Vérifiée", "REJECTED": "Refusée"})
+IDENTITY_METHODS = Labels({"ID_DOCUMENT": "Pièce d'identité", "SPONSOR_2FA": "Parrainage (code à usage unique)"})
+STUDENT_APPROVALS = Labels(
+    {
+        "PENDING": "À confirmer par l'élève",
+        "APPROVED": "Confirmée par l'élève",
+        "REJECTED": "Refusée par l'élève",
+        "NOT_REQUIRED": "Non requise",
+    }
+)
+IDENTITY_DOCUMENTS = Labels(
+    {
+        "CNI": "Carte nationale d'identité",
+        "PASSPORT": "Passeport",
+        "RESIDENCE_PERMIT": "Titre de séjour",
+        "OTHER": "Autre pièce officielle",
+    }
+)
+RELATIONSHIPS = Labels(
+    {
+        "MOTHER": "Mère",
+        "FATHER": "Père",
+        "LEGAL_GUARDIAN": "Tuteur légal",
+        "TUTOR": "Tuteur",
+        "OTHER": "Autre",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -1979,15 +2024,17 @@ class LinkRequest:
 # School plans (backend documents/plans_api.py)
 # =============================================================================
 
-PLAN_STATUSES = {"DRAFT": "Brouillon", "PUBLISHED": "Publié", "WITHDRAWN": "Retiré"}
-PLAN_VERSION_STATUSES = {"DRAFT": "Importée", "PUBLISHED": "Publiée (courante)", "SUPERSEDED": "Remplacée"}
-PLAN_DISTRIBUTIONS = {"AUTO": "Automatique", "MANUAL": "Manuelle"}
-PLAN_AUDIENCE_TARGETS = {
-    "SCHOOL_PARENTS": "Tous les parents vérifiés de l'école",
-    "SCHOOL_TEACHERS": "Tous les enseignants en activité de l'école",
-    "CLASS_PARENTS": "Parents vérifiés des élèves de la classe",
-    "CLASS_TEACHERS": "Enseignants de la classe",
-}
+PLAN_STATUSES = Labels({"DRAFT": "Brouillon", "PUBLISHED": "Publié", "WITHDRAWN": "Retiré"})
+PLAN_VERSION_STATUSES = Labels({"DRAFT": "Importée", "PUBLISHED": "Publiée (courante)", "SUPERSEDED": "Remplacée"})
+PLAN_DISTRIBUTIONS = Labels({"AUTO": "Automatique", "MANUAL": "Manuelle"})
+PLAN_AUDIENCE_TARGETS = Labels(
+    {
+        "SCHOOL_PARENTS": "Tous les parents vérifiés de l'école",
+        "SCHOOL_TEACHERS": "Tous les enseignants en activité de l'école",
+        "CLASS_PARENTS": "Parents vérifiés des élèves de la classe",
+        "CLASS_TEACHERS": "Enseignants de la classe",
+    }
+)
 PLAN_FORMATS = {"application/pdf": "PDF", "image/png": "PNG", "image/jpeg": "JPEG"}
 
 
@@ -2032,7 +2079,7 @@ class PlanVersion:
         if self.page_count:
             parts.append(f"{self.page_count} page{'s' if self.page_count > 1 else ''}")
         if self.width and self.height:
-            parts.append(f"{self.width}×{self.height} px")
+            parts.append(tr("{0}×{1} px", self.width, self.height))
         parts.append(_size_label(self.size_bytes))
         return " · ".join(parts)
 

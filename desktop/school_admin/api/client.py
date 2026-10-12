@@ -39,6 +39,10 @@ class ApiClient:
     def close(self):
         self._http.close()
 
+    def set_language(self, code):
+        """The server answers its own messages in this language from now on."""
+        self._http.headers["Accept-Language"] = code
+
     # --- core ------------------------------------------------------------------
 
     def request(

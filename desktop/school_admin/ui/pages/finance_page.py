@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...api.errors import NetworkError
+from ...i18n import Tr, tr
 from ...models import INVOICE_STATUSES, LEDGER_TYPES, PAYMENT_METHODS, PAYMENT_STATUSES, SIMULATION_BEHAVIORS, Metric
 from ...money import format_money, to_decimal
 from ...services.finance import PERIODS
@@ -65,7 +66,7 @@ def money_cell(value, currency):
 
 
 def _period_combo():
-    combo = _combo("Filtrer par période", PERIODS[""], 150)
+    combo = _combo(tr("Filtrer par période"), PERIODS[""], 150)
     for key, label in PERIODS.items():
         if key:
             combo.addItem(label, key)
@@ -78,19 +79,21 @@ def _period_combo():
 
 
 class OverviewPage(Page):
-    title = "Vue d'ensemble"
+    title = Tr("Vue d'ensemble")
 
     def __init__(self, finance, runner, parent=None, **kwargs):
         super().__init__(runner, parent, **kwargs)
         self.finance = finance
         head = QHBoxLayout()
         titles = QVBoxLayout()
-        titles.addWidget(QLabel("Vue financière", objectName="pageTitle"))
-        subtitle = QLabel("Chiffres calculés par le serveur (montants exacts, jamais estimés).", objectName="subtitle")
+        titles.addWidget(QLabel(tr("Vue financière"), objectName="pageTitle"))
+        subtitle = QLabel(
+            tr("Chiffres calculés par le serveur (montants exacts, jamais estimés)."), objectName="subtitle"
+        )
         subtitle.setWordWrap(True)
         titles.addWidget(subtitle)
         head.addLayout(titles, 1)
-        self.refresh_button = button("Actualiser", tooltip="Recharger (F5)")
+        self.refresh_button = button(tr("Actualiser"), tooltip=tr("Recharger (F5)"))
         self.refresh_button.clicked.connect(self.reload)
         head.addWidget(self.refresh_button, 0, Qt.AlignTop)
         self.layout_.addLayout(head)
@@ -98,9 +101,11 @@ class OverviewPage(Page):
         self.grid = QGridLayout()
         self.grid.setSpacing(12)
         self.layout_.addLayout(self.grid)
-        self.layout_.addWidget(QLabel("Mouvements récents de la trésorerie", objectName="sectionTitle"))
+        self.layout_.addWidget(QLabel(tr("Mouvements récents de la trésorerie"), objectName="sectionTitle"))
         self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["Date", "Opération", "Référence", "Montant", "Solde après"])
+        self.table.setHorizontalHeaderLabels(
+            [tr("Date"), tr("Opération"), tr("Référence"), tr("Montant"), tr("Solde après")]
+        )
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.verticalHeader().setVisible(False)
@@ -122,7 +127,7 @@ class OverviewPage(Page):
         self.call(
             lambda: (self.finance.dashboard(), self.finance.treasury()),
             self.show,
-            action="Impossible de charger la vue financière",
+            action=tr("Impossible de charger la vue financière"),
         )
 
     def show(self, loaded):
@@ -132,18 +137,20 @@ class OverviewPage(Page):
         overdue = data.get("overdue_invoices", 0) or 0
         by_status = data.get("payments_by_status") or {}
         self.metrics = [
-            Metric("Trésorerie", format_money(balance, currency), "solde de l'école"),
-            Metric("Encaissé net", format_money(data.get("net_collected"), currency), "paiements − remboursements"),
+            Metric(tr("Trésorerie"), format_money(balance, currency), tr("solde de l'école")),
             Metric(
-                "Reste à encaisser",
-                format_money(data.get("outstanding"), currency),
-                f"{overdue} facture(s) en retard" if overdue else "aucune facture en retard",
+                tr("Encaissé net"), format_money(data.get("net_collected"), currency), tr("paiements − remboursements")
             ),
-            Metric("Remboursé", format_money(data.get("refunded"), currency), "transactions inverses"),
             Metric(
-                "Paiements en attente / échoués",
+                tr("Reste à encaisser"),
+                format_money(data.get("outstanding"), currency),
+                tr("{0} facture(s) en retard", overdue) if overdue else tr("aucune facture en retard"),
+            ),
+            Metric(tr("Remboursé"), format_money(data.get("refunded"), currency), tr("transactions inverses")),
+            Metric(
+                tr("Paiements en attente / échoués"),
                 f"{by_status.get('PENDING', 0)} / {failed}",
-                "refusés, fonds insuffisants, délais, erreurs",
+                tr("refusés, fonds insuffisants, délais, erreurs"),
             ),
         ]
         for card in self.cards:
@@ -205,8 +212,8 @@ class PaymentFlow:
         elif kind == "cancel_invoice":
             return ask_reason(
                 self,
-                f"Annuler la facture {context['invoice'].number} ?",
-                "Possible seulement sans paiement.",
+                tr("Annuler la facture {0} ?", context["invoice"].number),
+                tr("Possible seulement sans paiement."),
                 danger=True,
             )
         else:
@@ -214,10 +221,10 @@ class PaymentFlow:
         return dialog.values() if dialog.exec() == QDialog.Accepted else None
 
     def search_students(self, text, done):
-        self.call(lambda: self.finance.find_students(text), done, action="Impossible de rechercher les élèves")
+        self.call(lambda: self.finance.find_students(text), done, action=tr("Impossible de rechercher les élèves"))
 
     def load_obligations(self, student_id, done):
-        self.call(lambda: self.finance.obligations(student_id), done, action="Impossible de charger les factures")
+        self.call(lambda: self.finance.obligations(student_id), done, action=tr("Impossible de charger les factures"))
 
     def collect(self, student=None, invoice=None):
         retry = self.retry if student is None else None
@@ -233,7 +240,7 @@ class PaymentFlow:
         self.call(
             lambda: (self.finance.fee_types(), self.finance.my_wallets()),
             open_form,
-            action="Impossible de préparer le paiement",
+            action=tr("Impossible de préparer le paiement"),
         )
 
     def send_payment(self, values):
@@ -244,7 +251,7 @@ class PaymentFlow:
                 self.retry = values  # outcome unknown: the retry reuses the key
                 raise
 
-        self.call(attempt, self.paid, action="Paiement sans réponse du serveur")
+        self.call(attempt, self.paid, action=tr("Paiement sans réponse du serveur"))
 
     def paid(self, payment):
         self.retry = None
@@ -252,17 +259,17 @@ class PaymentFlow:
         if payment.replayed:
             self.banner.show_message(
                 "info",
-                f"Ce paiement était déjà enregistré ({payment.status_label}) : aucun nouveau débit.",
-                title=f"Paiement {payment.reference}",
+                tr("Ce paiement était déjà enregistré ({0}) : aucun nouveau débit.", payment.status_label),
+                title=tr("Paiement {0}", payment.reference),
             )
         elif payment.status == "SUCCEEDED":
-            self.success(f"Paiement réussi — {payment.reference} · {amount} · {payment.student_name}.")
+            self.success(tr("Paiement réussi — {0} · {1} · {2}.", payment.reference, amount, payment.student_name))
         else:
-            detail = payment.failure_reason or "Aucun mouvement d'argent."
+            detail = payment.failure_reason or tr("Aucun mouvement d'argent.")
             self.banner.show_message(
                 "warning" if payment.failed else "info",
-                f"{payment.reference} · {amount} — {detail} Le paiement est enregistré avec ce résultat.",
-                title=f"Paiement {payment.status_label.lower()}",
+                tr("{0} · {1} — {2} Le paiement est enregistré avec ce résultat.", payment.reference, amount, detail),
+                title=tr("Paiement {0}", payment.status_label.lower()),
             )
         self.after_payment(payment)
 
@@ -276,12 +283,15 @@ class PaymentFlow:
                 lambda: self.finance.refund(payment.id, **values),
                 lambda refund: (
                     self.success(
-                        f"Remboursement de {format_money(refund.amount, payment.currency)} enregistré "
-                        f"(paiement {payment.reference}). L'historique est conservé."
+                        tr(
+                            "Remboursement de {0} enregistré (paiement {1}). L'historique est conservé.",
+                            format_money(refund.amount, payment.currency),
+                            payment.reference,
+                        )
                     ),
                     self.reload(),
                 ),
-                action="Impossible de rembourser le paiement",
+                action=tr("Impossible de rembourser le paiement"),
             )
 
     def show_payment(self, payment_id):
@@ -289,25 +299,25 @@ class PaymentFlow:
             if self.ask("payment_detail", payment=payment) == "refund":
                 self.refund_payment(payment)
 
-        self.call(lambda: self.finance.payment(payment_id), show, action="Impossible de charger le paiement")
+        self.call(lambda: self.finance.payment(payment_id), show, action=tr("Impossible de charger le paiement"))
 
 
 class PaymentsPage(PaymentFlow, PagedCatalogPage):
-    title = "Paiements"
-    description = "Historique des paiements. Un échec est un résultat enregistré, jamais supprimé."
-    columns = ["Référence", "Élève", "Montant", "Mode", "Date", STATUS_COLUMN_TITLE]
+    title = Tr("Paiements")
+    description = Tr("Historique des paiements. Un échec est un résultat enregistré, jamais supprimé.")
+    columns = Tr(["Référence", "Élève", "Montant", "Mode", "Date", STATUS_COLUMN_TITLE])
     noun = "paiement"
     feminine = False
-    search_placeholder = "Rechercher par référence, élève ou matricule…"
-    status_filters = [("Statut : tous", None), *((label, code) for code, label in PAYMENT_STATUSES.items())]
+    search_placeholder = Tr("Rechercher par référence, élève ou matricule…")
+    status_filters = Tr([("Statut : tous", None), *((label, code) for code, label in PAYMENT_STATUSES.items())])
     has_toggle = False
 
     def __init__(self, finance, runner, parent=None, **kwargs):
         self.finance = finance
         super().__init__(runner, parent, **kwargs)
         self.edit_button.hide()
-        self.add_button.setText("Nouveau paiement…")
-        self.add_button.setToolTip("Encaisser un paiement (Ctrl+N)")
+        self.add_button.setText(tr("Nouveau paiement…"))
+        self.add_button.setToolTip(tr("Encaisser un paiement (Ctrl+N)"))
         self.detail_button.clicked.connect(self.open_row)
         self.refund_button.clicked.connect(lambda: self.selected() and self.refund_payment(self.selected()))
 
@@ -315,15 +325,15 @@ class PaymentsPage(PaymentFlow, PagedCatalogPage):
         return {1}
 
     def leading_actions(self):
-        self.detail_button = button("Détail", tooltip="Détail du paiement (Entrée)")
+        self.detail_button = button(tr("Détail"), tooltip=tr("Détail du paiement (Entrée)"))
         return [self.detail_button]
 
     def extra_actions(self):
-        self.refund_button = button("Rembourser…", "danger")
+        self.refund_button = button(tr("Rembourser…"), "danger")
         return [self.refund_button]
 
     def add_filters(self, layout):
-        self.method_filter = _combo("Filtrer par mode", "Mode : tous", 130)
+        self.method_filter = _combo(tr("Filtrer par mode"), tr("Mode : tous"), 130)
         for code, label in PAYMENT_METHODS.items():
             self.method_filter.addItem(label, code)
         self.period_filter = _period_combo()
@@ -337,7 +347,7 @@ class PaymentsPage(PaymentFlow, PagedCatalogPage):
             refundable = row is not None and row.refundable > 0
             self.refund_button.setEnabled(refundable)
             self.refund_button.setToolTip(
-                "Sélectionnez un paiement réussi non entièrement remboursé." if not refundable else ""
+                tr("Sélectionnez un paiement réussi non entièrement remboursé.") if not refundable else ""
             )
 
     def is_filtered(self):
@@ -382,7 +392,7 @@ class PaymentsPage(PaymentFlow, PagedCatalogPage):
         self.call(
             self.fetch,
             lambda result: (self.show_rows(result), self.select_id(payment.id)),
-            action="Impossible de charger les paiements",
+            action=tr("Impossible de charger les paiements"),
         )
 
     def edit(self):
@@ -395,12 +405,12 @@ class PaymentsPage(PaymentFlow, PagedCatalogPage):
 
 
 class InvoicesPage(PaymentFlow, PagedCatalogPage):
-    title = "Factures"
-    description = "Obligations des élèves. Une facture payée ne s'annule pas : on rembourse."
-    columns = ["N°", "Élève", "Émise le", "Échéance", "Total", "Payé", "Reste", STATUS_COLUMN_TITLE]
+    title = Tr("Factures")
+    description = Tr("Obligations des élèves. Une facture payée ne s'annule pas : on rembourse.")
+    columns = Tr(["N°", "Élève", "Émise le", "Échéance", "Total", "Payé", "Reste", STATUS_COLUMN_TITLE])
     noun = "facture"
-    search_placeholder = "Rechercher par numéro, élève ou matricule…"
-    status_filters = [("Statut : tous", None), *((label, code) for code, label in INVOICE_STATUSES.items())]
+    search_placeholder = Tr("Rechercher par numéro, élève ou matricule…")
+    status_filters = Tr([("Statut : tous", None), *((label, code) for code, label in INVOICE_STATUSES.items())])
     narrow_hidden = (2, 5)  # issue date, paid: in the invoice's detail
     has_toggle = False
 
@@ -408,7 +418,7 @@ class InvoicesPage(PaymentFlow, PagedCatalogPage):
         self.finance = finance
         super().__init__(runner, parent, **kwargs)
         self.edit_button.hide()
-        self.add_button.setText("Nouvelle facture…")
+        self.add_button.setText(tr("Nouvelle facture…"))
         self.detail_button.clicked.connect(self.open_row)
         self.collect_button.clicked.connect(self.collect_selected)
         self.cancel_button.clicked.connect(self.cancel_invoice)
@@ -417,17 +427,17 @@ class InvoicesPage(PaymentFlow, PagedCatalogPage):
         return {1}
 
     def leading_actions(self):
-        self.detail_button = button("Détail", tooltip="Détail de la facture (Entrée)")
+        self.detail_button = button(tr("Détail"), tooltip=tr("Détail de la facture (Entrée)"))
         return [self.detail_button]
 
     def extra_actions(self):
-        self.cancel_button = button("Annuler…", "danger")
-        self.collect_button = button("Encaisser…")
+        self.cancel_button = button(tr("Annuler…"), "danger")
+        self.collect_button = button(tr("Encaisser…"))
         return [self.cancel_button, self.collect_button]
 
     def add_filters(self, layout):
         self.period_filter = _period_combo()
-        self.period_filter.setToolTip("Filtrer par date d'émission")
+        self.period_filter.setToolTip(tr("Filtrer par date d'émission"))
         self.period_filter.currentIndexChanged.connect(lambda _: self.reload_first_page())
         layout.addWidget(self.period_filter)
 
@@ -437,7 +447,7 @@ class InvoicesPage(PaymentFlow, PagedCatalogPage):
             for widget in (self.collect_button, self.cancel_button):
                 widget.setEnabled(row is not None and row.active)
                 widget.setToolTip(
-                    "Sélectionnez une facture émise ou partiellement payée." if not (row and row.active) else ""
+                    tr("Sélectionnez une facture émise ou partiellement payée.") if not (row and row.active) else ""
                 )
 
     def is_filtered(self):
@@ -448,7 +458,7 @@ class InvoicesPage(PaymentFlow, PagedCatalogPage):
             row.status, TOKENS.text_secondary
         )
         late = row.overdue(self.finance.today())
-        return coloured(row.status_label + (" · en retard" if late else ""), TOKENS.danger if late else colour)
+        return coloured(row.status_label + (tr(" · en retard") if late else ""), TOKENS.danger if late else colour)
 
     def fetch(self):
         return self.finance.invoices(
@@ -482,7 +492,7 @@ class InvoicesPage(PaymentFlow, PagedCatalogPage):
             if self.ask("invoice_detail", invoice=invoice) == "pay":
                 self.collect((invoice.student_id, invoice.student_name), invoice.id)
 
-        self.call(lambda: self.finance.invoice(row.id), show, action="Impossible de charger la facture")
+        self.call(lambda: self.finance.invoice(row.id), show, action=tr("Impossible de charger la facture"))
 
     def edit(self):
         self.open_row()
@@ -500,13 +510,17 @@ class InvoicesPage(PaymentFlow, PagedCatalogPage):
                     lambda: self.finance.issue_invoice(**values),
                     lambda invoice: self._reselect(
                         invoice.id,
-                        f"Facture {invoice.number} émise : {format_money(invoice.total, invoice.currency)} "
-                        f"pour {invoice.student_name}.",
+                        tr(
+                            "Facture {0} émise : {1} pour {2}.",
+                            invoice.number,
+                            format_money(invoice.total, invoice.currency),
+                            invoice.student_name,
+                        ),
                     ),
-                    action="Impossible d'émettre la facture",
+                    action=tr("Impossible d'émettre la facture"),
                 )
 
-        self.call(self.finance.fee_types, open_form, action="Impossible de charger les motifs de frais")
+        self.call(self.finance.fee_types, open_form, action=tr("Impossible de charger les motifs de frais"))
 
     def cancel_invoice(self):
         row = self.selected()
@@ -516,8 +530,8 @@ class InvoicesPage(PaymentFlow, PagedCatalogPage):
         if values:
             self.call(
                 lambda: self.finance.cancel_invoice(row.id, values["reason"]),
-                lambda invoice: self._reselect(invoice.id, f"Facture {invoice.number} annulée."),
-                action="Impossible d'annuler la facture",
+                lambda invoice: self._reselect(invoice.id, tr("Facture {0} annulée.", invoice.number)),
+                action=tr("Impossible d'annuler la facture"),
             )
 
 
@@ -527,14 +541,14 @@ class InvoicesPage(PaymentFlow, PagedCatalogPage):
 
 
 class RefundsPage(PaymentFlow, PagedCatalogPage):
-    title = "Remboursements"
-    description = "Transactions inverses : le paiement d'origine reste dans l'historique."
-    columns = ["Date", "Paiement d'origine", "Élève", "Remboursé", "Montant initial", "Motif"]
+    title = Tr("Remboursements")
+    description = Tr("Transactions inverses : le paiement d'origine reste dans l'historique.")
+    columns = Tr(["Date", "Paiement d'origine", "Élève", "Remboursé", "Montant initial", "Motif"])
     narrow_hidden = (4,)  # original amount: in the payment's detail
     noun = "remboursement"
     feminine = False
-    search_placeholder = "Rechercher par paiement, élève ou motif…"
-    status_filters = [("Tous", None)]
+    search_placeholder = Tr("Rechercher par paiement, élève ou motif…")
+    status_filters = Tr([("Tous", None)])
     has_toggle = False
 
     def __init__(self, finance, runner, parent=None, **kwargs):
@@ -549,7 +563,7 @@ class RefundsPage(PaymentFlow, PagedCatalogPage):
         return {2, 5}
 
     def leading_actions(self):
-        self.origin_button = button("Paiement d'origine", tooltip="Détail du paiement remboursé (Entrée)")
+        self.origin_button = button(tr("Paiement d'origine"), tooltip=tr("Détail du paiement remboursé (Entrée)"))
         return [self.origin_button]
 
     def add_filters(self, layout):
@@ -597,12 +611,12 @@ class RefundsPage(PaymentFlow, PagedCatalogPage):
 
 
 class WalletsPage(CatalogPage):
-    title = "Wallets"
-    description = "Portefeuilles simulés de l'école (lecture seule). Les identifiants sont masqués."
-    columns = ["Propriétaire", "Fournisseur", "Identifiant", "Solde", "Simulation", STATUS_COLUMN_TITLE]
+    title = Tr("Wallets")
+    description = Tr("Portefeuilles simulés de l'école (lecture seule). Les identifiants sont masqués.")
+    columns = Tr(["Propriétaire", "Fournisseur", "Identifiant", "Solde", "Simulation", STATUS_COLUMN_TITLE])
     noun = "wallet"
     feminine = False
-    search_placeholder = "Rechercher par propriétaire ou fournisseur…"
+    search_placeholder = Tr("Rechercher par propriétaire ou fournisseur…")
     has_toggle = False
 
     def __init__(self, finance, runner, parent=None, **kwargs):
@@ -615,7 +629,9 @@ class WalletsPage(CatalogPage):
         return {0}
 
     def status_cell(self, row):
-        return coloured("●  Actif" if row.active else "○  Bloqué", TOKENS.success if row.active else TOKENS.danger)
+        return coloured(
+            tr("●  Actif") if row.active else tr("○  Bloqué"), TOKENS.success if row.active else TOKENS.danger
+        )
 
     def fetch(self):
         rows = self.finance.wallets()
@@ -640,9 +656,9 @@ class WalletsPage(CatalogPage):
 
 
 class FeeTypesPage(CatalogPage):
-    title = "Motifs de frais"
-    description = "Scolarité, inscription, cantine… utilisés par les factures et les paiements sans facture."
-    columns = ["Code", "Nom", "Description", STATUS_COLUMN_TITLE]
+    title = Tr("Motifs de frais")
+    description = Tr("Scolarité, inscription, cantine… utilisés par les factures et les paiements sans facture.")
+    columns = Tr(["Code", "Nom", "Description", STATUS_COLUMN_TITLE])
     noun = "motif"
     feminine = False
     has_toggle = False
@@ -675,8 +691,8 @@ class FeeTypesPage(CatalogPage):
         if values:
             self.call(
                 lambda: self.finance.create_fee_type(**values),
-                lambda fee: self._saved(fee, "créé"),
-                action="Impossible de créer le motif",
+                lambda fee: self._saved(fee, tr("créé")),
+                action=tr("Impossible de créer le motif"),
             )
 
     def open_row(self):
@@ -689,7 +705,7 @@ class FeeTypesPage(CatalogPage):
 
 
 class FinancePage(Page):
-    title = "Finance"
+    title = Tr("Finance")
 
     def __init__(self, finance, runner, parent=None, **kwargs):
         super().__init__(runner, parent, **kwargs)
@@ -703,12 +719,12 @@ class FinancePage(Page):
         self.wallets = WalletsPage(finance, runner, **kwargs)
         self.fee_types = FeeTypesPage(finance, runner, **kwargs)
         for page, label in (
-            (self.overview, "Vue d'ensemble"),
-            (self.payments, "Paiements"),
-            (self.invoices, "Factures"),
-            (self.refunds, "Remboursements"),
-            (self.wallets, "Wallets"),
-            (self.fee_types, "Motifs"),
+            (self.overview, tr("Vue d'ensemble")),
+            (self.payments, tr("Paiements")),
+            (self.invoices, tr("Factures")),
+            (self.refunds, tr("Remboursements")),
+            (self.wallets, tr("Wallets")),
+            (self.fee_types, tr("Motifs")),
         ):
             self.tabs.addTab(page, label)
             page.session_expired.connect(self.session_expired.emit)

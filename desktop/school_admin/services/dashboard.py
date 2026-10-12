@@ -31,6 +31,7 @@ Authentication errors still propagate (-> login).
 from datetime import date, datetime, timedelta
 
 from ..api.errors import ApiError, NetworkError, Unauthorized
+from ..i18n import Labels, Texts, tr
 from ..messages import explain
 from ..models import (
     PAYMENT_STATUSES,
@@ -44,53 +45,57 @@ from ..models import (
 )
 from ..money import ZERO, format_money, to_decimal
 
-ATTENDANCE_LABELS = {"PRESENT": "présents", "LATE": "retards", "ABSENT": "absents", "EXCUSED": "excusés"}
+ATTENDANCE_LABELS = Labels({"PRESENT": "présents", "LATE": "retards", "ABSENT": "absents", "EXCUSED": "excusés"})
 TREND_DAYS = 14
-MONTHS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."]
-MONTH_NAMES = [
-    "janvier",
-    "février",
-    "mars",
-    "avril",
-    "mai",
-    "juin",
-    "juillet",
-    "août",
-    "septembre",
-    "octobre",
-    "novembre",
-    "décembre",
-]
+MONTHS = Texts(["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."])
+MONTH_NAMES = Texts(
+    [
+        "janvier",
+        "février",
+        "mars",
+        "avril",
+        "mai",
+        "juin",
+        "juillet",
+        "août",
+        "septembre",
+        "octobre",
+        "novembre",
+        "décembre",
+    ]
+)
 WEEKDAYS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
 
 # Administrative audit actions shown in "Activité récente" (an unknown one is
 # shown as its code, never hidden).
-ACTIVITY_LABELS = {
-    "ACADEMIC_YEAR_CREATED": "Année scolaire créée",
-    "ACADEMIC_YEAR_UPDATED": "Année scolaire modifiée",
-    "ACADEMIC_YEAR_SET_CURRENT": "Année courante définie",
-    "ACADEMIC_YEAR_CLOSED": "Année scolaire clôturée",
-    "LEVEL_CREATED": "Niveau créé",
-    "LEVEL_UPDATED": "Niveau modifié",
-    "LEVEL_ACTIVATED": "Niveau réactivé",
-    "LEVEL_DEACTIVATED": "Niveau désactivé",
-    "CLASS_CREATED": "Classe créée",
-    "CLASS_UPDATED": "Classe modifiée",
-    "CLASS_ACTIVATED": "Classe réactivée",
-    "CLASS_DEACTIVATED": "Classe désactivée",
-    "CLASS_MAIN_ROOM_SET": "Salle principale attribuée",
-    "CATEGORY_CREATED": "Catégorie créée",
-    "CATEGORY_UPDATED": "Catégorie modifiée",
-    "CATEGORY_ACTIVATED": "Catégorie réactivée",
-    "CATEGORY_DEACTIVATED": "Catégorie désactivée",
-    "SUBJECT_CREATED": "Matière créée",
-    "SUBJECT_UPDATED": "Matière modifiée",
-    "SUBJECT_ACTIVATED": "Matière réactivée",
-    "SUBJECT_DEACTIVATED": "Matière désactivée",
-    "ROOM_CREATED": "Salle créée",
-    "FEE_TYPE_CREATED": "Type de frais créé",
-    "FEE_SCHEDULE_CREATED": "Échéancier de frais créé",
-}
+ACTIVITY_LABELS = Labels(
+    {
+        "ACADEMIC_YEAR_CREATED": "Année scolaire créée",
+        "ACADEMIC_YEAR_UPDATED": "Année scolaire modifiée",
+        "ACADEMIC_YEAR_SET_CURRENT": "Année courante définie",
+        "ACADEMIC_YEAR_CLOSED": "Année scolaire clôturée",
+        "LEVEL_CREATED": "Niveau créé",
+        "LEVEL_UPDATED": "Niveau modifié",
+        "LEVEL_ACTIVATED": "Niveau réactivé",
+        "LEVEL_DEACTIVATED": "Niveau désactivé",
+        "CLASS_CREATED": "Classe créée",
+        "CLASS_UPDATED": "Classe modifiée",
+        "CLASS_ACTIVATED": "Classe réactivée",
+        "CLASS_DEACTIVATED": "Classe désactivée",
+        "CLASS_MAIN_ROOM_SET": "Salle principale attribuée",
+        "CATEGORY_CREATED": "Catégorie créée",
+        "CATEGORY_UPDATED": "Catégorie modifiée",
+        "CATEGORY_ACTIVATED": "Catégorie réactivée",
+        "CATEGORY_DEACTIVATED": "Catégorie désactivée",
+        "SUBJECT_CREATED": "Matière créée",
+        "SUBJECT_UPDATED": "Matière modifiée",
+        "SUBJECT_ACTIVATED": "Matière réactivée",
+        "SUBJECT_DEACTIVATED": "Matière désactivée",
+        "ROOM_CREATED": "Salle créée",
+        "FEE_TYPE_CREATED": "Type de frais créé",
+        "FEE_SCHEDULE_CREATED": "Échéancier de frais créé",
+    }
+)
 
 
 money = format_money  # '1250000.00', 'XAF' -> '1 250 000 XAF'
@@ -104,16 +109,16 @@ def relative_time(moment, now=None):
     seconds = (now - moment).total_seconds()
     local = moment.astimezone() if moment.tzinfo else moment
     if seconds < 60:
-        return "à l'instant"
+        return tr("à l'instant")
     if seconds < 3600:
-        return f"il y a {int(seconds // 60)} min"
+        return tr("il y a {0} min", int(seconds // 60))
     if seconds < 6 * 3600:
-        return f"il y a {int(seconds // 3600)} h"
+        return tr("il y a {0} h", int(seconds // 3600))
     today = (now.astimezone() if now.tzinfo else now).date()
     if local.date() == today:
-        return f"aujourd'hui à {local:%H:%M}"
+        return tr("aujourd'hui à {0:%H:%M}", local)
     if local.date() == today - timedelta(days=1):
-        return f"hier à {local:%H:%M}"
+        return tr("hier à {0:%H:%M}", local)
     return f"{local:%d/%m} à {local:%H:%M}"
 
 
@@ -131,8 +136,9 @@ def _parse_datetime(value):
         return None
 
 
-def _plural(count, singular, plural=None):
-    return f"{count} {singular if count < 2 else (plural or singular + 's')}"
+def _plural(count, singular, plural):
+    """« 1 élève », « 3 élèves »: the two nouns come translated (tr)."""
+    return f"{count} {singular if count < 2 else plural}"
 
 
 def _month(key):
@@ -176,40 +182,40 @@ class DashboardService:
         monday = today - timedelta(days=today.weekday())
         data.metrics = [
             Metric(
-                "Année scolaire active",
+                tr("Année scolaire active"),
                 current["name"] if current else None,
                 f"{current['start_date']} → {current['end_date']}" if current else "",
-                error=None if current else "Aucune année scolaire courante n'est définie.",
+                error=None if current else tr("Aucune année scolaire courante n'est définie."),
             ),
             self._metric(
-                "Classes",
+                tr("Classes"),
                 lambda: str(self.api.count("classes/", academic_year=current["id"] if current else None)),
-                "de l'année active" if current else "toutes années",
+                tr("de l'année active") if current else tr("toutes années"),
             ),
-            self._metric("Élèves", lambda: str(self.api.count("students/", status="ACTIVE")), "actifs"),
-            self._metric("Enseignants", self._teachers, "actifs"),
+            self._metric(tr("Élèves"), lambda: str(self.api.count("students/", status="ACTIVE")), tr("actifs")),
+            self._metric(tr("Enseignants"), self._teachers, tr("actifs")),
             self._metric(
-                "Séances cette semaine",
+                tr("Séances cette semaine"),
                 lambda: str(
                     self.api.count(
                         "sessions/", date_from=monday.isoformat(), date_to=(monday + timedelta(days=6)).isoformat()
                     )
                 ),
-                f"du {monday:%d/%m} au {monday + timedelta(days=6):%d/%m}",
+                tr("du {0:%d/%m} au {1:%d/%m}", monday, monday + timedelta(days=6)),
             ),
-            self._metric("Séances aujourd'hui", lambda: self._sessions_today(today), f"{today:%d/%m/%Y}"),
+            self._metric(tr("Séances aujourd'hui"), lambda: self._sessions_today(today), f"{today:%d/%m/%Y}"),
             self._metric(
-                "Changements de planning",
+                tr("Changements de planning"),
                 lambda: str(
                     len(self.api.list_all("planning/changes/", date_from=f"{today - timedelta(days=6):%Y-%m-%d}"))
                 ),
-                "7 derniers jours",
+                tr("7 derniers jours"),
             ),
-            self._metric("Présence aujourd'hui", lambda: self._attendance(today), f"{today:%d/%m/%Y}"),
-            self._metric("Encaissements", self._finance, "net des remboursements"),
-            self._metric("Paies versées", self._payroll, ""),
-            self._metric("Communication", self._communication, ""),
-            self._metric("Documents", self._documents, ""),
+            self._metric(tr("Présence aujourd'hui"), lambda: self._attendance(today), f"{today:%d/%m/%Y}"),
+            self._metric(tr("Encaissements"), self._finance, tr("net des remboursements")),
+            self._metric(tr("Paies versées"), self._payroll, ""),
+            self._metric(tr("Communication"), self._communication, ""),
+            self._metric(tr("Documents"), self._documents, ""),
         ]
         return data
 
@@ -225,7 +231,7 @@ class DashboardService:
             start, end = datetime.fromisoformat(row["scheduled_start"]), datetime.fromisoformat(row["scheduled_end"])
             if start <= datetime.now(start.tzinfo) < end:
                 running += 1
-        return str(len(rows) - cancelled), f"{running} en cours · {cancelled} annulée(s)"
+        return str(len(rows) - cancelled), tr("{0} en cours · {1} annulée(s)", running, cancelled)
 
     def _attendance(self, day):
         """Big value = presence rate of the pupils already checked today;
@@ -233,7 +239,7 @@ class DashboardService:
         counts = self.api.get("admin/attendance/dashboard/", date=day.isoformat()).get("counts", {})
         checked = sum(counts.get(k, 0) for k in ATTENDANCE_LABELS)
         if not checked:
-            return "—", f"aucun élève pointé le {day:%d/%m/%Y}"
+            return "—", tr("aucun élève pointé le {0:%d/%m/%Y}", day)
         rate = 100 * (counts.get("PRESENT", 0) + counts.get("LATE", 0)) / checked
         detail = " · ".join(f"{counts.get(k, 0)} {label}" for k, label in ATTENDANCE_LABELS.items())
         return f"{rate:.0f} %", detail
@@ -242,15 +248,15 @@ class DashboardService:
         """Active teachers (teaching and employed) and the split by category."""
         data = self.api.get("admin/dashboard/teachers/")
         split = " · ".join(f"{c['code']} {c['count']}" for c in data.get("by_category", []))
-        return str(data.get("active", 0)), f"actifs · {split}" if split else "actifs"
+        return str(data.get("active", 0)), tr("actifs · {0}", split) if split else tr("actifs")
 
     def _finance(self):
         data = self.api.get("admin/finance/dashboard/")
         currency = data.get("currency", "")
         overdue = data.get("overdue_invoices", 0) or 0
-        hint = f"reste à encaisser : {money(data.get('outstanding', 0), currency)}"
+        hint = tr("reste à encaisser : {0}", money(data.get("outstanding", 0), currency))
         if overdue:
-            hint += f" · {_plural(overdue, 'facture')} en retard"
+            hint += tr(" · {0} en retard", _plural(overdue, tr("facture"), tr("factures")))
         return money(data.get("net_collected", 0), currency), hint
 
     def _payroll(self):
@@ -260,7 +266,9 @@ class DashboardService:
         waiting = sum(1 for r in rows if r.get("status") == "APPROVED")
         currency = next((r.get("currency") for r in rows if r.get("currency")), "")
         total = sum((to_decimal(r.get("approved_amount")) or ZERO for r in paid), ZERO)
-        return money(total, currency), f"{_plural(len(paid), 'paie')} payée(s) · {waiting} approuvée(s) à payer"
+        return money(total, currency), tr(
+            "{0} payée(s) · {1} approuvée(s) à payer", _plural(len(paid), tr("paie"), tr("paies")), waiting
+        )
 
     def _communication(self):
         """Unread notifications (big value); unread messages and open complaints in the hint."""
@@ -268,14 +276,18 @@ class DashboardService:
         messages = sum(int(c.get("unread_count") or 0) for c in self.api.list_all("conversations/"))
         open_complaints = sum(self.api.count("complaints/", status=s) for s in ("OPEN", "IN_PROGRESS"))
         return (
-            f"{unread} non lue(s)",
-            f"{_plural(messages, 'message')} non lu(s) · {_plural(open_complaints, 'réclamation')} ouverte(s)",
+            tr("{0} non lue(s)", unread),
+            tr(
+                "{0} non lu(s) · {1} ouverte(s)",
+                _plural(messages, tr("message"), tr("messages")),
+                _plural(open_complaints, tr("réclamation"), tr("réclamations")),
+            ),
         )
 
     def _documents(self):
         rows, total = self.api.page("documents/", page=1, page_size=1)
         latest = rows[0].get("title") if rows else ""
-        return str(total), f"dernier : {latest}" if latest else "aucun document généré"
+        return str(total), tr("dernier : {0}", latest) if latest else tr("aucun document généré")
 
     # --- charts ---------------------------------------------------------------------
     def load_charts(self):
@@ -308,12 +320,17 @@ class DashboardService:
     def _payments_by_status(self):
         counts = self.api.get("admin/finance/dashboard/").get("payments_by_status") or {}
         points = [
-            Point(label, (counts[code],), f"{label} : {_plural(counts[code], 'paiement')}")
+            Point(
+                label, (counts[code],), tr("{0} : {1}", label, _plural(counts[code], tr("paiement"), tr("paiements")))
+            )
             for code, label in PAYMENT_STATUSES.items()
             if counts.get(code)
         ]
         return ChartData(
-            series=("Paiements",), points=points, note="Nombre de paiements par résultat", empty_text="Aucun paiement."
+            series=(tr("Paiements"),),
+            points=points,
+            note=tr("Nombre de paiements par résultat"),
+            empty_text=tr("Aucun paiement."),
         )
 
     def _payrolls_by_status(self):
@@ -322,9 +339,12 @@ class DashboardService:
         for code, label in PAYROLL_STATUSES.items():
             count = sum(1 for r in rows if r.get("status") == code)
             if count:
-                points.append(Point(label, (count,), f"{label} : {_plural(count, 'paie')}"))
+                points.append(Point(label, (count,), tr("{0} : {1}", label, _plural(count, tr("paie"), tr("paies")))))
         return ChartData(
-            series=("Paies",), points=points, note="Nombre de paies par étape", empty_text="Aucune paie calculée."
+            series=(tr("Paies"),),
+            points=points,
+            note=tr("Nombre de paies par étape"),
+            empty_text=tr("Aucune paie calculée."),
         )
 
     def _attendance_trend(self):
@@ -339,67 +359,83 @@ class DashboardService:
                 continue
             moment = date.fromisoformat(day["date"])
             rate, absent_rate = 100 * present / checked, 100 * absent / checked
-            tooltip = (
-                f"{WEEKDAYS[moment.weekday()].capitalize()} {moment:%d/%m} : {rate:.0f} % présents "
-                f"({present} sur {_plural(checked, 'élève')} pointés) · {_plural(late, 'retard')} · "
-                f"{_plural(absent, 'absent')} dont {excused} justifiés"
+            tooltip = tr(
+                "{0} {1:%d/%m} : {2:.0f} % présents ({3} sur {4} pointés) · {5} · {6} dont {7} justifiés",
+                WEEKDAYS[moment.weekday()].capitalize(),
+                moment,
+                rate,
+                present,
+                _plural(checked, tr("élève"), tr("élèves")),
+                _plural(late, tr("retard"), tr("retards")),
+                _plural(absent, tr("absent"), tr("absents")),
+                excused,
             )
             points.append(Point(f"{moment:%d/%m}", (round(rate, 1), round(absent_rate, 1)), tooltip))
         return ChartData(
-            series=("Présents", "Absents"),
+            series=(tr("Présents"), tr("Absents")),
             points=points,
             unit="%",
             maximum=100,
-            empty_text=f"Aucune présence pointée sur les {TREND_DAYS} derniers jours.",
-            note=f"{TREND_DAYS} derniers jours, en % des élèves pointés",
+            empty_text=tr("Aucune présence pointée sur les {0} derniers jours.", TREND_DAYS),
+            note=tr("{0} derniers jours, en % des élèves pointés", TREND_DAYS),
         )
 
     def _enrollment_charts(self, data):
         if not data.get("academic_year"):
-            message = "Aucune année scolaire courante n'est définie."
+            message = tr("Aucune année scolaire courante n'est définie.")
             return tuple(ChartData(empty_text=message) for _ in range(3))
         year = data.get("academic_year_name") or ""
-        empty = f"Aucun élève inscrit en {year}."
+        empty = tr("Aucun élève inscrit en {0}.", year)
         by_level = ChartData(
-            series=("Élèves",),
+            series=(tr("Élèves"),),
             points=[
-                Point(r["code"], (r["count"],), f"{r['name']} ({r['code']}) : {_plural(r['count'], 'élève')} inscrits")
+                Point(
+                    r["code"],
+                    (r["count"],),
+                    tr(
+                        "{0} ({1}) : {2} inscrits", r["name"], r["code"], _plural(r["count"], tr("élève"), tr("élèves"))
+                    ),
+                )
                 for r in data.get("by_level", [])
             ],
-            note=f"Élèves inscrits par niveau, année {year}",
+            note=tr("Élèves inscrits par niveau, année {0}", year),
             empty_text=empty,
         )
         classes = data.get("by_class", [])
         by_class = ChartData(
-            series=("Élèves",),
+            series=(tr("Élèves"),),
             points=[
                 Point(
                     r["name"],
                     (r["count"],),
-                    f"{r['name']} : {_plural(r['count'], 'élève')}"
-                    + (f" pour {r['capacity']} places" if r.get("capacity") else ""),
+                    tr("{0} : {1}", r["name"], _plural(r["count"], tr("élève"), tr("élèves")))
+                    + (tr(" pour {0} places", r["capacity"]) if r.get("capacity") else ""),
                 )
                 for r in classes
             ]
             if any(r["count"] for r in classes)
             else [],
-            note=f"Élèves inscrits par classe active, année {year}",
-            empty_text=empty if classes else f"Aucune classe active en {year}.",
+            note=tr("Élèves inscrits par classe active, année {0}", year),
+            empty_text=empty if classes else tr("Aucune classe active en {0}.", year),
         )
         months = data.get("by_month", [])
         trend = ChartData(
-            series=("Élèves inscrits",),
+            series=(tr("Élèves inscrits"),),
             points=[
                 Point(
                     _month(m["month"])[0],
                     (m["enrolled"],),
-                    f"Fin {_month(m['month'])[1]} : {_plural(m['enrolled'], 'élève')} inscrits",
+                    tr(
+                        "Fin {0} : {1} inscrits",
+                        _month(m["month"])[1],
+                        _plural(m["enrolled"], tr("élève"), tr("élèves")),
+                    ),
                 )
                 for m in months
             ]
             if any(m["enrolled"] for m in months)
             else [],
-            note=f"Élèves inscrits à la fin de chaque mois, année {year}",
+            note=tr("Élèves inscrits à la fin de chaque mois, année {0}", year),
             empty_text=empty,
         )
         return by_level, by_class, trend

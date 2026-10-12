@@ -11,9 +11,10 @@ evaluates compatibility, it relays the server's lists.
 """
 
 from ..api.errors import ValidationFailed
+from ..i18n import Labels, tr
 from ..models import Course, EligibleTeacher
 
-REQUIRED = {"class_id": "Classe", "subject_id": "Matière", "teacher_id": "Enseignant"}
+REQUIRED = Labels({"class_id": "Classe", "subject_id": "Matière", "teacher_id": "Enseignant"})
 
 
 class CourseService:
@@ -73,7 +74,7 @@ class CourseService:
 
     def create(self, *, class_id, subject_id, teacher_id, coefficient=None, weekly_hours=None, scale_id=None):
         values = {"class_id": class_id, "subject_id": subject_id, "teacher_id": teacher_id}
-        missing = {name: ["Obligatoire."] for name in REQUIRED if not values[name]}
+        missing = {name: [tr("Obligatoire.")] for name in REQUIRED if not values[name]}
         if missing:
             raise ValidationFailed("Formulaire incomplet.", details=missing)
         fields = dict(values)
@@ -88,7 +89,7 @@ class CourseService:
         """Editable: teacher, coefficient, weekly hours, grading scale (class,
         subject and year are fixed by the server)."""
         if "teacher_id" in fields and not fields["teacher_id"]:
-            raise ValidationFailed("Formulaire incomplet.", details={"teacher": ["Obligatoire."]})
+            raise ValidationFailed("Formulaire incomplet.", details={"teacher": [tr("Obligatoire.")]})
         return Course.from_api(self.api.patch(f"{self.PATH}{course_id}/", self._payload(fields)))
 
     def deactivate(self, course_id):

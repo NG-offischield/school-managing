@@ -12,23 +12,28 @@ from dataclasses import dataclass
 from datetime import date, datetime
 
 from ..api.errors import ValidationFailed
+from ..i18n import Labels, tr
 
-DAILY_STATUSES = {
-    "PENDING": "En attente",
-    "PRESENT": "Présent",
-    "LATE": "En retard",
-    "ABSENT": "Absent",
-    "EXCUSED": "Absence justifiée",
-}
-SCAN_RESULTS = {
-    "ACCEPTED": "Accepté (arrivée)",
-    "ALREADY_PRESENT": "Accepté (déjà présent)",
-    "UNKNOWN_TOKEN": "QR inconnu",
-    "REVOKED_TOKEN": "QR révoqué",
-    "EXPIRED_TOKEN": "QR d'une autre année",
-    "STUDENT_NOT_ENROLLED": "Élève non inscrit",
-}
-ACCOUNT_STATUSES = {"ACTIVE": "Actif", "SUSPENDED": "Suspendu", "PENDING": "En attente", "LEFT": "Parti"}
+DAILY_STATUSES = Labels(
+    {
+        "PENDING": "En attente",
+        "PRESENT": "Présent",
+        "LATE": "En retard",
+        "ABSENT": "Absent",
+        "EXCUSED": "Absence justifiée",
+    }
+)
+SCAN_RESULTS = Labels(
+    {
+        "ACCEPTED": "Accepté (arrivée)",
+        "ALREADY_PRESENT": "Accepté (déjà présent)",
+        "UNKNOWN_TOKEN": "QR inconnu",
+        "REVOKED_TOKEN": "QR révoqué",
+        "EXPIRED_TOKEN": "QR d'une autre année",
+        "STUDENT_NOT_ENROLLED": "Élève non inscrit",
+    }
+)
+ACCOUNT_STATUSES = Labels({"ACTIVE": "Actif", "SUSPENDED": "Suspendu", "PENDING": "En attente", "LEFT": "Parti"})
 
 
 def _when(value):
@@ -125,7 +130,7 @@ class Guardian:
     @property
     def account_label(self):
         if self.account_status == "ACTIVE" and not self.activated:
-            return "À activer"
+            return tr("À activer")
         return ACCOUNT_STATUSES.get(self.account_status, self.account_status)
 
     @classmethod
@@ -178,7 +183,7 @@ class AttendanceService:
             if not (v or "").strip()
         ]
         if missing:
-            raise ValidationFailed("Formulaire incomplet.", details={k: ["Obligatoire."] for k in missing})
+            raise ValidationFailed("Formulaire incomplet.", details={k: [tr("Obligatoire.")] for k in missing})
         payload = {
             "first_name": first_name.strip(),
             "last_name": last_name.strip(),

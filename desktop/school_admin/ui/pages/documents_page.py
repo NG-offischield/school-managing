@@ -15,6 +15,7 @@ document, authenticity check by code. No PDF logic in the desktop.
 
 from PySide6.QtWidgets import QDialog, QFileDialog, QTabWidget
 
+from ...i18n import Texts, Tr, tr
 from ...models import DOCUMENT_KINDS, DOCUMENT_STATUSES
 from ..dialogs.document_dialogs import (
     ComputeReportCardsDialog,
@@ -29,40 +30,44 @@ from .finance_page import coloured
 from .planning_page import _combo
 from .plans_page import PlansPage
 
-TABS = (
-    ("report_cards", "Bulletins", ("REPORT_CARD",)),
-    ("cards", "Cartes élèves", ("STUDENT_CARD",)),
-    ("timetables", "Emplois du temps", ("TIMETABLE",)),
-    ("receipts", "Reçus", ("PAYMENT_RECEIPT",)),
-    ("payslips", "Bulletins de paie", ("PAYSLIP",)),
-    ("attendance", "Relevés de présence", ("STUDENT_ATTENDANCE", "CLASS_ATTENDANCE")),
+TABS = Texts(
+    (
+        ("report_cards", "Bulletins", ("REPORT_CARD",)),
+        ("cards", "Cartes élèves", ("STUDENT_CARD",)),
+        ("timetables", "Emplois du temps", ("TIMETABLE",)),
+        ("receipts", "Reçus", ("PAYMENT_RECEIPT",)),
+        ("payslips", "Bulletins de paie", ("PAYSLIP",)),
+        ("attendance", "Relevés de présence", ("STUDENT_ATTENDANCE", "CLASS_ATTENDANCE")),
+    )
 )
 STATUS_COLOURS = TokenColours(OFFICIAL="success", PROVISIONAL="warning")
 
 
 def ask_save_path(parent, name):
-    path, _ = QFileDialog.getSaveFileName(parent, "Enregistrer le PDF", name, "PDF (*.pdf)")
+    path, _ = QFileDialog.getSaveFileName(parent, tr("Enregistrer le PDF"), name, tr("PDF (*.pdf)"))
     return path
 
 
 class DocumentKindPage(PagedCatalogPage):
-    columns = ["Titre", "Type", "Version", "Généré le", "Code de vérification", STATUS_COLUMN_TITLE]
+    columns = Tr(["Titre", "Type", "Version", "Généré le", "Code de vérification", STATUS_COLUMN_TITLE])
     noun = "document"
     feminine = False
-    search_placeholder = "Rechercher par titre ou code de vérification…"
-    status_filters = [("Statut : tous", None), *((label, code) for code, label in DOCUMENT_STATUSES.items())]
+    search_placeholder = Tr("Rechercher par titre ou code de vérification…")
+    status_filters = Tr([("Statut : tous", None), *((label, code) for code, label in DOCUMENT_STATUSES.items())])
     has_toggle = False
     narrow_hidden = (1, 2)
 
     def __init__(self, title, kinds, sources, runner, parent=None, **kwargs):
         self.title, self.kinds, self.sources = title, kinds, sources
         self.documents = sources["documents"]
-        self.description = "Documents officiels de l'école, produits par le serveur aux couleurs de l'établissement."
+        self.description = tr(
+            "Documents officiels de l'école, produits par le serveur aux couleurs de l'établissement."
+        )
         self.save_path = ask_save_path
         super().__init__(runner, parent, **kwargs)
         self.edit_button.hide()
-        self.add_button.setText("Générer…")
-        self.add_button.setToolTip("Générer (ou retrouver) le document à jour")
+        self.add_button.setText(tr("Générer…"))
+        self.add_button.setToolTip(tr("Générer (ou retrouver) le document à jour"))
         self.detail_button.clicked.connect(self.open_row)
         self.download_button.clicked.connect(lambda: self.download(self.selected()))
         self.regenerate_button.clicked.connect(lambda: self.regenerate(self.selected()))
@@ -74,21 +79,21 @@ class DocumentKindPage(PagedCatalogPage):
         return {0}
 
     def leading_actions(self):
-        self.detail_button = button("Détail", tooltip="Métadonnées du document (Entrée)")
+        self.detail_button = button(tr("Détail"), tooltip=tr("Métadonnées du document (Entrée)"))
         return [self.detail_button]
 
     def extra_actions(self):
-        self.verify_button = button("Vérifier…", tooltip="Authenticité d'un document imprimé")
-        self.regenerate_button = button("Regénérer")
-        self.download_button = button("Télécharger…")
-        self.compute_button = button("Calculer les bulletins…") if self.kinds == ("REPORT_CARD",) else None
+        self.verify_button = button(tr("Vérifier…"), tooltip=tr("Authenticité d'un document imprimé"))
+        self.regenerate_button = button(tr("Regénérer"))
+        self.download_button = button(tr("Télécharger…"))
+        self.compute_button = button(tr("Calculer les bulletins…")) if self.kinds == ("REPORT_CARD",) else None
         extras = [self.verify_button, self.regenerate_button, self.download_button]
         return [self.compute_button, *extras] if self.compute_button else extras
 
     def add_filters(self, layout):
         self.kind_filter = None
         if len(self.kinds) > 1:
-            self.kind_filter = _combo("Type de document", DOCUMENT_KINDS[self.kinds[0]], 190)
+            self.kind_filter = _combo(tr("Type de document"), DOCUMENT_KINDS[self.kinds[0]], 190)
             self.kind_filter.setItemData(0, self.kinds[0])
             for kind in self.kinds[1:]:
                 self.kind_filter.addItem(DOCUMENT_KINDS[kind], kind)
@@ -105,7 +110,7 @@ class DocumentKindPage(PagedCatalogPage):
             self.download_button.setEnabled(row is not None)
             provisional = row is not None and row.status == "PROVISIONAL"
             self.regenerate_button.setEnabled(provisional)
-            self.regenerate_button.setToolTip("" if provisional else "Seul un document provisoire se regénère.")
+            self.regenerate_button.setToolTip("" if provisional else tr("Seul un document provisoire se regénère."))
 
     def status_cell(self, row):
         return coloured(row.status_label, STATUS_COLOURS.get(row.status, TOKENS.text_secondary))
@@ -161,10 +166,10 @@ class DocumentKindPage(PagedCatalogPage):
         def open_form(context):
             context.update(
                 search_students=lambda text, done: self.call(
-                    lambda: self.sources["finance"].find_students(text), done, action="Recherche impossible"
+                    lambda: self.sources["finance"].find_students(text), done, action=tr("Recherche impossible")
                 ),
                 load_cards=lambda student, done: self.call(
-                    lambda: self.documents.report_cards(student), done, action="Impossible de charger les bulletins"
+                    lambda: self.documents.report_cards(student), done, action=tr("Impossible de charger les bulletins")
                 ),
                 find_payments=lambda text, done: self.call(
                     lambda: [
@@ -173,7 +178,7 @@ class DocumentKindPage(PagedCatalogPage):
                         if p.status in ("SUCCEEDED", "PARTIALLY_REFUNDED", "REFUNDED")
                     ],
                     done,
-                    action="Recherche impossible",
+                    action=tr("Recherche impossible"),
                 ),
             )
             values = self.ask("generate", document_kind=kind, sources=context)
@@ -182,12 +187,17 @@ class DocumentKindPage(PagedCatalogPage):
                     lambda: self.documents.generate(kind, **values),
                     lambda document: self._reselect(
                         document.id,
-                        f"{document.kind_label} prêt : « {document.title} » ({document.status_label.lower()}).",
+                        tr(
+                            "{0} prêt : « {1} » ({2}).",
+                            document.kind_label,
+                            document.title,
+                            document.status_label.lower(),
+                        ),
                     ),
-                    action="Impossible de générer le document",
+                    action=tr("Impossible de générer le document"),
                 )
 
-        self.call(self._generation_sources, open_form, action="Impossible de préparer la génération")
+        self.call(self._generation_sources, open_form, action=tr("Impossible de préparer la génération"))
 
     def open_row(self):
         row = self.selected()
@@ -201,7 +211,7 @@ class DocumentKindPage(PagedCatalogPage):
             elif action == "regenerate":
                 self.regenerate(document)
 
-        self.call(lambda: self.documents.document(row.id), show, action="Impossible de charger le document")
+        self.call(lambda: self.documents.document(row.id), show, action=tr("Impossible de charger le document"))
 
     def edit(self):
         self.open_row()
@@ -216,9 +226,11 @@ class DocumentKindPage(PagedCatalogPage):
         def save(content):
             with open(path, "wb") as handle:
                 handle.write(content)
-            self.success(f"PDF enregistré : {document.file_name}.")
+            self.success(tr("PDF enregistré : {0}.", document.file_name))
 
-        self.call(lambda: self.documents.download(document.id), save, action="Impossible de télécharger le document")
+        self.call(
+            lambda: self.documents.download(document.id), save, action=tr("Impossible de télécharger le document")
+        )
 
     def regenerate(self, document):
         if document is None:
@@ -226,9 +238,9 @@ class DocumentKindPage(PagedCatalogPage):
         self.call(
             lambda: self.documents.regenerate(document.id),
             lambda saved: self._reselect(
-                saved.id, f"Document regénéré (version {saved.version}) ; l'ancien est conservé."
+                saved.id, tr("Document regénéré (version {0}) ; l'ancien est conservé.", saved.version)
             ),
-            action="Impossible de regénérer le document",
+            action=tr("Impossible de regénérer le document"),
         )
 
     def verify(self):
@@ -237,16 +249,16 @@ class DocumentKindPage(PagedCatalogPage):
             return
 
         def show(result):
-            title = result.get("title") or "(document non lisible avec vos droits)"
-            state = "à jour" if result.get("current") else "remplacé par une version plus récente"
+            title = result.get("title") or tr("(document non lisible avec vos droits)")
+            state = tr("à jour") if result.get("current") else tr("remplacé par une version plus récente")
             self.banner.show_message(
                 "success" if result.get("current") else "warning",
                 f"{DOCUMENT_KINDS.get(result.get('kind'), result.get('kind'))} · "
                 f"{DOCUMENT_STATUSES.get(result.get('status'), result.get('status'))} · {state} — {title}",
-                title="Document authentique",
+                title=tr("Document authentique"),
             )
 
-        self.call(lambda: self.documents.verify(values["code"]), show, action="Code inconnu pour cette école")
+        self.call(lambda: self.documents.verify(values["code"]), show, action=tr("Code inconnu pour cette école"))
 
     def compute_report_cards(self):
         def open_form(lists):
@@ -255,19 +267,21 @@ class DocumentKindPage(PagedCatalogPage):
             if values:
                 self.call(
                     lambda: self.documents.compute_report_cards(values["class_id"], values["period_id"]),
-                    lambda cards: self.success(f"{len(cards)} bulletin(s) calculé(s) : générez maintenant leur PDF."),
-                    action="Impossible de calculer les bulletins",
+                    lambda cards: self.success(
+                        tr("{0} bulletin(s) calculé(s) : générez maintenant leur PDF.", len(cards))
+                    ),
+                    action=tr("Impossible de calculer les bulletins"),
                 )
 
         self.call(
             lambda: (self.sources["references"].classes(), self.documents.periods()),
             open_form,
-            action="Impossible de charger les classes et les périodes",
+            action=tr("Impossible de charger les classes et les périodes"),
         )
 
 
 class DocumentsPage(Page):
-    title = "Documents"
+    title = Tr("Documents")
 
     def __init__(self, documents, finance, payroll, references, teachers, runner, parent=None, *, plans=None, **kwargs):
         super().__init__(runner, parent, **kwargs)
@@ -291,7 +305,7 @@ class DocumentsPage(Page):
         if plans is not None:
             self.plans = PlansPage(plans, references, runner, **kwargs)
             self.pages["plans"] = self.plans
-            self.tabs.addTab(self.plans, "Plans")
+            self.tabs.addTab(self.plans, tr("Plans"))
             self.plans.session_expired.connect(self.session_expired.emit)
         self.layout_.addWidget(self.tabs)
         self.tabs.currentChanged.connect(lambda _: self.tabs.currentWidget().activate())

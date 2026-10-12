@@ -23,6 +23,8 @@ from PySide6.QtCore import QDate, QLocale, QObject, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QGuiApplication, QPalette, QTextCharFormat
 from PySide6.QtWidgets import QApplication, QCalendarWidget, QStyleFactory
 
+from ..i18n import Labels, language, tr
+
 ASSETS = Path(__file__).resolve().parent / "assets"
 
 
@@ -472,7 +474,10 @@ def style_calendar(calendar: QCalendarWidget, t=TOKENS, today=None):
     weekends in `calendar_weekend`, and TODAY marked (dark blue, bold,
     underlined) so it never looks like the SELECTED day (solid primary tile).
     Display only: the selected date and its format are untouched."""
-    calendar.setLocale(QLocale(QLocale.French, QLocale.France))
+    english = language() == "en"
+    calendar.setLocale(
+        QLocale(QLocale.English, QLocale.UnitedKingdom) if english else QLocale(QLocale.French, QLocale.France)
+    )
     calendar.setFirstDayOfWeek(Qt.Monday)
     calendar.setGridVisible(False)
     calendar.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)
@@ -507,7 +512,7 @@ def theme_events():
     return _EVENTS
 
 
-THEME_MODES = {"system": "Système", "light": "Clair", "dark": "Sombre"}
+THEME_MODES = Labels({"system": "Système", "light": "Clair", "dark": "Sombre"})
 
 
 def system_prefers_dark(app=None):
@@ -529,7 +534,7 @@ def apply_theme(app, mode="light"):
     open windows are re-polished, calendars restyled; pages that coloured
     table cells reload them (MainWindow.refresh_theme)."""
     set_active_tokens(resolve_mode(mode, app))
-    style = QStyleFactory.create("Fusion")
+    style = QStyleFactory.create(tr("Fusion"))
     app.setStyle(style)
     # Once a style sheet is set, Qt wraps the style (QStyleSheetStyle):
     # remember the base style for diagnostics and tests.

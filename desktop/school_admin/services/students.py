@@ -14,16 +14,19 @@ the only checks here are that required fields are filled before a call.
 from datetime import datetime
 
 from ..api.errors import NotFound, ValidationFailed
+from ..i18n import Labels, tr
 from ..models import Enrollment, HistoryEntry, Student
 
-REQUIRED = {
-    "student_number": "Matricule",
-    "registration_number": "N° d'inscription",
-    "last_name": "Nom",
-    "first_name": "Prénom(s)",
-    "date_of_birth": "Date de naissance",
-    "sex": "Sexe",
-}
+REQUIRED = Labels(
+    {
+        "student_number": "Matricule",
+        "registration_number": "N° d'inscription",
+        "last_name": "Nom",
+        "first_name": "Prénom(s)",
+        "date_of_birth": "Date de naissance",
+        "sex": "Sexe",
+    }
+)
 PHOTO_TYPES = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
 PHOTO_MAX_BYTES = 3 * 1024 * 1024  # same limit as the server (which decides)
 
@@ -101,7 +104,7 @@ class StudentService:
     @staticmethod
     def _require(fields, creating):
         errors = {
-            name: ["Obligatoire."]
+            name: [tr("Obligatoire.")]
             for name in REQUIRED
             if (creating or name in fields) and not (str(fields.get(name) or "").strip())
         }
@@ -132,7 +135,7 @@ class StudentService:
 
     def enroll(self, student_id, class_id, enrollment_date=None):
         if not class_id:
-            raise ValidationFailed("Formulaire incomplet.", details={"school_class": ["Choisissez une classe."]})
+            raise ValidationFailed("Formulaire incomplet.", details={"school_class": [tr("Choisissez une classe.")]})
         payload = {"school_class": class_id}
         if enrollment_date:
             payload["enrollment_date"] = enrollment_date.isoformat()
@@ -140,7 +143,7 @@ class StudentService:
 
     def change_class(self, enrollment_id, class_id):
         if not class_id:
-            raise ValidationFailed("Formulaire incomplet.", details={"school_class": ["Choisissez une classe."]})
+            raise ValidationFailed("Formulaire incomplet.", details={"school_class": [tr("Choisissez une classe.")]})
         return Enrollment.from_api(
             self.api.post(f"enrollments/{enrollment_id}/change-class/", {"school_class": class_id})
         )
@@ -154,7 +157,7 @@ class StudentService:
         real type and size, re-encodes it and keeps it private."""
         extension = extension.lower().lstrip(".")
         if extension not in PHOTO_TYPES:
-            raise ValidationFailed("Utilisez une image JPEG, PNG ou WebP.", details={"photo": ["Format."]})
+            raise ValidationFailed("Utilisez une image JPEG, PNG ou WebP.", details={"photo": [tr("Format.")]})
         row = self.api.upload(
             f"{self.PATH}{student_id}/photo/",
             "photo",

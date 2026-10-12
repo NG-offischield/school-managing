@@ -9,6 +9,7 @@ list, never free text); the backend enforces it too.
 """
 
 from ..api.errors import ValidationFailed
+from ..i18n import tr
 from ..models import Category, Subject
 
 
@@ -35,7 +36,7 @@ class CategoryService:
         if not code or not name:
             raise ValidationFailed(
                 "Le code et le nom sont obligatoires.",
-                details={"code": ["Obligatoire."]} if not code else {"name": ["Obligatoire."]},
+                details={"code": [tr("Obligatoire.")]} if not code else {"name": [tr("Obligatoire.")]},
             )
         payload = {"code": code, "name": name, "description": _clean(description) or None}
         return Category.from_api(self.api.post(self.PATH, payload))
@@ -44,7 +45,7 @@ class CategoryService:
         """The code is immutable server-side: only name and description change."""
         name = _clean(name)
         if not name:
-            raise ValidationFailed("Le nom est obligatoire.", details={"name": ["Obligatoire."]})
+            raise ValidationFailed("Le nom est obligatoire.", details={"name": [tr("Obligatoire.")]})
         payload = {"name": name, "description": _clean(description) or None}
         return Category.from_api(self.api.patch(f"{self.PATH}{category_id}/", payload))
 
@@ -71,11 +72,11 @@ class SubjectService:
     def _require(code=None, name=None, category_id=None, creating=True):
         errors = {}
         if creating and not _clean(code):
-            errors["code"] = ["Obligatoire."]
+            errors["code"] = [tr("Obligatoire.")]
         if not _clean(name):
-            errors["name"] = ["Obligatoire."]
+            errors["name"] = [tr("Obligatoire.")]
         if not category_id:
-            errors["category"] = ["Choisissez une catégorie existante."]
+            errors["category"] = [tr("Choisissez une catégorie existante.")]
         if errors:
             raise ValidationFailed(
                 "Formulaire incomplet : une matière appartient toujours à une catégorie.", details=errors

@@ -5,22 +5,25 @@ official documents produced by the server."""
 from PySide6.QtWidgets import QLabel
 
 from ... import __version__
+from ...i18n import tr
 from ..branding import SOFTWARE_NAME, brand_mark
 from ..widgets import FormDialog
 
 
 class AboutDialog(FormDialog):
     def __init__(self, parent=None):
-        super().__init__(f"À propos de {SOFTWARE_NAME}", "", parent, save_text="Fermer", width=480)
+        super().__init__(tr("À propos de {0}", SOFTWARE_NAME), "", parent, save_text=tr("Fermer"), width=480)
         self.cancel_button.hide()
         self.brand = brand_mark("horizontal", 56, object_name="softwareBrandLogin")
         self.body.addWidget(self.brand)
         for text, name in (
             (f"Version {__version__}", "fieldValue"),
-            ("Poste d'administration de l'école : années, classes, élèves, enseignants, cours, planning.", "help"),
+            (tr("Poste d'administration de l'école : années, classes, élèves, enseignants, cours, planning."), "help"),
             (
-                "Les documents officiels (bulletins, cartes, reçus, fiches de paie, emplois du temps…) portent "
-                "toujours le logo et les couleurs de l'établissement, jamais celui du logiciel.",
+                tr(
+                    "Les documents officiels (bulletins, cartes, reçus, fiches de paie, emplois du temps…) portent "
+                    "toujours le logo et les couleurs de l'établissement, jamais celui du logiciel."
+                ),
                 "help",
             ),
         ):

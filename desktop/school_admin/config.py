@@ -21,6 +21,7 @@ DEFAULT_API_URL = "http://127.0.0.1:8000/api/v1/"
 APP_DIR_NAME = "SchoolManagingDesktop"
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 THEMES = ("system", "light", "dark")
+LANGUAGES = ("fr", "en")  # interface language; the server answers in it too
 
 
 def config_dir():
@@ -67,7 +68,8 @@ def load_config(env=None, directory=None):
     api_url = env.get("SCHOOL_ADMIN_API_URL") or values.get("api_url") or DEFAULT_API_URL
     timeout = float(env.get("SCHOOL_ADMIN_TIMEOUT") or values.get("timeout") or 10.0)
     theme = values.get("theme") if values.get("theme") in THEMES else "system"
-    return AppConfig(api_url=_normalise(api_url), timeout=timeout, language=values.get("language", "fr"), theme=theme)
+    language = values.get("language") if values.get("language") in LANGUAGES else "fr"
+    return AppConfig(api_url=_normalise(api_url), timeout=timeout, language=language, theme=theme)
 
 
 def save_preference(key, value, directory=None):

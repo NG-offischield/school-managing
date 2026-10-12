@@ -8,6 +8,7 @@ default room); the server enforces every rule."""
 
 from PySide6.QtWidgets import QComboBox, QDialog
 
+from ...i18n import Tr, tr
 from ...services.classes import RegimeService
 from ..dialogs.class_dialog import ClassDialog
 from ..dialogs.regime_dialog import RegimeDialog
@@ -19,11 +20,11 @@ ALL_LEVELS = "Tous les niveaux"
 
 
 class ClassesPage(CatalogPage):
-    title = "Classes"
-    description = "Classes de chaque année scolaire, avec leur niveau et leur salle principale."
-    columns = ["Nom", "Niveau", "Année scolaire", "Salle principale", "Capacité", STATUS_COLUMN_TITLE]
+    title = Tr("Classes")
+    description = Tr("Classes de chaque année scolaire, avec leur niveau et leur salle principale.")
+    columns = Tr(["Nom", "Niveau", "Année scolaire", "Salle principale", "Capacité", STATUS_COLUMN_TITLE])
     noun = "classe"
-    search_placeholder = "Rechercher par nom ou niveau…"
+    search_placeholder = Tr("Rechercher par nom ou niveau…")
 
     def __init__(self, service, references, runner, parent=None, *, dialog=ClassDialog, regimes=None, **kwargs):
         self.service = service
@@ -41,7 +42,7 @@ class ClassesPage(CatalogPage):
 
     def extra_actions(self):
         self.regimes_button = button(
-            "Régimes horaires…", tooltip="Cours du jour / du soir : fenêtres horaires facultatives des classes"
+            tr("Régimes horaires…"), tooltip=tr("Cours du jour / du soir : fenêtres horaires facultatives des classes")
         )
         self.regimes_button.clicked.connect(self.manage_regimes)
         return [self.regimes_button]
@@ -51,15 +52,15 @@ class ClassesPage(CatalogPage):
 
     def add_filters(self, layout):
         self.year_filter = QComboBox()
-        self.year_filter.setAccessibleName("Filtrer par année scolaire")
-        self.year_filter.setToolTip("Filtrer par année scolaire")
+        self.year_filter.setAccessibleName(tr("Filtrer par année scolaire"))
+        self.year_filter.setToolTip(tr("Filtrer par année scolaire"))
         self.year_filter.setMinimumWidth(220)
-        self.year_filter.addItem(ALL_YEARS, None)
+        self.year_filter.addItem(tr(ALL_YEARS), None)
         self.level_filter = QComboBox()
-        self.level_filter.setAccessibleName("Filtrer par niveau")
-        self.level_filter.setToolTip("Filtrer par niveau")
+        self.level_filter.setAccessibleName(tr("Filtrer par niveau"))
+        self.level_filter.setToolTip(tr("Filtrer par niveau"))
         self.level_filter.setMinimumWidth(170)
-        self.level_filter.addItem(ALL_LEVELS, None)
+        self.level_filter.addItem(tr(ALL_LEVELS), None)
         for combo in (self.year_filter, self.level_filter):
             combo.currentIndexChanged.connect(lambda _: self._filters_ready and self.reload())
             layout.addWidget(combo)
@@ -69,7 +70,7 @@ class ClassesPage(CatalogPage):
         self.call(
             lambda: (self.references.years(), self.references.levels(active_only=False)),
             self._fill_filters,
-            action="Impossible de charger les années et les niveaux",
+            action=tr("Impossible de charger les années et les niveaux"),
         )
 
     def _fill_filters(self, references):
@@ -78,7 +79,7 @@ class ClassesPage(CatalogPage):
         first_time = not self._filters_ready
         self._filters_ready = False
         self.year_filter.clear()
-        self.year_filter.addItem(ALL_YEARS, None)
+        self.year_filter.addItem(tr(ALL_YEARS), None)
         for year in years:
             self.year_filter.addItem(year.label, year.id)
         if first_time:  # default: the current year, which is what the administrator works on
@@ -86,9 +87,9 @@ class ClassesPage(CatalogPage):
             current_year = current.id if current else None
         self.year_filter.setCurrentIndex(max(0, self.year_filter.findData(current_year)))
         self.level_filter.clear()
-        self.level_filter.addItem(ALL_LEVELS, None)
+        self.level_filter.addItem(tr(ALL_LEVELS), None)
         for level in levels:
-            self.level_filter.addItem(level.label if level.active else f"{level.label} (inactif)", level.id)
+            self.level_filter.addItem(level.label if level.active else tr("{0} (inactif)", level.label), level.id)
         self.level_filter.setCurrentIndex(max(0, self.level_filter.findData(current_level)))
         self._filters_ready = True
         self.reload()
@@ -102,7 +103,7 @@ class ClassesPage(CatalogPage):
         )
 
     def cells(self, row):
-        capacity = f"{row.capacity} élèves" if row.capacity else "—"
+        capacity = tr("{0} élèves", row.capacity) if row.capacity else "—"
         room = row.main_room_label or "—"
         if row.regime_label:
             room = f"{room} · {row.regime_label}"
@@ -125,7 +126,7 @@ class ClassesPage(CatalogPage):
                 self.references.regimes(),
             ),
             then,
-            action="Impossible de charger les années, niveaux, salles et régimes",
+            action=tr("Impossible de charger les années, niveaux, salles et régimes"),
         )
 
     # --- timetable regimes ------------------------------------------------------------
@@ -143,19 +144,21 @@ class ClassesPage(CatalogPage):
             if regime_id:
                 values.pop("academic_year_id")
                 call = lambda: self.regime_service.update(regime_id, **values)  # noqa: E731
-                done, failed = "modifié", "Impossible de modifier le régime horaire"
+                done, failed = tr("modifié"), tr("Impossible de modifier le régime horaire")
             else:
                 values.pop("active")
                 call = lambda: self.regime_service.create(**values)  # noqa: E731
-                done, failed = "créé", "Impossible de créer le régime horaire"
+                done, failed = tr("créé"), tr("Impossible de créer le régime horaire")
             self.call(
-                call, lambda saved: self.success(f"Régime horaire « {saved.name} » {done} avec succès."), action=failed
+                call,
+                lambda saved: self.success(tr("Régime horaire « {0} » {1} avec succès.", saved.name, done)),
+                action=failed,
             )
 
         self.call(
             lambda: (self.references.years(open_only=True), self.regime_service.list()),
             open_form,
-            action="Impossible de charger les régimes horaires",
+            action=tr("Impossible de charger les régimes horaires"),
         )
 
     def add(self):
@@ -164,8 +167,8 @@ class ClassesPage(CatalogPage):
             if values:
                 self.call(
                     lambda: self.service.create(**values),
-                    lambda saved: self._saved(saved, "créée"),
-                    action="Impossible de créer la classe",
+                    lambda saved: self._saved(saved, tr("créée")),
+                    action=tr("Impossible de créer la classe"),
                 )
 
         self._with_references(open_form)
@@ -181,8 +184,8 @@ class ClassesPage(CatalogPage):
                 values.pop("academic_year_id")  # fixed at creation
                 self.call(
                     lambda: self.service.update(row.id, **values),
-                    lambda saved: self._saved(saved, "modifiée"),
-                    action="Impossible de modifier la classe",
+                    lambda saved: self._saved(saved, tr("modifiée")),
+                    action=tr("Impossible de modifier la classe"),
                 )
 
         self._with_references(open_form)

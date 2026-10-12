@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ...i18n import Labels, tr
 from ...models import SEXES, STUDENT_STATUSES
 from ...services.students import PHOTO_MAX_BYTES, PHOTO_TYPES
 from ..widgets import FormDialog, button, date_field
@@ -41,17 +42,19 @@ NO_DATE = "jj/mm/aaaa"
 PHOTO_SIZE = (96, 120)
 EARLIEST = QDate(1900, 1, 1)
 
-HISTORY_LABELS = {
-    "STUDENT_CREATED": "Fiche créée",
-    "STUDENT_UPDATED": "Fiche modifiée",
-    "STUDENT_ARCHIVED": "Élève archivé",
-    "STUDENT_REACTIVATED": "Élève réactivé",
-    "STUDENT_ENROLLED": "Inscription",
-    "STUDENT_CLASS_CHANGED": "Changement de classe",
-    "STUDENT_WITHDRAWN": "Retrait de la classe",
-    "STUDENT_PHOTO_SET": "Photo ajoutée",
-    "STUDENT_PHOTO_REMOVED": "Photo retirée",
-}
+HISTORY_LABELS = Labels(
+    {
+        "STUDENT_CREATED": "Fiche créée",
+        "STUDENT_UPDATED": "Fiche modifiée",
+        "STUDENT_ARCHIVED": "Élève archivé",
+        "STUDENT_REACTIVATED": "Élève réactivé",
+        "STUDENT_ENROLLED": "Inscription",
+        "STUDENT_CLASS_CHANGED": "Changement de classe",
+        "STUDENT_WITHDRAWN": "Retrait de la classe",
+        "STUDENT_PHOTO_SET": "Photo ajoutée",
+        "STUDENT_PHOTO_REMOVED": "Photo retirée",
+    }
+)
 
 
 def _qdate(value):
@@ -71,13 +74,13 @@ def photo_pixmap(content):
 
 
 def photo_frame(content=None):
-    frame = QLabel("Pas de photo", objectName="photoFrame", alignment=Qt.AlignCenter)
+    frame = QLabel(tr("Pas de photo"), objectName="photoFrame", alignment=Qt.AlignCenter)
     frame.setFixedSize(*PHOTO_SIZE)
     frame.setWordWrap(True)
     pixmap = photo_pixmap(content)
     if pixmap is not None:
         frame.setPixmap(pixmap)
-    frame.setAccessibleName("Photo de l'élève")
+    frame.setAccessibleName(tr("Photo de l'élève"))
     return frame
 
 
@@ -91,21 +94,21 @@ class ClassPicker:
     def __init__(self, dialog, years, levels, classes, *, fixed_year=None, current=None, on_change=None):
         self.classes = classes
         self.on_change = on_change or (lambda: None)
-        self.year = dialog.add_field("academic_year", "Année scolaire", QComboBox(), required=True, width="medium")
-        self.level = dialog.add_field("level", "Niveau", QComboBox(), required=True, width="medium", beside=True)
-        self.school_class = dialog.add_field("school_class", "Classe", QComboBox(), required=True, width="medium")
+        self.year = dialog.add_field("academic_year", tr("Année scolaire"), QComboBox(), required=True, width="medium")
+        self.level = dialog.add_field("level", tr("Niveau"), QComboBox(), required=True, width="medium", beside=True)
+        self.school_class = dialog.add_field("school_class", tr("Classe"), QComboBox(), required=True, width="medium")
         self.hint = QLabel("", objectName="help")
         self.hint.setWordWrap(True)
         dialog.body.addWidget(self.hint)
         if fixed_year is None:
-            self.year.addItem(CHOOSE_YEAR, None)
+            self.year.addItem(tr(CHOOSE_YEAR), None)
             for year in years:
                 self.year.addItem(year.short_label, year.id)
             self.year.setCurrentIndex(1 if years else 0)  # the current year comes first
         else:
             self.year.addItem(fixed_year[1], fixed_year[0])
             self.year.setEnabled(False)  # a class change stays in the enrollment's year
-        self.level.addItem(CHOOSE_LEVEL, None)
+        self.level.addItem(tr(CHOOSE_LEVEL), None)
         for level in levels:
             self.level.addItem(level.label, level.id)
         self.current = current  # class id to leave out (class change)
@@ -123,24 +126,24 @@ class ClassPicker:
         chosen = self.school_class.currentData()
         self.school_class.blockSignals(True)
         self.school_class.clear()
-        self.school_class.addItem(CHOOSE_CLASS, None)
+        self.school_class.addItem(tr(CHOOSE_CLASS), None)
         matching = [
             c for c in self.classes if c.year_id == year and c.level_id == level and c.id != self.current and c.active
         ]
         for school_class in matching:
-            places = f" · {school_class.capacity} places" if school_class.capacity else ""
+            places = tr(" · {0} places", school_class.capacity) if school_class.capacity else ""
             self.school_class.addItem(f"{school_class.name}{places}", school_class.id)
         self.school_class.setCurrentIndex(max(0, self.school_class.findData(chosen)))
         self.school_class.setEnabled(bool(matching))
         self.school_class.blockSignals(False)
         if not year:
-            self.hint.setText("Choisissez d'abord l'année scolaire.")
+            self.hint.setText(tr("Choisissez d'abord l'année scolaire."))
         elif not level:
-            self.hint.setText("Choisissez le niveau : seules ses classes de cette année sont proposées.")
+            self.hint.setText(tr("Choisissez le niveau : seules ses classes de cette année sont proposées."))
         elif not matching:
-            self.hint.setText("Aucune classe active pour ce niveau dans cette année.")
+            self.hint.setText(tr("Aucune classe active pour ce niveau dans cette année."))
         else:
-            self.hint.setText(f"{len(matching)} classe(s) de ce niveau pour cette année.")
+            self.hint.setText(tr("{0} classe(s) de ce niveau pour cette année.", len(matching)))
         self.on_change()
 
     @property
@@ -160,8 +163,8 @@ class StudentDialog(FormDialog):
     def __init__(self, references=None, parent=None, student=None, *, photo=None, choose_file=None):
         editing = student is not None
         super().__init__(
-            "Modifier la fiche de l'élève" if editing else "Nouvel élève",
-            "Fiche administrative de l'élève. La classe dépend de l'année : elle est gérée par l'inscription.",
+            tr("Modifier la fiche de l'élève") if editing else tr("Nouvel élève"),
+            tr("Fiche administrative de l'élève. La classe dépend de l'année : elle est gérée par l'inscription."),
             parent,
             width=600,
         )
@@ -169,40 +172,44 @@ class StudentDialog(FormDialog):
         self.photo_change = None  # None | ("set", bytes, extension) | ("remove",)
 
         # --- IDENTITÉ ---
-        self.add_section("Identité")
+        self.add_section(tr("Identité"))
         self.student_number = self.add_field(
             "student_number",
-            "Matricule",
-            QLineEdit(placeholderText="Ex. MAT-2026-001", maxLength=50),
+            tr("Matricule"),
+            QLineEdit(placeholderText=tr("Ex. MAT-2026-001"), maxLength=50),
             required=True,
             width="short",
-            help_text="Unique dans l'école.",
+            help_text=tr("Unique dans l'école."),
         )
         self.registration_number = self.add_field(
             "registration_number",
-            "N° d'inscription",
-            QLineEdit(placeholderText="Ex. INS-0001", maxLength=50),
+            tr("N° d'inscription"),
+            QLineEdit(placeholderText=tr("Ex. INS-0001"), maxLength=50),
             required=True,
             width="short",
             beside=True,
-            help_text="Numéro administratif, unique.",
+            help_text=tr("Numéro administratif, unique."),
         )
         self.last_name = self.add_field(
-            "last_name", "Nom", QLineEdit(placeholderText="Ex. NDIAYE", maxLength=120), required=True, width="medium"
+            "last_name",
+            tr("Nom"),
+            QLineEdit(placeholderText=tr("Ex. NDIAYE"), maxLength=120),
+            required=True,
+            width="medium",
         )
         self.first_name = self.add_field(
             "first_name",
-            "Prénom(s)",
-            QLineEdit(placeholderText="Ex. Awa Marie", maxLength=120),
+            tr("Prénom(s)"),
+            QLineEdit(placeholderText=tr("Ex. Awa Marie"), maxLength=120),
             required=True,
             width="medium",
             beside=True,
         )
         sex = QComboBox()
-        sex.addItem(CHOOSE_SEX, None)
+        sex.addItem(tr(CHOOSE_SEX), None)
         for value, label in SEXES.items():
             sex.addItem(label, value)
-        self.sex = self.add_field("sex", "Sexe", sex, required=True, width="short")
+        self.sex = self.add_field("sex", tr("Sexe"), sex, required=True, width="short")
         born = date_field()
         born.setMinimumDate(EARLIEST)
         born.setSpecialValueText(NO_DATE)  # EARLIEST = not chosen yet
@@ -210,14 +217,17 @@ class StudentDialog(FormDialog):
         born.setDate(EARLIEST)
         born.calendarWidget().setCurrentPage(QDate.currentDate().year() - 10, 1)
         self.date_of_birth = self.add_field(
-            "date_of_birth", "Date de naissance", born, required=True, width="short", beside=True
+            "date_of_birth", tr("Date de naissance"), born, required=True, width="short", beside=True
         )
         self.birth_place = self.add_field(
-            "birth_place", "Lieu de naissance", QLineEdit(placeholderText="Facultatif", maxLength=160), width="medium"
+            "birth_place",
+            tr("Lieu de naissance"),
+            QLineEdit(placeholderText=tr("Facultatif"), maxLength=160),
+            width="medium",
         )
 
         # --- PHOTO ---
-        self.add_section("Photo", "JPEG, PNG ou WebP, 3 Mo au plus. Utilisée par la carte d'élève.")
+        self.add_section(tr("Photo"), tr("JPEG, PNG ou WebP, 3 Mo au plus. Utilisée par la carte d'élève."))
         row = QWidget()
         line = QHBoxLayout(row)
         line.setContentsMargins(0, 0, 0, 0)
@@ -227,8 +237,8 @@ class StudentDialog(FormDialog):
         actions = QWidget()
         column = QGridLayout(actions)
         column.setContentsMargins(0, 0, 0, 0)
-        self.photo_button = button("Choisir une photo…")
-        self.remove_photo_button = button("Retirer la photo")
+        self.photo_button = button(tr("Choisir une photo…"))
+        self.remove_photo_button = button(tr("Retirer la photo"))
         self.photo_status = QLabel("", objectName="help")
         self.photo_status.setWordWrap(True)
         column.addWidget(self.photo_button, 0, 0, Qt.AlignLeft)
@@ -241,21 +251,21 @@ class StudentDialog(FormDialog):
         self.remove_photo_button.setEnabled(bool(photo))
 
         # --- INFORMATIONS COMPLÉMENTAIRES (champs existants du modèle) ---
-        self.add_section("Informations complémentaires")
-        address = QPlainTextEdit(placeholderText="Facultatif")
+        self.add_section(tr("Informations complémentaires"))
+        address = QPlainTextEdit(placeholderText=tr("Facultatif"))
         address.setFixedHeight(64)
         address.setTabChangesFocus(True)
-        self.address = self.add_field("address", "Adresse", address)
-        height = QLineEdit(placeholderText="Ex. 145", maxLength=3)
+        self.address = self.add_field("address", tr("Adresse"), address)
+        height = QLineEdit(placeholderText=tr("Ex. 145"), maxLength=3)
         height.setValidator(QIntValidator(30, 250, height))
-        self.height_cm = self.add_field("height_cm", "Taille (cm)", height, width="short")
+        self.height_cm = self.add_field("height_cm", tr("Taille (cm)"), height, width="short")
 
         # --- INSCRIPTION (création seulement) ---
         self.picker = None
         if not editing and references is not None:
             years, levels, classes = references
-            self.add_section("Inscription", "Facultatif : l'élève peut aussi être inscrit plus tard.")
-            self.enroll = self.add_field("enroll", "Inscription", QCheckBox("Inscrire l'élève maintenant"))
+            self.add_section(tr("Inscription"), tr("Facultatif : l'élève peut aussi être inscrit plus tard."))
+            self.enroll = self.add_field("enroll", tr("Inscription"), QCheckBox(tr("Inscrire l'élève maintenant")))
             self.picker = ClassPicker(self, years, levels, classes, on_change=self.refresh_state)
             self.enroll.toggled.connect(self._toggle_enrollment)
             self._toggle_enrollment(False)
@@ -286,7 +296,9 @@ class StudentDialog(FormDialog):
     # --- photo -----------------------------------------------------------------------
     @staticmethod
     def _choose_file(parent):
-        path, _ = QFileDialog.getOpenFileName(parent, "Choisir une photo", "", "Images (*.jpg *.jpeg *.png *.webp)")
+        path, _ = QFileDialog.getOpenFileName(
+            parent, tr("Choisir une photo"), "", tr("Images (*.jpg *.jpeg *.png *.webp)")
+        )
         return path
 
     def pick_photo(self):
@@ -298,28 +310,28 @@ class StudentDialog(FormDialog):
             with open(path, "rb") as handle:  # read locally; only the bytes are sent
                 content = handle.read(PHOTO_MAX_BYTES + 1)
         except OSError:
-            self.photo_status.setText("Impossible de lire ce fichier.")
+            self.photo_status.setText(tr("Impossible de lire ce fichier."))
             return
         if extension not in PHOTO_TYPES:
-            self.photo_status.setText("Format non accepté : JPEG, PNG ou WebP.")
+            self.photo_status.setText(tr("Format non accepté : JPEG, PNG ou WebP."))
             return
         if len(content) > PHOTO_MAX_BYTES:
-            self.photo_status.setText("Photo trop lourde : 3 Mo au plus.")
+            self.photo_status.setText(tr("Photo trop lourde : 3 Mo au plus."))
             return
         pixmap = photo_pixmap(content)
         if pixmap is None:
-            self.photo_status.setText("Ce fichier n'est pas une image lisible.")
+            self.photo_status.setText(tr("Ce fichier n'est pas une image lisible."))
             return
         self.photo.setPixmap(pixmap)
         self.photo_change = ("set", content, extension)
-        self.photo_status.setText("Nouvelle photo : elle sera envoyée à l'enregistrement.")
+        self.photo_status.setText(tr("Nouvelle photo : elle sera envoyée à l'enregistrement."))
         self.remove_photo_button.setEnabled(True)
 
     def drop_photo(self):
         self.photo.clear()
-        self.photo.setText("Pas de photo")
+        self.photo.setText(tr("Pas de photo"))
         self.photo_change = ("remove",)
-        self.photo_status.setText("La photo sera retirée à l'enregistrement.")
+        self.photo_status.setText(tr("La photo sera retirée à l'enregistrement."))
         self.remove_photo_button.setEnabled(False)
 
     # --- state --------------------------------------------------------------------------
@@ -332,19 +344,19 @@ class StudentDialog(FormDialog):
     def missing_fields(self):
         missing = []
         for widget, label in (
-            (self.student_number, "Matricule"),
-            (self.registration_number, "N° d'inscription"),
-            (self.last_name, "Nom"),
-            (self.first_name, "Prénom(s)"),
+            (self.student_number, tr("Matricule")),
+            (self.registration_number, tr("N° d'inscription")),
+            (self.last_name, tr("Nom")),
+            (self.first_name, tr("Prénom(s)")),
         ):
             if not widget.text().strip():
                 missing.append(label)
         if not self.sex.currentData():
-            missing.append("Sexe")
+            missing.append(tr("Sexe"))
         if self.date_of_birth.date() == EARLIEST:
-            missing.append("Date de naissance")
+            missing.append(tr("Date de naissance"))
         if self.picker is not None and self.enroll.isChecked() and not self.picker.class_id:
-            missing.append("Classe")
+            missing.append(tr("Classe"))
         return missing
 
     def values(self):
@@ -374,20 +386,20 @@ class EnrollDialog(FormDialog):
     def __init__(self, references, parent=None, student=None):
         years, levels, classes = references
         super().__init__(
-            "Inscrire l'élève",
-            f"{student.name} ({student.student_number}) : une seule classe par année scolaire.",
+            tr("Inscrire l'élève"),
+            tr("{0} ({1}) : une seule classe par année scolaire.", student.name, student.student_number),
             parent,
-            save_text="Inscrire",
+            save_text=tr("Inscrire"),
         )
         self.years = years
         self._year_shown = None
         self.picker = ClassPicker(self, years, levels, classes, on_change=self._follow_year)
         self.enrollment_date = self.add_field(
             "enrollment_date",
-            "Date d'inscription",
+            tr("Date d'inscription"),
             date_field(),
             width="short",
-            help_text="Comprise dans l'année scolaire choisie.",
+            help_text=tr("Comprise dans l'année scolaire choisie."),
         )
         self._follow_year()
         self.finish()
@@ -405,7 +417,7 @@ class EnrollDialog(FormDialog):
 
     def missing_fields(self):
         picker = getattr(self, "picker", None)
-        return [] if picker is not None and picker.class_id else ["Classe"]
+        return [] if picker is not None and picker.class_id else [tr("Classe")]
 
     def values(self):
         return {"class_id": self.picker.class_id, "enrollment_date": self.enrollment_date.date().toPython()}
@@ -415,11 +427,15 @@ class ChangeClassDialog(FormDialog):
     def __init__(self, references, parent=None, enrollment=None):
         _years, levels, classes = references
         super().__init__(
-            "Changer de classe",
-            f"Classe actuelle : {enrollment.class_name} ({enrollment.year_name}). La nouvelle classe est de la "
-            "même année ; notes et présences déjà saisies restent dans l'historique.",
+            tr("Changer de classe"),
+            tr(
+                "Classe actuelle : {0} ({1}). La nouvelle classe est de la même année ; notes et présences déjà "
+                "saisies restent dans l'historique.",
+                enrollment.class_name,
+                enrollment.year_name,
+            ),
             parent,
-            save_text="Changer de classe",
+            save_text=tr("Changer de classe"),
         )
         self.picker = ClassPicker(
             self,
@@ -435,7 +451,7 @@ class ChangeClassDialog(FormDialog):
 
     def missing_fields(self):
         picker = getattr(self, "picker", None)
-        return [] if picker is not None and picker.class_id else ["Nouvelle classe"]
+        return [] if picker is not None and picker.class_id else [tr("Nouvelle classe")]
 
     def values(self):
         return {"class_id": self.picker.class_id}
@@ -451,13 +467,13 @@ class StudentRecordDialog(FormDialog):
     "enroll", "change_class" or "withdraw"; the page then runs the action."""
 
     def __init__(self, student, enrollments, history, photo=None, parent=None):
-        super().__init__(f"Fiche de l'élève — {student.name}", "", parent, save_text="Fermer", width=640)
+        super().__init__(tr("Fiche de l'élève — {0}", student.name), "", parent, save_text=tr("Fermer"), width=640)
         self.student = student
         self.action = None
         self.cancel_button.hide()
         active = next((e for e in enrollments if e.active), None)
 
-        self.add_section("Identité")
+        self.add_section(tr("Identité"))
         identity = QWidget()
         row = QHBoxLayout(identity)
         row.setContentsMargins(0, 0, 0, 0)
@@ -466,61 +482,63 @@ class StudentRecordDialog(FormDialog):
         row.addWidget(
             self._grid(
                 [
-                    ("Matricule", student.student_number),
-                    ("N° d'inscription", student.registration_number),
-                    ("Nom", student.last_name),
-                    ("Prénom(s)", student.first_name),
-                    ("Sexe", student.sex_label),
-                    ("Date de naissance", _day(student.date_of_birth)),
-                    ("Lieu de naissance", student.birth_place or "—"),
-                    ("Statut", STUDENT_STATUSES.get(student.status, student.status)),
+                    (tr("Matricule"), student.student_number),
+                    (tr("N° d'inscription"), student.registration_number),
+                    (tr("Nom"), student.last_name),
+                    (tr("Prénom(s)"), student.first_name),
+                    (tr("Sexe"), student.sex_label),
+                    (tr("Date de naissance"), _day(student.date_of_birth)),
+                    (tr("Lieu de naissance"), student.birth_place or "—"),
+                    (tr("Statut"), STUDENT_STATUSES.get(student.status, student.status)),
                 ]
             ),
             1,
         )
         self.body.addWidget(identity)
-        self.edit_button = self._action_button("Modifier la fiche…", "edit", student.status != "ARCHIVED")
+        self.edit_button = self._action_button(tr("Modifier la fiche…"), "edit", student.status != "ARCHIVED")
         self.body.addWidget(self.edit_button, 0, Qt.AlignLeft)
 
-        self.add_section("Scolarité")
+        self.add_section(tr("Scolarité"))
         if active is not None:
             self.body.addWidget(
                 self._grid(
                     [
-                        ("Année scolaire", active.year_name),
-                        ("Niveau", f"{active.level_name} ({active.level_code})" if active.level_code else "—"),
-                        ("Classe", active.class_name),
-                        ("Inscription", f"{active.status_label} depuis le {_day(active.enrollment_date)}"),
+                        (tr("Année scolaire"), active.year_name),
+                        (tr("Niveau"), f"{active.level_name} ({active.level_code})" if active.level_code else "—"),
+                        (tr("Classe"), active.class_name),
+                        (tr("Inscription"), tr("{0} depuis le {1}", active.status_label, _day(active.enrollment_date))),
                     ]
                 )
             )
         else:
-            note = QLabel("Aucune inscription en cours.", objectName="help")
+            note = QLabel(tr("Aucune inscription en cours."), objectName="help")
             self.body.addWidget(note)
         buttons = QWidget()
         line = QHBoxLayout(buttons)
         line.setContentsMargins(0, 0, 0, 0)
         line.setSpacing(8)
         can_enroll = student.status == "ACTIVE"
-        self.enroll_button = self._action_button("Inscrire…", "enroll", can_enroll and active is None)
-        self.change_button = self._action_button("Changer de classe…", "change_class", active is not None)
-        self.withdraw_button = self._action_button("Retirer de la classe…", "withdraw", active is not None, "danger")
+        self.enroll_button = self._action_button(tr("Inscrire…"), "enroll", can_enroll and active is None)
+        self.change_button = self._action_button(tr("Changer de classe…"), "change_class", active is not None)
+        self.withdraw_button = self._action_button(
+            tr("Retirer de la classe…"), "withdraw", active is not None, "danger"
+        )
         for widget in (self.enroll_button, self.change_button, self.withdraw_button):
             line.addWidget(widget)
         line.addStretch()
         self.body.addWidget(buttons)
 
-        self.add_section("Informations complémentaires")
+        self.add_section(tr("Informations complémentaires"))
         self.body.addWidget(
             self._grid(
                 [
-                    ("Adresse", student.address or "—"),
-                    ("Taille", f"{student.height_cm} cm" if student.height_cm else "—"),
+                    (tr("Adresse"), student.address or "—"),
+                    (tr("Taille"), f"{student.height_cm} cm" if student.height_cm else "—"),
                 ]
             )
         )
 
-        self.add_section("Historique des inscriptions")
+        self.add_section(tr("Historique des inscriptions"))
         if enrollments:
             self.body.addWidget(
                 self._grid(
@@ -528,16 +546,16 @@ class StudentRecordDialog(FormDialog):
                         (
                             e.year_name,
                             f"{e.class_name} · {e.status_label}"
-                            + (f" (jusqu'au {_day(e.end_date)})" if e.end_date else ""),
+                            + (tr(" (jusqu'au {0})", _day(e.end_date)) if e.end_date else ""),
                         )
                         for e in enrollments
                     ]
                 )
             )
         else:
-            self.body.addWidget(QLabel("Aucune inscription.", objectName="help"))
+            self.body.addWidget(QLabel(tr("Aucune inscription."), objectName="help"))
 
-        self.add_section("Changements")
+        self.add_section(tr("Changements"))
         if history:
             lines = []
             for entry in history[:20]:
@@ -548,7 +566,7 @@ class StudentRecordDialog(FormDialog):
                 lines.append((when, f"{label}{detail}{author}"))
             self.body.addWidget(self._grid(lines))
         else:
-            self.body.addWidget(QLabel("Aucun changement enregistré.", objectName="help"))
+            self.body.addWidget(QLabel(tr("Aucun changement enregistré."), objectName="help"))
         self.finish(required_note=False)
         self.save_button.setFocus()
 

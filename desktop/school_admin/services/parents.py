@@ -15,13 +15,14 @@ shown at the school; it is sent once for the comparison and never kept.
 """
 
 from ..api.errors import ValidationFailed
+from ..i18n import tr
 from ..models import LinkRequest, ParentRegistration
 
 
 def _reason(reason):
     reason = (reason or "").strip()
     if not reason:
-        raise ValidationFailed("Formulaire incomplet.", details={"reason": ["Indiquez le motif."]})
+        raise ValidationFailed("Formulaire incomplet.", details={"reason": [tr("Indiquez le motif.")]})
     return reason
 
 
@@ -68,7 +69,7 @@ class ParentAdminService:
         number = (document_number or "").strip()
         if not document_type or not number:
             raise ValidationFailed(
-                "Formulaire incomplet.", details={"document_number": ["Saisissez le numéro de la pièce présentée."]}
+                "Formulaire incomplet.", details={"document_number": [tr("Saisissez le numéro de la pièce présentée.")]}
             )
         return LinkRequest.from_api(
             self.api.post(

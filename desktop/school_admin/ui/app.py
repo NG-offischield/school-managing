@@ -2,6 +2,7 @@
 
 import sys
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
 from ..api.client import ApiClient
@@ -9,6 +10,7 @@ from ..auth.device import device_info
 from ..auth.session import AuthService
 from ..auth.token_store import KeyringTokenStore
 from ..config import load_config, save_preference
+from ..i18n import LANGUAGES, language, set_language, tr
 from ..realtime import RealtimeClient, socket_url
 from ..services.accounts import AccountService
 from ..services.attendance import AttendanceService
@@ -77,8 +79,8 @@ class AppController:
         self.plans = PlanService(api)
         self.me = MeService(api)
         self.attendance = AttendanceService(api)
-        self.login_window = LoginWindow(auth, runner, config)
-        self.login_window.logged_in.connect(self.show_shell)
+        set_language(config.language)  # before any window is built
+        self.login_window = self._new_login_window()
         self.main_window = None
 
     def page_factories(self):
@@ -173,20 +175,76 @@ class AppController:
         self.login_window.hide()
         if self.realtime_factory is not None:  # the existing ws/v1/realtime/ endpoint
             self.realtime = self.realtime_factory(self.api, socket_url(self.config.api_url))
-            self.realtime.session_expired.connect(lambda: self.show_login("Votre session a expiré : reconnectez-vous."))
+            self.realtime.session_expired.connect(
+                lambda: self.show_login(tr("Votre session a expiré : reconnectez-vous."))
+            )
             self.realtime.start()
-        self.main_window = MainWindow(identity, self.page_factories(), self.runner)
-        self.main_window.logout_requested.connect(self.logout)
-        self.main_window.account_requested.connect(self.open_account)
-        self.main_window.session_expired.connect(lambda: self.show_login("Votre session a expiré : reconnectez-vous."))
+        self.main_window = self._new_main_window(identity)
         self.main_window.show()
+
+    def _new_main_window(self, identity):
+        window = MainWindow(identity, self.page_factories(), self.runner)
+        window.logout_requested.connect(self.logout)
+        window.account_requested.connect(self.open_account)
+        window.session_expired.connect(lambda: self.show_login(tr("Votre session a expiré : reconnectez-vous.")))
+        return window
+
+    def _new_login_window(self):
+        window = LoginWindow(self.auth, self.runner, self.config)
+        window.logged_in.connect(self.show_shell)
+        return window
+
+    def set_language(self, code):
+        """Français / English: applied at once — the windows are rebuilt on the
+        same module (their texts are set when they are built) — sent to the
+        server (Accept-Language) and kept in desktop.json."""
+        if code not in LANGUAGES:
+            return False
+        set_language(code)
+        self.api.set_language(code)
+        saved = save_preference("language", code, self.config_directory)
+        self.rebuild_windows()
+        return saved
+
+    def rebuild_windows(self):
+        old_login = self.login_window
+        self.login_window = self._new_login_window()
+        if old_login.isVisible():
+            self.login_window.setGeometry(old_login.geometry())
+            self.login_window.show()
+        old_login.close()
+        old_login.deleteLater()
+        old = self.main_window
+        if old is None:
+            return
+        key, geometry, visible = old.current_key, old.geometry(), old.isVisible()
+        self.main_window = self._new_main_window(old.identity)
+        self.main_window.setGeometry(geometry)
+        self.main_window.open(key)
+        if visible:
+            self.main_window.show()
+        old.close()  # disconnects its theme signal (closeEvent)
+        old.deleteLater()
+
+    def change_language(self, code):
+        """From « Mon compte »: the dialog closes, the windows are rebuilt, then
+        « Mon compte » opens again in the new language."""
+        saved = self.set_language(code)
+        QTimer.singleShot(0, self.open_account)
+        return saved
 
     def account_dialog(self):
         dialog = AccountDialog(
-            self.me, self.runner, self.main_window, theme_mode=self.theme_mode(), on_theme=self.set_theme
+            self.me,
+            self.runner,
+            self.main_window,
+            theme_mode=self.theme_mode(),
+            on_theme=self.set_theme,
+            language=language(),
+            on_language=self.change_language,
         )
         dialog.signed_out.connect(self.logout)  # every device disconnected: this one too
-        dialog.session_expired.connect(lambda: self.show_login("Votre session a expiré : reconnectez-vous."))
+        dialog.session_expired.connect(lambda: self.show_login(tr("Votre session a expiré : reconnectez-vous.")))
         return dialog
 
     def theme_mode(self):
@@ -206,14 +264,14 @@ class AppController:
     def logout(self):
         self.runner.run(
             self.auth.logout,
-            lambda _: self.show_login("Vous êtes déconnecté."),
-            lambda _exc: self.show_login("Vous êtes déconnecté."),
+            lambda _: self.show_login(tr("Vous êtes déconnecté.")),
+            lambda _exc: self.show_login(tr("Vous êtes déconnecté.")),
         )
 
 
 def main(argv=None):
     app = QApplication(argv if argv is not None else sys.argv)
-    app.setApplicationName(SOFTWARE_NAME)
+    app.setApplicationName(SOFTWARE_NAME)  # identity of the program (paths, settings): never translated
     app.setWindowIcon(software_icon())
     config = load_config()
     apply_theme(app, config.theme)  # Système (default) / Clair / Sombre, desktop.json

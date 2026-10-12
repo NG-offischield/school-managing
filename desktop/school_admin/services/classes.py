@@ -15,6 +15,7 @@ room_default_regimes_overlap). Changing it moves no planned slot or session.
 """
 
 from ..api.errors import ValidationFailed
+from ..i18n import tr
 from ..models import AcademicYear, Level, Room, SchoolClass, TimetableRegime
 
 
@@ -71,11 +72,11 @@ class ClassService:
     def _require(name, level_id, year_id=None, creating=True):
         errors = {}
         if not (name or "").strip():
-            errors["name"] = ["Obligatoire."]
+            errors["name"] = [tr("Obligatoire.")]
         if not level_id:
-            errors["level"] = ["Choisissez un niveau."]
+            errors["level"] = [tr("Choisissez un niveau.")]
         if creating and not year_id:
-            errors["academic_year"] = ["Choisissez une année scolaire."]
+            errors["academic_year"] = [tr("Choisissez une année scolaire.")]
         if errors:
             raise ValidationFailed("Formulaire incomplet.", details=errors)
 
@@ -139,7 +140,7 @@ class RegimeService:
 
     def create(self, *, academic_year_id, name, start, end):
         if not (name or "").strip():
-            raise ValidationFailed("Formulaire incomplet.", details={"name": ["Obligatoire."]})
+            raise ValidationFailed("Formulaire incomplet.", details={"name": [tr("Obligatoire.")]})
         payload = {"academic_year": academic_year_id, "name": name.strip(), "start_time": start, "end_time": end}
         return TimetableRegime.from_api(self.api.post(self.PATH, payload))
 

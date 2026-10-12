@@ -20,16 +20,19 @@ import uuid
 from datetime import date, timedelta
 
 from ..api.errors import ValidationFailed
+from ..i18n import Labels, tr
 from ..models import FeeType, Invoice, Payment, Refund, TreasuryEntry, Wallet
 from ..money import amount_text, parse_amount, to_decimal
 
-PERIODS = {
-    "": "Période : toutes",
-    "today": "Aujourd'hui",
-    "7": "7 derniers jours",
-    "30": "30 derniers jours",
-    "month": "Ce mois-ci",
-}
+PERIODS = Labels(
+    {
+        "": "Période : toutes",
+        "today": "Aujourd'hui",
+        "7": "7 derniers jours",
+        "30": "30 derniers jours",
+        "month": "Ce mois-ci",
+    }
+)
 
 
 def period_range(key, today):
@@ -44,7 +47,7 @@ def period_range(key, today):
 
 
 def _require(**fields):
-    missing = {name: ["Obligatoire."] for name, value in fields.items() if value in (None, "", [])}
+    missing = {name: [tr("Obligatoire.")] for name, value in fields.items() if value in (None, "", [])}
     if missing:
         raise ValidationFailed("Formulaire incomplet.", details=missing)
 
@@ -52,7 +55,9 @@ def _require(**fields):
 def _amount(text, field="amount"):
     value = parse_amount(text) if not hasattr(text, "as_tuple") else text
     if value is None:
-        raise ValidationFailed("Montant invalide.", details={field: ["Saisissez un montant (ex. 15000 ou 15000,50)."]})
+        raise ValidationFailed(
+            "Montant invalide.", details={field: [tr("Saisissez un montant (ex. 15000 ou 15000,50).")]}
+        )
     return amount_text(value)
 
 

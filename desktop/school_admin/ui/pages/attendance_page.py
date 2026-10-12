@@ -8,6 +8,7 @@ Every call off the UI thread; every rule is the server's.
 from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import QComboBox, QDialog, QLineEdit, QTabWidget
 
+from ...i18n import Lazy, Texts, Tr, tr
 from ...services.attendance import DAILY_STATUSES, SCAN_RESULTS
 from ..dialogs.teacher_dialogs import ActivationCodeDialog, ask_reason
 from ..theme import TOKENS, TokenColours
@@ -16,14 +17,14 @@ from .catalog_base import STATUS_COLUMN_TITLE, CatalogPage
 from .finance_page import coloured
 
 DAILY_COLOURS = TokenColours(PRESENT="success", LATE="warning", ABSENT="danger", EXCUSED="text_secondary")
-ALL = [("Tous", None)]
+ALL = Texts([("Tous", None)])
 
 
 def _date_filter(page, layout):
     page.day = date_field()
     page.day.setDate(QDate.currentDate())
-    page.day.setAccessibleName("Date")
-    page.day.setToolTip("Jour affiché")
+    page.day.setAccessibleName(tr("Date"))
+    page.day.setToolTip(tr("Jour affiché"))
     page.day.dateChanged.connect(lambda _: page.reload())
     layout.addWidget(page.day)
 
@@ -44,13 +45,13 @@ class _ReadOnly(CatalogPage):
 
 
 class DailyAttendancePage(_ReadOnly):
-    title = "Présences du jour"
-    description = "Calculées par le serveur à partir des passages au portail (QR) et de l'horaire du jour."
-    columns = ["Élève", "Matricule", "Classe", "Arrivée", "Retard", STATUS_COLUMN_TITLE]
+    title = Tr("Présences du jour")
+    description = Tr("Calculées par le serveur à partir des passages au portail (QR) et de l'horaire du jour.")
+    columns = Tr(["Élève", "Matricule", "Classe", "Arrivée", "Retard", STATUS_COLUMN_TITLE])
     noun = "élève"
     feminine = False
-    search_placeholder = "Rechercher un élève…"
-    status_filters = ALL + [(label, code) for code, label in DAILY_STATUSES.items()]
+    search_placeholder = Tr("Rechercher un élève…")
+    status_filters = Lazy(lambda: list(ALL) + [(label, code) for code, label in DAILY_STATUSES.items()])
     narrow_hidden = (1,)
 
     def __init__(self, service, references, runner, parent=None, **kwargs):
@@ -63,8 +64,8 @@ class DailyAttendancePage(_ReadOnly):
     def add_filters(self, layout):
         _date_filter(self, layout)
         self.class_filter = QComboBox()
-        self.class_filter.setAccessibleName("Filtrer par classe")
-        self.class_filter.addItem("Toutes les classes", None)
+        self.class_filter.setAccessibleName(tr("Filtrer par classe"))
+        self.class_filter.addItem(tr("Toutes les classes"), None)
         self.class_filter.setMinimumWidth(160)
         self.class_filter.currentIndexChanged.connect(lambda _: self.reload())
         layout.addWidget(self.class_filter)
@@ -98,13 +99,13 @@ class DailyAttendancePage(_ReadOnly):
 
 
 class ScansPage(_ReadOnly):
-    title = "Passages au portail"
-    description = "Chaque QR présenté au portail, accepté ou refusé, avec le gardien qui l'a scanné."
-    columns = ["Heure", "Élève", "Gardien", STATUS_COLUMN_TITLE]
+    title = Tr("Passages au portail")
+    description = Tr("Chaque QR présenté au portail, accepté ou refusé, avec le gardien qui l'a scanné.")
+    columns = Tr(["Heure", "Élève", "Gardien", STATUS_COLUMN_TITLE])
     noun = "passage"
     feminine = False
-    search_placeholder = "Rechercher un élève ou un gardien…"
-    status_filters = ALL + [(label, code) for code, label in SCAN_RESULTS.items()]
+    search_placeholder = Tr("Rechercher un élève ou un gardien…")
+    status_filters = Lazy(lambda: list(ALL) + [(label, code) for code, label in SCAN_RESULTS.items()])
     default_sort = (0, Qt.DescendingOrder)  # most recent first
 
     def stretch_columns(self):
@@ -113,8 +114,8 @@ class ScansPage(_ReadOnly):
     def add_filters(self, layout):
         _date_filter(self, layout)
         self.guardian_filter = QComboBox()
-        self.guardian_filter.setAccessibleName("Filtrer par gardien")
-        self.guardian_filter.addItem("Tous les gardiens", None)
+        self.guardian_filter.setAccessibleName(tr("Filtrer par gardien"))
+        self.guardian_filter.addItem(tr("Tous les gardiens"), None)
         self.guardian_filter.setMinimumWidth(170)
         self.guardian_filter.currentIndexChanged.connect(lambda _: self.reload())
         layout.addWidget(self.guardian_filter)
@@ -123,7 +124,7 @@ class ScansPage(_ReadOnly):
         current = self.guardian_filter.currentData()
         self.guardian_filter.blockSignals(True)
         self.guardian_filter.clear()
-        self.guardian_filter.addItem("Tous les gardiens", None)
+        self.guardian_filter.addItem(tr("Tous les gardiens"), None)
         for guardian in guardians:
             self.guardian_filter.addItem(f"{guardian.name} ({guardian.number})", guardian.id)
         self.guardian_filter.setCurrentIndex(max(0, self.guardian_filter.findData(current)))
@@ -155,16 +156,16 @@ class ScansPage(_ReadOnly):
 class GuardianDialog(FormDialog):
     def __init__(self, parent=None):
         super().__init__(
-            "Nouveau gardien",
-            "Le compte est créé sans mot de passe : remettez ensuite un code d'activation à la personne.",
+            tr("Nouveau gardien"),
+            tr("Le compte est créé sans mot de passe : remettez ensuite un code d'activation à la personne."),
             parent,
             width=560,
         )
-        self.first_name = self.add_field("first_name", "Prénom", QLineEdit(), required=True, width="medium")
-        self.last_name = self.add_field("last_name", "Nom", QLineEdit(), required=True, width="medium", beside=True)
-        self.email = self.add_field("email", "E-mail (identifiant)", QLineEdit(), required=True)
-        self.number = self.add_field("guardian_number", "N° de gardien", QLineEdit(), required=True, width="short")
-        self.phone = self.add_field("phone", "Téléphone", QLineEdit(), width="medium", beside=True)
+        self.first_name = self.add_field("first_name", tr("Prénom"), QLineEdit(), required=True, width="medium")
+        self.last_name = self.add_field("last_name", tr("Nom"), QLineEdit(), required=True, width="medium", beside=True)
+        self.email = self.add_field("email", tr("E-mail (identifiant)"), QLineEdit(), required=True)
+        self.number = self.add_field("guardian_number", tr("N° de gardien"), QLineEdit(), required=True, width="short")
+        self.phone = self.add_field("phone", tr("Téléphone"), QLineEdit(), width="medium", beside=True)
         for field in (self.first_name, self.last_name, self.email, self.number):
             field.textChanged.connect(lambda _: self.refresh_state())
         self.finish()
@@ -184,13 +185,13 @@ class GuardianDialog(FormDialog):
 
 
 class GuardiansPage(CatalogPage):
-    title = "Gardiens"
-    description = "Comptes des gardiens du portail : création, code d'activation, suspension."
-    columns = ["Nom", "N°", "E-mail", "Passages aujourd'hui", "Dernier passage", STATUS_COLUMN_TITLE]
+    title = Tr("Gardiens")
+    description = Tr("Comptes des gardiens du portail : création, code d'activation, suspension.")
+    columns = Tr(["Nom", "N°", "E-mail", "Passages aujourd'hui", "Dernier passage", STATUS_COLUMN_TITLE])
     noun = "gardien"
     feminine = False
-    search_placeholder = "Rechercher par nom, n° ou e-mail…"
-    status_filters = [("Tous", None), ("Actifs", "ACTIVE"), ("Suspendus", "SUSPENDED")]
+    search_placeholder = Tr("Rechercher par nom, n° ou e-mail…")
+    status_filters = Tr([("Tous", None), ("Actifs", "ACTIVE"), ("Suspendus", "SUSPENDED")])
     has_toggle = False
     narrow_hidden = (2, 4)
 
@@ -208,11 +209,11 @@ class GuardiansPage(CatalogPage):
 
     def extra_actions(self):
         self.code_button = button(
-            "Code d'activation…", tooltip="Générer le code que la personne saisira dans l'application"
+            tr("Code d'activation…"), tooltip=tr("Générer le code que la personne saisira dans l'application")
         )
-        self.suspend_button = button("Suspendre", "danger", tooltip="Connexion impossible, sessions fermées")
-        self.enable_button = button("Réactiver")
-        self.scans_button = button("Passages…", tooltip="Les passages enregistrés par ce gardien")
+        self.suspend_button = button(tr("Suspendre"), "danger", tooltip=tr("Connexion impossible, sessions fermées"))
+        self.enable_button = button(tr("Réactiver"))
+        self.scans_button = button(tr("Passages…"), tooltip=tr("Les passages enregistrés par ce gardien"))
         self.code_button.clicked.connect(self.issue_code)
         self.suspend_button.clicked.connect(self.suspend)
         self.enable_button.clicked.connect(self.enable)
@@ -258,8 +259,8 @@ class GuardiansPage(CatalogPage):
         if values:
             self.call(
                 lambda: self.service.create_guardian(**values),
-                lambda saved: self._saved(saved, "créé"),
-                action="Impossible de créer le gardien",
+                lambda saved: self._saved(saved, tr("créé")),
+                action=tr("Impossible de créer le gardien"),
             )
 
     def _done(self, message):
@@ -274,9 +275,13 @@ class GuardiansPage(CatalogPage):
         def shown(issued):
             self.show_code(row, issued)
             expires = f"{issued.expires_at:%d/%m/%Y %H:%M}" if issued.expires_at else "—"
-            self._done(f"Code d'activation remis pour {row.name} (valable jusqu'au {expires}).")  # never the code
+            self._done(
+                tr("Code d'activation remis pour {0} (valable jusqu'au {1}).", row.name, expires)
+            )  # never the code
 
-        self.call(lambda: self.accounts.issue_code(row.membership_id), shown, action="Impossible de générer le code")
+        self.call(
+            lambda: self.accounts.issue_code(row.membership_id), shown, action=tr("Impossible de générer le code")
+        )
 
     def suspend(self):
         row = self.selected()
@@ -284,16 +289,16 @@ class GuardiansPage(CatalogPage):
             return
         answer = self.ask_suspend(
             self,
-            "Suspendre le gardien",
-            f"{row.name} ne pourra plus se connecter ni scanner ; ses sessions sont fermées.",
-            save_text="Suspendre",
+            tr("Suspendre le gardien"),
+            tr("{0} ne pourra plus se connecter ni scanner ; ses sessions sont fermées.", row.name),
+            save_text=tr("Suspendre"),
             danger=True,
         )
         if answer:
             self.call(
                 lambda: self.accounts.disable(row.membership_id, answer["reason"]),
-                lambda _: self._done(f"Compte de {row.name} suspendu."),
-                action="Impossible de suspendre le compte",
+                lambda _: self._done(tr("Compte de {0} suspendu.", row.name)),
+                action=tr("Impossible de suspendre le compte"),
             )
 
     def enable(self):
@@ -301,8 +306,8 @@ class GuardiansPage(CatalogPage):
         if row is not None:
             self.call(
                 lambda: self.accounts.enable(row.membership_id),
-                lambda _: self._done(f"Compte de {row.name} réactivé."),
-                action="Impossible de réactiver le compte",
+                lambda _: self._done(tr("Compte de {0} réactivé.", row.name)),
+                action=tr("Impossible de réactiver le compte"),
             )
 
     def open_scans(self):
@@ -312,7 +317,7 @@ class GuardiansPage(CatalogPage):
 
 
 class AttendancePage(Page):
-    title = "Présences"
+    title = Tr("Présences")
 
     def __init__(self, service, references, accounts, runner, parent=None, **kwargs):
         super().__init__(runner, parent, **kwargs)
@@ -324,9 +329,9 @@ class AttendancePage(Page):
         self.guardians = GuardiansPage(service, accounts, runner, show_scans=self._scans_of, **kwargs)
         self.pages = {"daily": self.daily, "scans": self.scans, "guardians": self.guardians}
         for page, label in (
-            (self.daily, "Présences du jour"),
-            (self.scans, "Passages au portail"),
-            (self.guardians, "Gardiens"),
+            (self.daily, tr("Présences du jour")),
+            (self.scans, tr("Passages au portail")),
+            (self.guardians, tr("Gardiens")),
         ):
             self.tabs.addTab(page, label)
             page.session_expired.connect(self.session_expired.emit)

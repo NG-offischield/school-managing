@@ -2,6 +2,7 @@
 
 from PySide6.QtWidgets import QComboBox, QDialog
 
+from ...i18n import Tr, tr
 from ...models import SUBJECT_TYPES
 from ..dialogs.category_dialog import CategoryDialog
 from ..dialogs.subject_dialog import SubjectDialog
@@ -9,9 +10,9 @@ from .catalog_base import STATUS_COLUMN_TITLE, CatalogPage
 
 
 class CategoriesPage(CatalogPage):
-    title = "Catégories pédagogiques"
-    description = "Familles de matières de l'école. Une matière appartient toujours à une catégorie."
-    columns = ["Code", "Nom", "Matières actives", STATUS_COLUMN_TITLE]
+    title = Tr("Catégories pédagogiques")
+    description = Tr("Familles de matières de l'école. Une matière appartient toujours à une catégorie.")
+    columns = Tr(["Code", "Nom", "Matières actives", STATUS_COLUMN_TITLE])
     noun = "catégorie"
 
     def __init__(self, service, runner, parent=None, *, dialog=CategoryDialog, **kwargs):
@@ -36,8 +37,8 @@ class CategoriesPage(CatalogPage):
         if values:
             self.call(
                 lambda: self.service.create(**values),
-                lambda saved: self._saved(saved, "créée"),
-                action="Impossible de créer la catégorie",
+                lambda saved: self._saved(saved, tr("créée")),
+                action=tr("Impossible de créer la catégorie"),
             )
 
     def edit(self):
@@ -48,8 +49,8 @@ class CategoriesPage(CatalogPage):
         if values:
             self.call(
                 lambda: self.service.update(row.id, name=values["name"], description=values["description"]),
-                lambda saved: self._saved(saved, "modifiée"),
-                action="Impossible de modifier la catégorie",
+                lambda saved: self._saved(saved, tr("modifiée")),
+                action=tr("Impossible de modifier la catégorie"),
             )
 
     def deactivate(self, row_id):
@@ -60,9 +61,9 @@ class CategoriesPage(CatalogPage):
 
 
 class SubjectsPage(CatalogPage):
-    title = "Matières"
-    description = "Matières enseignées, chacune rattachée à une catégorie pédagogique."
-    columns = ["Code", "Nom", "Catégorie", "Type", STATUS_COLUMN_TITLE]
+    title = Tr("Matières")
+    description = Tr("Matières enseignées, chacune rattachée à une catégorie pédagogique.")
+    columns = Tr(["Code", "Nom", "Catégorie", "Type", STATUS_COLUMN_TITLE])
     noun = "matière"
 
     def __init__(self, service, category_service, runner, parent=None, *, dialog=SubjectDialog, **kwargs):
@@ -76,10 +77,10 @@ class SubjectsPage(CatalogPage):
 
     def add_filters(self, layout):
         self.category_filter = QComboBox()
-        self.category_filter.setAccessibleName("Filtrer par catégorie")
-        self.category_filter.setToolTip("Filtrer par catégorie")
+        self.category_filter.setAccessibleName(tr("Filtrer par catégorie"))
+        self.category_filter.setToolTip(tr("Filtrer par catégorie"))
         self.category_filter.setMinimumWidth(200)
-        self.category_filter.addItem("Toutes les catégories", None)
+        self.category_filter.addItem(tr("Toutes les catégories"), None)
         self.category_filter.currentIndexChanged.connect(lambda _: self.reload())
         layout.addWidget(self.category_filter)
 
@@ -88,14 +89,14 @@ class SubjectsPage(CatalogPage):
         self.call(
             lambda: self.category_service.list(active=None),
             self._fill_filter,
-            action="Impossible de charger les catégories",
+            action=tr("Impossible de charger les catégories"),
         )
 
     def _fill_filter(self, categories):
         current = self.category_filter.currentData()
         self.category_filter.blockSignals(True)
         self.category_filter.clear()
-        self.category_filter.addItem("Toutes les catégories", None)
+        self.category_filter.addItem(tr("Toutes les catégories"), None)
         for category in categories:
             suffix = "" if category.active else " (inactive)"
             self.category_filter.addItem(f"{category.code} — {category.name}{suffix}", category.id)
@@ -117,7 +118,9 @@ class SubjectsPage(CatalogPage):
 
     def _with_categories(self, then):
         """The category list offered by the form = active categories, fresh from the API."""
-        self.call(lambda: self.category_service.list(active=True), then, action="Impossible de charger les catégories")
+        self.call(
+            lambda: self.category_service.list(active=True), then, action=tr("Impossible de charger les catégories")
+        )
 
     def add(self):
         def open_form(categories):
@@ -125,8 +128,8 @@ class SubjectsPage(CatalogPage):
             if values:
                 self.call(
                     lambda: self.service.create(**values),
-                    lambda saved: self._saved(saved, "créée"),
-                    action="Impossible de créer la matière",
+                    lambda saved: self._saved(saved, tr("créée")),
+                    action=tr("Impossible de créer la matière"),
                 )
 
         self._with_categories(open_form)
@@ -147,8 +150,8 @@ class SubjectsPage(CatalogPage):
                         subject_type=values["subject_type"],
                         public_visible=values["public_visible"],
                     ),
-                    lambda saved: self._saved(saved, "modifiée"),
-                    action="Impossible de modifier la matière",
+                    lambda saved: self._saved(saved, tr("modifiée")),
+                    action=tr("Impossible de modifier la matière"),
                 )
 
         self._with_categories(open_form)

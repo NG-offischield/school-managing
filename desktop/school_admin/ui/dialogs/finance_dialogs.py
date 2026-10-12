@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ...i18n import tr
 from ...models import INVOICE_STATUSES, PAYMENT_METHODS
 from ...money import ZERO, format_money, parse_amount
 from ...services.finance import new_idempotency_key
@@ -26,7 +27,8 @@ def _when(moment):
     return f"{moment:%d/%m/%Y %H:%M}" if moment else "—"
 
 
-def _amount_field(placeholder="ex. 15000"):
+def _amount_field(placeholder=None):
+    placeholder = tr("ex. 15000") if placeholder is None else placeholder  # read now: follows the language
     field = QLineEdit(placeholderText=placeholder)
     field.setAlignment(Qt.AlignRight)
     return field
@@ -41,11 +43,11 @@ class StudentPicker(QWidget):
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(8)
-        self.text = QLineEdit(placeholderText="Nom, prénom ou matricule")
-        self.find_button = button("Rechercher")
+        self.text = QLineEdit(placeholderText=tr("Nom, prénom ou matricule"))
+        self.find_button = button(tr("Rechercher"))
         self.results = QComboBox()
         self.results.setMinimumWidth(220)
-        self.results.addItem("— lancez une recherche —", None)
+        self.results.addItem(tr("— lancez une recherche —"), None)
         row.addWidget(self.text, 1)
         row.addWidget(self.find_button)
         row.addWidget(self.results, 2)
@@ -59,7 +61,7 @@ class StudentPicker(QWidget):
     def show(self, rows):
         self.results.clear()
         if not rows:
-            self.results.addItem("Aucun élève trouvé", None)
+            self.results.addItem(tr("Aucun élève trouvé"), None)
         for student_id, label in rows:
             self.results.addItem(label, student_id)
 
@@ -93,48 +95,58 @@ class PaymentDialog(FormDialog):
         retry=None,
     ):
         super().__init__(
-            "Nouveau paiement",
-            "Le serveur décide de l'issue (réussi, refusé, fonds insuffisants, délai dépassé, erreur fournisseur) "
-            "et l'enregistre dans tous les cas.",
+            tr("Nouveau paiement"),
+            tr(
+                "Le serveur décide de l'issue (réussi, refusé, fonds insuffisants, délai dépassé, erreur "
+                "fournisseur) et l'enregistre dans tous les cas."
+            ),
             parent,
-            save_text="Envoyer le paiement",
+            save_text=tr("Envoyer le paiement"),
             width=640,
         )
         self.load_obligations = load_obligations
         self.key = (retry or {}).get("idempotency_key") or new_idempotency_key()
         self.invoices = []
-        self.picker = self.add_field("student", "Élève", StudentPicker(search), required=True)
-        self.add_section("Objet du paiement")
+        self.picker = self.add_field("student", tr("Élève"), StudentPicker(search), required=True)
+        self.add_section(tr("Objet du paiement"))
         self.invoice_list = QListWidget()
         self.invoice_list.setMaximumHeight(120)
-        self.invoice_list.setAccessibleName("Factures ouvertes")
+        self.invoice_list.setAccessibleName(tr("Factures ouvertes"))
         self.invoice_list = self.add_field(
-            "invoices", "Factures ouvertes", self.invoice_list, help_text="Cochez les factures réglées par ce paiement."
+            "invoices",
+            tr("Factures ouvertes"),
+            self.invoice_list,
+            help_text=tr("Cochez les factures réglées par ce paiement."),
         )
         self.fee_type = QComboBox()
-        self.fee_type.addItem("— aucun (factures cochées) —", None)
+        self.fee_type.addItem(tr("— aucun (factures cochées) —"), None)
         for fee in fee_types:
             if fee.active:
                 self.fee_type.addItem(f"{fee.code} — {fee.name}", fee.id)
         self.fee_type = self.add_field(
-            "fee_type", "Motif sans facture", self.fee_type, help_text="Seulement si aucune facture n'est cochée."
+            "fee_type",
+            tr("Motif sans facture"),
+            self.fee_type,
+            help_text=tr("Seulement si aucune facture n'est cochée."),
         )
-        self.add_section("Règlement")
-        self.amount = self.add_field("amount", "Montant", _amount_field(), required=True, width="short")
+        self.add_section(tr("Règlement"))
+        self.amount = self.add_field("amount", tr("Montant"), _amount_field(), required=True, width="short")
         self.method = QComboBox()
         for code, label in PAYMENT_METHODS.items():
             self.method.addItem(label, code)
-        self.method = self.add_field("method", "Mode", self.method, required=True, width="medium", beside=True)
+        self.method = self.add_field("method", tr("Mode"), self.method, required=True, width="medium", beside=True)
         self.wallet = QComboBox()
         for wallet in wallets:
-            self.wallet.addItem(f"{wallet.code} — solde {format_money(wallet.balance, wallet.currency)}", wallet.id)
+            self.wallet.addItem(
+                tr("{0} — solde {1}", wallet.code, format_money(wallet.balance, wallet.currency)), wallet.id
+            )
         self.wallet = self.add_field(
             "wallet",
-            "Portefeuille",
+            tr("Portefeuille"),
             self.wallet,
-            help_text="Vos propres portefeuilles uniquement (règle du serveur)."
+            help_text=tr("Vos propres portefeuilles uniquement (règle du serveur).")
             if wallets
-            else "Vous n'avez aucun portefeuille : paiement en espèces uniquement.",
+            else tr("Vous n'avez aucun portefeuille : paiement en espèces uniquement."),
         )
         if not wallets:
             self.method.model().item(self.method.findData("WALLET")).setEnabled(False)
@@ -169,14 +181,19 @@ class PaymentDialog(FormDialog):
         for invoice in invoices:
             due = f"{invoice.due_date:%d/%m/%Y}" if invoice.due_date else "—"
             item = QListWidgetItem(
-                f"{invoice.number} · échéance {due} · reste {format_money(invoice.balance, invoice.currency)}"
+                tr(
+                    "{0} · échéance {1} · reste {2}",
+                    invoice.number,
+                    due,
+                    format_money(invoice.balance, invoice.currency),
+                )
             )
             item.setData(Qt.UserRole, invoice.id)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Checked if invoice.id == preselect else Qt.Unchecked)
             self.invoice_list.addItem(item)
         if not invoices:
-            self.invoice_list.addItem(QListWidgetItem("Aucune facture ouverte pour cet élève."))
+            self.invoice_list.addItem(QListWidgetItem(tr("Aucune facture ouverte pour cet élève.")))
         self.invoice_list.blockSignals(False)
         self._invoices_changed()
 
@@ -196,8 +213,10 @@ class PaymentDialog(FormDialog):
         self.amount.setText(values.get("amount", ""))
         self.method.setCurrentIndex(max(0, self.method.findData(values.get("method"))))
         self.retry_note.setText(
-            "Nouvelle tentative du même paiement : le serveur rejouera le premier envoi s'il avait abouti "
-            "(aucun double débit)."
+            tr(
+                "Nouvelle tentative du même paiement : le serveur rejouera le premier envoi s'il avait abouti (aucun "
+                "double débit)."
+            )
         )
 
     # --- state ----------------------------------------------------------------------
@@ -213,11 +232,11 @@ class PaymentDialog(FormDialog):
     def missing_fields(self):
         missing = []
         if not self.picker.student_id:
-            missing.append("Élève")
+            missing.append(tr("Élève"))
         if parse_amount(self.amount.text()) is None:
-            missing.append("Montant")
+            missing.append(tr("Montant"))
         if self.method.currentData() == "WALLET" and not self.wallet.currentData():
-            missing.append("Portefeuille")
+            missing.append(tr("Portefeuille"))
         return missing
 
     def values(self):
@@ -237,38 +256,42 @@ class RefundDialog(FormDialog):
 
     def __init__(self, payment, parent=None):
         super().__init__(
-            f"Rembourser le paiement {payment.reference}",
-            "Le remboursement est une transaction inverse : le paiement d'origine et son historique sont conservés.",
+            tr("Rembourser le paiement {0}", payment.reference),
+            tr(
+                "Le remboursement est une transaction inverse : le paiement d'origine et son historique sont conservés."
+            ),
             parent,
-            save_text="Rembourser",
+            save_text=tr("Rembourser"),
             width=560,
         )
         self.body.addWidget(
             _grid(
                 [
-                    ("Paiement d'origine", payment.reference),
-                    ("Élève", payment.student_name),
-                    ("Montant payé", format_money(payment.amount, payment.currency)),
-                    ("Déjà remboursé", format_money(payment.refunded, payment.currency)),
-                    ("Mode", PAYMENT_METHODS.get(payment.method, payment.method)),
-                    ("Date", _when(payment.completed_at or payment.initiated_at)),
+                    (tr("Paiement d'origine"), payment.reference),
+                    (tr("Élève"), payment.student_name),
+                    (tr("Montant payé"), format_money(payment.amount, payment.currency)),
+                    (tr("Déjà remboursé"), format_money(payment.refunded, payment.currency)),
+                    (tr("Mode"), PAYMENT_METHODS.get(payment.method, payment.method)),
+                    (tr("Date"), _when(payment.completed_at or payment.initiated_at)),
                 ]
             )
         )
-        self.amount = self.add_field("amount", "Montant à rembourser", _amount_field(), required=True, width="short")
+        self.amount = self.add_field(
+            "amount", tr("Montant à rembourser"), _amount_field(), required=True, width="short"
+        )
         self.amount.setText(str(payment.refundable))
-        reason = QPlainTextEdit(placeholderText="Motif (obligatoire)")
+        reason = QPlainTextEdit(placeholderText=tr("Motif (obligatoire)"))
         reason.setFixedHeight(72)
         reason.setTabChangesFocus(True)
-        self.reason = self.add_field("reason", "Motif", reason, required=True)
+        self.reason = self.add_field("reason", tr("Motif"), reason, required=True)
         self.amount.textChanged.connect(self.refresh_state)
         self.reason.textChanged.connect(self.refresh_state)
         self.finish()
         self.reason.setFocus()
 
     def missing_fields(self):
-        missing = [] if parse_amount(self.amount.text()) is not None else ["Montant"]
-        return missing + ([] if self.reason.toPlainText().strip() else ["Motif"])
+        missing = [] if parse_amount(self.amount.text()) is not None else [tr("Montant")]
+        return missing + ([] if self.reason.toPlainText().strip() else [tr("Motif")])
 
     def values(self):
         return {"amount": self.amount.text().strip(), "reason": self.reason.toPlainText().strip()}
@@ -278,19 +301,21 @@ class InvoiceDialog(FormDialog):
     """Issue an invoice (obligation) of one line for a student."""
 
     def __init__(self, fee_types, search, parent=None):
-        super().__init__("Nouvelle facture", "Une obligation de paiement pour un élève.", parent, width=600)
-        self.picker = self.add_field("student", "Élève", StudentPicker(search), required=True)
+        super().__init__(tr("Nouvelle facture"), tr("Une obligation de paiement pour un élève."), parent, width=600)
+        self.picker = self.add_field("student", tr("Élève"), StudentPicker(search), required=True)
         self.fee_type = QComboBox()
-        self.fee_type.addItem("— choisir —", None)
+        self.fee_type.addItem(tr("— choisir —"), None)
         for fee in fee_types:
             if fee.active:
                 self.fee_type.addItem(f"{fee.code} — {fee.name}", fee.id)
-        self.fee_type = self.add_field("fee_type", "Motif", self.fee_type, required=True, width="medium")
+        self.fee_type = self.add_field("fee_type", tr("Motif"), self.fee_type, required=True, width="medium")
         self.description = self.add_field(
-            "description", "Libellé", QLineEdit(placeholderText="ex. Scolarité 1er trimestre"), width="medium"
+            "description", tr("Libellé"), QLineEdit(placeholderText=tr("ex. Scolarité 1er trimestre")), width="medium"
         )
-        self.amount = self.add_field("amount", "Montant", _amount_field(), required=True, width="short")
-        self.due_date = self.add_field("due_date", "Échéance", date_field(), required=True, width="short", beside=True)
+        self.amount = self.add_field("amount", tr("Montant"), _amount_field(), required=True, width="short")
+        self.due_date = self.add_field(
+            "due_date", tr("Échéance"), date_field(), required=True, width="short", beside=True
+        )
         self.due_date.setDate(QDate.currentDate().addDays(30))
         self.picker.results.currentIndexChanged.connect(lambda _: self.refresh_state())
         self.fee_type.currentIndexChanged.connect(lambda _: self.refresh_state())
@@ -298,9 +323,9 @@ class InvoiceDialog(FormDialog):
         self.finish()
 
     def missing_fields(self):
-        missing = [] if self.picker.student_id else ["Élève"]
-        missing += [] if self.fee_type.currentData() else ["Motif"]
-        return missing + ([] if parse_amount(self.amount.text()) is not None else ["Montant"])
+        missing = [] if self.picker.student_id else [tr("Élève")]
+        missing += [] if self.fee_type.currentData() else [tr("Motif")]
+        return missing + ([] if parse_amount(self.amount.text()) is not None else [tr("Montant")])
 
     def values(self):
         return {
@@ -314,16 +339,20 @@ class InvoiceDialog(FormDialog):
 
 class FeeTypeDialog(FormDialog):
     def __init__(self, parent=None):
-        super().__init__("Nouveau motif de frais", "Scolarité, inscription, cantine, transport…", parent, width=520)
-        self.code = self.add_field("code", "Code", QLineEdit(placeholderText="ex. SCOL"), required=True, width="short")
-        self.name = self.add_field("name", "Nom", QLineEdit(), required=True, width="medium", beside=True)
-        self.description = self.add_field("description", "Description", QLineEdit())
+        super().__init__(
+            tr("Nouveau motif de frais"), tr("Scolarité, inscription, cantine, transport…"), parent, width=520
+        )
+        self.code = self.add_field(
+            "code", tr("Code"), QLineEdit(placeholderText=tr("ex. SCOL")), required=True, width="short"
+        )
+        self.name = self.add_field("name", tr("Nom"), QLineEdit(), required=True, width="medium", beside=True)
+        self.description = self.add_field("description", tr("Description"), QLineEdit())
         for field in (self.code, self.name):
             field.textChanged.connect(self.refresh_state)
         self.finish()
 
     def missing_fields(self):
-        return [label for label, field in (("Code", self.code), ("Nom", self.name)) if not field.text().strip()]
+        return [label for label, field in ((tr("Code"), self.code), (tr("Nom"), self.name)) if not field.text().strip()]
 
     def values(self):
         return {
@@ -337,25 +366,25 @@ class PaymentDetailDialog(FormDialog):
     """Read-only detail of a payment; « Rembourser… » closes it with action = "refund"."""
 
     def __init__(self, payment, parent=None, *, can_refund=False):
-        super().__init__(f"Paiement {payment.reference}", "", parent, save_text="Fermer", width=620)
+        super().__init__(tr("Paiement {0}", payment.reference), "", parent, save_text=tr("Fermer"), width=620)
         self.action = None
         self.cancel_button.hide()
         rows = [
-            ("Statut", payment.status_label),
-            ("Élève", payment.student_name),
-            ("Montant", format_money(payment.amount, payment.currency)),
-            ("Remboursé", format_money(payment.refunded, payment.currency)),
-            ("Mode", PAYMENT_METHODS.get(payment.method, payment.method)),
-            ("Fournisseur", payment.provider or "—"),
-            ("Initié le", _when(payment.initiated_at)),
-            ("Terminé le", _when(payment.completed_at)),
+            (tr("Statut"), payment.status_label),
+            (tr("Élève"), payment.student_name),
+            (tr("Montant"), format_money(payment.amount, payment.currency)),
+            (tr("Remboursé"), format_money(payment.refunded, payment.currency)),
+            (tr("Mode"), PAYMENT_METHODS.get(payment.method, payment.method)),
+            (tr("Fournisseur"), payment.provider or "—"),
+            (tr("Initié le"), _when(payment.initiated_at)),
+            (tr("Terminé le"), _when(payment.completed_at)),
         ]
         if payment.failure_reason:
-            rows.append(("Motif de l'échec", payment.failure_reason))
+            rows.append((tr("Motif de l'échec"), payment.failure_reason))
         if payment.provider_reference:
-            rows.append(("Référence fournisseur", payment.provider_reference))
+            rows.append((tr("Référence fournisseur"), payment.provider_reference))
         self.body.addWidget(_grid(rows))
-        self.add_section("Imputations")
+        self.add_section(tr("Imputations"))
         self.body.addWidget(
             _grid(
                 [
@@ -364,9 +393,9 @@ class PaymentDetailDialog(FormDialog):
                 ]
             )
             if payment.allocations
-            else QLabel("Aucune facture (paiement sur motif) ou paiement échoué.", objectName="help")
+            else QLabel(tr("Aucune facture (paiement sur motif) ou paiement échoué."), objectName="help")
         )
-        self.add_section("Remboursements", "Transactions inverses : rien n'est supprimé.")
+        self.add_section(tr("Remboursements"), tr("Transactions inverses : rien n'est supprimé."))
         self.body.addWidget(
             _grid(
                 [
@@ -375,10 +404,10 @@ class PaymentDetailDialog(FormDialog):
                 ]
             )
             if payment.refunds
-            else QLabel("Aucun remboursement.", objectName="help")
+            else QLabel(tr("Aucun remboursement."), objectName="help")
         )
         if can_refund and payment.refundable > 0:
-            refund = button("Rembourser…", "danger")
+            refund = button(tr("Rembourser…"), "danger")
             refund.clicked.connect(lambda: self._start("refund"))
             self.body.addWidget(refund, 0, Qt.AlignLeft)
         self.finish(required_note=False)
@@ -390,25 +419,25 @@ class PaymentDetailDialog(FormDialog):
 
 class InvoiceDetailDialog(FormDialog):
     def __init__(self, invoice, parent=None):
-        super().__init__(f"Facture {invoice.number}", "", parent, save_text="Fermer", width=580)
+        super().__init__(tr("Facture {0}", invoice.number), "", parent, save_text=tr("Fermer"), width=580)
         self.action = None
         self.cancel_button.hide()
         rows = [
-            ("Statut", INVOICE_STATUSES.get(invoice.status, invoice.status)),
-            ("Élève", invoice.student_name),
-            ("Émise le", f"{invoice.issue_date:%d/%m/%Y}" if invoice.issue_date else "—"),
-            ("Échéance", f"{invoice.due_date:%d/%m/%Y}" if invoice.due_date else "—"),
-            ("Total", format_money(invoice.total, invoice.currency)),
-            ("Payé", format_money(invoice.paid, invoice.currency)),
-            ("Reste à payer", format_money(invoice.balance, invoice.currency)),
+            (tr("Statut"), INVOICE_STATUSES.get(invoice.status, invoice.status)),
+            (tr("Élève"), invoice.student_name),
+            (tr("Émise le"), f"{invoice.issue_date:%d/%m/%Y}" if invoice.issue_date else "—"),
+            (tr("Échéance"), f"{invoice.due_date:%d/%m/%Y}" if invoice.due_date else "—"),
+            (tr("Total"), format_money(invoice.total, invoice.currency)),
+            (tr("Payé"), format_money(invoice.paid, invoice.currency)),
+            (tr("Reste à payer"), format_money(invoice.balance, invoice.currency)),
         ]
         if invoice.cancelled_reason:
-            rows.append(("Motif d'annulation", invoice.cancelled_reason))
+            rows.append((tr("Motif d'annulation"), invoice.cancelled_reason))
         self.body.addWidget(_grid(rows))
-        self.add_section("Lignes")
+        self.add_section(tr("Lignes"))
         self.body.addWidget(_grid([(label, format_money(total, invoice.currency)) for label, total in invoice.lines]))
         if invoice.active:
-            collect = button("Encaisser…", "primary")
+            collect = button(tr("Encaisser…"), "primary")
             collect.clicked.connect(lambda: self._start("pay"))
             self.body.addWidget(collect, 0, Qt.AlignLeft)
         self.finish(required_note=False)

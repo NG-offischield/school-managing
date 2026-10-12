@@ -14,14 +14,17 @@ from datetime import datetime
 from pathlib import Path
 
 from ..api.errors import NotFound
+from ..i18n import Labels, tr
 
-FIELD_LABELS = {
-    "phone": "Téléphone",
-    "occupation": "Profession",
-    "address": "Adresse",
-    "emergency_phone": "Téléphone d'urgence",
-    "preferred_language": "Langue préférée",
-}
+FIELD_LABELS = Labels(
+    {
+        "phone": "Téléphone",
+        "occupation": "Profession",
+        "address": "Adresse",
+        "emergency_phone": "Téléphone d'urgence",
+        "preferred_language": "Langue préférée",
+    }
+)
 PHOTO_FILTER = "Photos (*.jpg *.jpeg *.png *.webp)"
 
 
@@ -79,7 +82,7 @@ class MySession:
     def from_api(cls, data):
         return cls(
             id=str(data["id"]),
-            device_name=data.get("device_name") or "Appareil",
+            device_name=data.get("device_name") or tr("Appareil"),
             platform=data.get("platform") or "",
             current=bool(data.get("is_current")),
             last_used_at=_when(data.get("last_used_at") or data.get("created_at")),

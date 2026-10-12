@@ -19,6 +19,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import QLabel
 
+from ..i18n import tr
+
 SOFTWARE_NAME = "School Managing"
 SOFTWARE_TAGLINE = "Administration de l'école"
 BRAND_DIR = Path(__file__).resolve().parent / "assets" / "brand"
@@ -62,14 +64,14 @@ def brand_mark(kind="horizontal", height=40, *, object_name="softwareBrand"):
     otherwise the neutral text mark. Always named `softwareBrand` so screens
     and tests find it the same way."""
     label = QLabel(objectName=object_name)
-    label.setAccessibleName(f"Logo {SOFTWARE_NAME}")
+    label.setAccessibleName(f"Logo {tr(SOFTWARE_NAME)}")
     label.setProperty("software_brand", True)
     pixmap = software_pixmap(kind, height)
     if pixmap is not None:
         label.setPixmap(pixmap)
         label.setProperty("brand_source", "file")
     else:
-        label.setText(SOFTWARE_NAME)
+        label.setText(tr(SOFTWARE_NAME))
         label.setProperty("brand_source", "text")
-    label.setToolTip(SOFTWARE_NAME)
+    label.setToolTip(tr(SOFTWARE_NAME))
     return label

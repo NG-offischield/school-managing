@@ -4,6 +4,7 @@ builds the PDF (school branding only), decides its status and traces it."""
 from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QLineEdit, QRadioButton, QWidget
 
+from ...i18n import tr
 from ...models import DOCUMENT_KINDS, DOCUMENT_STATUSES, PAYROLL_STATUSES
 from ...money import format_money
 from ..widgets import FormDialog, button, date_field
@@ -29,74 +30,76 @@ class GenerateDocumentDialog(FormDialog):
 
     def __init__(self, kind, context, parent=None):
         super().__init__(
-            f"Générer — {DOCUMENT_KINDS[kind]}",
-            "Le serveur produit le PDF aux couleurs de l'établissement. Un document déjà à jour est réutilisé.",
+            tr("Générer — {0}", DOCUMENT_KINDS[kind]),
+            tr("Le serveur produit le PDF aux couleurs de l'établissement. Un document déjà à jour est réutilisé."),
             parent,
-            save_text="Générer",
+            save_text=tr("Générer"),
             width=600,
         )
         self.kind, self.context = kind, context
         self.picker = self.card = self.school_class = self.teacher = self.payment = self.payroll = None
         self.day = self.date_from = self.date_to = None
         if kind in ("REPORT_CARD", "STUDENT_CARD", "STUDENT_ATTENDANCE"):
-            self.picker = self.add_field("student", "Élève", StudentPicker(context["search_students"]), required=True)
+            self.picker = self.add_field(
+                "student", tr("Élève"), StudentPicker(context["search_students"]), required=True
+            )
             self.picker.results.currentIndexChanged.connect(lambda _: self._student_changed())
         if kind == "REPORT_CARD":
-            self.card = self.add_field("report_card", "Bulletin", QComboBox(), required=True, width="medium")
+            self.card = self.add_field("report_card", tr("Bulletin"), QComboBox(), required=True, width="medium")
             self.card.currentIndexChanged.connect(lambda _: self.refresh_state())
         if kind in ("TIMETABLE", "CLASS_ATTENDANCE"):
             if kind == "TIMETABLE":
                 holder = QWidget()
                 row = QHBoxLayout(holder)
                 row.setContentsMargins(0, 0, 0, 0)
-                self.by_class, self.by_teacher = QRadioButton("D'une classe"), QRadioButton("D'un enseignant")
+                self.by_class, self.by_teacher = QRadioButton(tr("D'une classe")), QRadioButton(tr("D'un enseignant"))
                 self.by_class.setChecked(True)
                 row.addWidget(self.by_class)
                 row.addWidget(self.by_teacher)
                 row.addStretch()
-                self.add_field("source", "Emploi du temps", holder)
+                self.add_field("source", tr("Emploi du temps"), holder)
             self.school_class = QComboBox()
-            self.school_class.addItem("— choisir —", None)
+            self.school_class.addItem(tr("— choisir —"), None)
             for school_class in context["classes"]:
                 self.school_class.addItem(school_class.name, school_class.id)
-            self.school_class = self.add_field("class", "Classe", self.school_class, required=True, width="medium")
+            self.school_class = self.add_field("class", tr("Classe"), self.school_class, required=True, width="medium")
             self.school_class.currentIndexChanged.connect(lambda _: self.refresh_state())
             if kind == "TIMETABLE":
                 self.teacher = QComboBox()
-                self.teacher.addItem("— choisir —", None)
+                self.teacher.addItem(tr("— choisir —"), None)
                 for teacher in context["teachers"]:
                     self.teacher.addItem(f"{teacher.name} ({teacher.number})", teacher.id)
-                self.teacher = self.add_field("teacher", "Enseignant", self.teacher, width="medium")
+                self.teacher = self.add_field("teacher", tr("Enseignant"), self.teacher, width="medium")
                 self.teacher.currentIndexChanged.connect(lambda _: self.refresh_state())
                 self.by_class.toggled.connect(lambda _: self._source_changed())
                 self._source_changed()
-            label = "Semaine du" if kind == "TIMETABLE" else "Jour"
+            label = tr("Semaine du") if kind == "TIMETABLE" else tr("Jour")
             self.day = self.add_field("date", label, date_field(), required=True, width="short")
             self.day.setDate(QDate.currentDate())
         if kind == "STUDENT_ATTENDANCE":
             today = QDate.currentDate()
-            self.date_from = self.add_field("date_from", "Du", date_field(), required=True, width="short")
-            self.date_to = self.add_field("date_to", "Au", date_field(), required=True, width="short", beside=True)
+            self.date_from = self.add_field("date_from", tr("Du"), date_field(), required=True, width="short")
+            self.date_to = self.add_field("date_to", tr("Au"), date_field(), required=True, width="short", beside=True)
             self.date_from.setDate(today.addDays(-30))
             self.date_to.setDate(today)
         if kind == "PAYMENT_RECEIPT":
             search = QWidget()
             row = QHBoxLayout(search)
             row.setContentsMargins(0, 0, 0, 0)
-            self.payment_text = QLineEdit(placeholderText="Référence, élève ou matricule")
-            find = button("Rechercher")
+            self.payment_text = QLineEdit(placeholderText=tr("Référence, élève ou matricule"))
+            find = button(tr("Rechercher"))
             self.payment = QComboBox()
-            self.payment.addItem("— lancez une recherche —", None)
+            self.payment.addItem(tr("— lancez une recherche —"), None)
             row.addWidget(self.payment_text, 1)
             row.addWidget(find)
-            self.add_field("search", "Paiement", search)
-            self.payment = self.add_field("payment", "Paiement réussi", self.payment, required=True)
+            self.add_field("search", tr("Paiement"), search)
+            self.payment = self.add_field("payment", tr("Paiement réussi"), self.payment, required=True)
             find.clicked.connect(self._find_payments)
             self.payment_text.returnPressed.connect(self._find_payments)
             self.payment.currentIndexChanged.connect(lambda _: self.refresh_state())
         if kind == "PAYSLIP":
             self.payroll = QComboBox()
-            self.payroll.addItem("— choisir —", None)
+            self.payroll.addItem(tr("— choisir —"), None)
             for payroll in context["payrolls"]:
                 self.payroll.addItem(
                     f"{payroll.employee_name} · {payroll.period_name} · "
@@ -104,7 +107,7 @@ class GenerateDocumentDialog(FormDialog):
                     f"{format_money(payroll.approved or payroll.payable, payroll.currency)}",
                     payroll.id,
                 )
-            self.payroll = self.add_field("payroll", "Paie", self.payroll, required=True)
+            self.payroll = self.add_field("payroll", tr("Paie"), self.payroll, required=True)
             self.payroll.currentIndexChanged.connect(lambda _: self.refresh_state())
         self.finish()
 
@@ -122,7 +125,7 @@ class GenerateDocumentDialog(FormDialog):
         for card in cards:
             self.card.addItem(f"{card.get('period_name', '')} — {card.get('status', '')}", card["id"])
         if not cards:
-            self.card.addItem("Aucun bulletin calculé pour cet élève", None)
+            self.card.addItem(tr("Aucun bulletin calculé pour cet élève"), None)
         self.refresh_state()
 
     def _find_payments(self):
@@ -138,7 +141,7 @@ class GenerateDocumentDialog(FormDialog):
                 payment.id,
             )
         if not payments:
-            self.payment.addItem("Aucun paiement réussi trouvé", None)
+            self.payment.addItem(tr("Aucun paiement réussi trouvé"), None)
         self.refresh_state()
 
     def _source_changed(self):
@@ -151,20 +154,20 @@ class GenerateDocumentDialog(FormDialog):
     def missing_fields(self):
         missing = []
         if self.picker is not None and not self.picker.student_id:
-            missing.append("Élève")
+            missing.append(tr("Élève"))
         if self.card is not None and not self.card.currentData():
-            missing.append("Bulletin")
+            missing.append(tr("Bulletin"))
         if self.kind == "TIMETABLE":
             if self.by_class.isChecked() and not self.school_class.currentData():
-                missing.append("Classe")
+                missing.append(tr("Classe"))
             if self.by_teacher.isChecked() and not self.teacher.currentData():
-                missing.append("Enseignant")
+                missing.append(tr("Enseignant"))
         elif self.school_class is not None and not self.school_class.currentData():
-            missing.append("Classe")
+            missing.append(tr("Classe"))
         if self.payment is not None and not self.payment.currentData():
-            missing.append("Paiement")
+            missing.append(tr("Paiement"))
         if self.payroll is not None and not self.payroll.currentData():
-            missing.append("Paie")
+            missing.append(tr("Paie"))
         return missing
 
     def values(self):
@@ -194,29 +197,29 @@ class ComputeReportCardsDialog(FormDialog):
 
     def __init__(self, classes, periods, parent=None):
         super().__init__(
-            "Calculer les bulletins",
-            "Le serveur calcule les moyennes et les rangs (bulletins provisoires ; un bulletin validé est figé).",
+            tr("Calculer les bulletins"),
+            tr("Le serveur calcule les moyennes et les rangs (bulletins provisoires ; un bulletin validé est figé)."),
             parent,
-            save_text="Calculer",
+            save_text=tr("Calculer"),
             width=520,
         )
         self.school_class = QComboBox()
-        self.school_class.addItem("— choisir —", None)
+        self.school_class.addItem(tr("— choisir —"), None)
         for school_class in classes:
             self.school_class.addItem(school_class.name, school_class.id)
-        self.school_class = self.add_field("class", "Classe", self.school_class, required=True, width="medium")
+        self.school_class = self.add_field("class", tr("Classe"), self.school_class, required=True, width="medium")
         self.period = QComboBox()
-        self.period.addItem("— choisir —", None)
+        self.period.addItem(tr("— choisir —"), None)
         for period in periods:
             self.period.addItem(period.get("name", ""), period["id"])
-        self.period = self.add_field("period", "Période", self.period, required=True, width="medium")
+        self.period = self.add_field("period", tr("Période"), self.period, required=True, width="medium")
         for combo in (self.school_class, self.period):
             combo.currentIndexChanged.connect(lambda _: self.refresh_state())
         self.finish()
 
     def missing_fields(self):
-        missing = [] if self.school_class.currentData() else ["Classe"]
-        return missing + ([] if self.period.currentData() else ["Période"])
+        missing = [] if self.school_class.currentData() else [tr("Classe")]
+        return missing + ([] if self.period.currentData() else [tr("Période")])
 
     def values(self):
         return {"class_id": self.school_class.currentData(), "period_id": self.period.currentData()}
@@ -226,24 +229,26 @@ class DocumentDetailDialog(FormDialog):
     """Read-only metadata; buttons close it with `action` = download / regenerate."""
 
     def __init__(self, document, parent=None):
-        super().__init__(document.title, document.kind_label, parent, save_text="Fermer", width=600)
+        super().__init__(document.title, document.kind_label, parent, save_text=tr("Fermer"), width=600)
         self.cancel_button.hide()
         self.action = None
         self.body.addWidget(
             _grid(
                 [
-                    ("Statut", DOCUMENT_STATUSES.get(document.status, document.status)),
-                    ("Version", str(document.version)),
-                    ("Généré le", _when(document.generated_at)),
-                    ("Fichier", f"{document.file_name} ({max(1, document.size_bytes // 1024)} Ko)"),
-                    ("Code de vérification", document.verification_code or "—"),
-                    ("Empreinte SHA-256", f"{document.sha256[:16]}…" if document.sha256 else "—"),
+                    (tr("Statut"), DOCUMENT_STATUSES.get(document.status, document.status)),
+                    (tr("Version"), str(document.version)),
+                    (tr("Généré le"), _when(document.generated_at)),
+                    (tr("Fichier"), tr("{0} ({1} Ko)", document.file_name, max(1, document.size_bytes // 1024))),
+                    (tr("Code de vérification"), document.verification_code or "—"),
+                    (tr("Empreinte SHA-256"), f"{document.sha256[:16]}…" if document.sha256 else "—"),
                 ]
             )
         )
         note = QLabel(
-            "Le document porte l'identité de l'établissement. Un document officiel est figé ; "
-            "un document provisoire peut être regénéré, l'ancien reste dans l'historique.",
+            tr(
+                "Le document porte l'identité de l'établissement. Un document officiel est figé ; un document "
+                "provisoire peut être regénéré, l'ancien reste dans l'historique."
+            ),
             objectName="help",
         )
         note.setWordWrap(True)
@@ -251,11 +256,11 @@ class DocumentDetailDialog(FormDialog):
         row = QWidget()
         actions = QHBoxLayout(row)
         actions.setContentsMargins(0, 0, 0, 0)
-        self.download_button = button("Télécharger le PDF…", "primary")
-        self.regenerate_button = button("Regénérer")
+        self.download_button = button(tr("Télécharger le PDF…"), "primary")
+        self.regenerate_button = button(tr("Regénérer"))
         self.regenerate_button.setEnabled(document.status == "PROVISIONAL")
         self.regenerate_button.setToolTip(
-            "" if document.status == "PROVISIONAL" else "Seul un document provisoire se regénère."
+            "" if document.status == "PROVISIONAL" else tr("Seul un document provisoire se regénère.")
         )
         for widget in (self.download_button, self.regenerate_button):
             actions.addWidget(widget)
@@ -273,20 +278,20 @@ class DocumentDetailDialog(FormDialog):
 class VerifyDialog(FormDialog):
     def __init__(self, parent=None):
         super().__init__(
-            "Vérifier un document",
-            "Saisissez le code de vérification imprimé sur le document.",
+            tr("Vérifier un document"),
+            tr("Saisissez le code de vérification imprimé sur le document."),
             parent,
-            save_text="Vérifier",
+            save_text=tr("Vérifier"),
             width=480,
         )
         self.code = self.add_field(
-            "code", "Code", QLineEdit(placeholderText="ex. 7KQ2-M9XA"), required=True, width="medium"
+            "code", tr("Code"), QLineEdit(placeholderText=tr("ex. 7KQ2-M9XA")), required=True, width="medium"
         )
         self.code.textChanged.connect(self.refresh_state)
         self.finish()
 
     def missing_fields(self):
-        return [] if self.code.text().strip() else ["Code"]
+        return [] if self.code.text().strip() else [tr("Code")]
 
     def values(self):
         return {"code": self.code.text().strip()}

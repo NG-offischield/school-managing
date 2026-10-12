@@ -32,11 +32,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ...i18n import Texts, Tr, is_english, tr
 from ..theme import TOKENS
 from ..widgets import Page, button, set_variant
 
-STATUS_FILTERS = [("Actives", True), ("Inactives", False), ("Toutes", None)]
-MASCULINE_STATUS_FILTERS = [("Actifs", True), ("Inactifs", False), ("Tous", None)]
+STATUS_FILTERS = Texts([("Actives", True), ("Inactives", False), ("Toutes", None)])
+MASCULINE_STATUS_FILTERS = Texts([("Actifs", True), ("Inactifs", False), ("Tous", None)])
 STATUS_COLUMN_TITLE = "Statut"
 
 
@@ -56,14 +57,16 @@ class SortableItem(QTableWidgetItem):
 
 def status_item(active, feminine=True):
     e = "e" if feminine else ""
-    word = ("Active" if active else "Inactive") if feminine else ("Actif" if active else "Inactif")
+    word = (tr("Active") if active else tr("Inactive")) if feminine else (tr("Actif") if active else tr("Inactif"))
     item = QTableWidgetItem(f"●  {word}" if active else f"○  {word}")
     item.setForeground(QBrush(QColor(TOKENS.success if active else TOKENS.text_secondary)))
     font = QFont()
     font.setWeight(QFont.DemiBold if active else QFont.Normal)
     item.setFont(font)
     item.setToolTip(
-        f"Proposé{e} dans les nouvelles saisies" if active else f"Désactivé{e} : conservé{e} pour l'historique"
+        tr("Proposé{0} dans les nouvelles saisies", e)
+        if active
+        else tr("Désactivé{0} : conservé{1} pour l'historique", e, e)
     )
     return item
 
@@ -75,7 +78,7 @@ class CatalogPage(Page):
     noun = ""  # "catégorie", "matière", "niveau"
     feminine = True
     plural_noun = ""  # irregular plural ("niveaux"); default noun + "s"
-    search_placeholder = "Rechercher par code ou nom…"
+    search_placeholder = Tr("Rechercher par code ou nom…")
     status_filters = STATUS_FILTERS
     has_toggle = True  # Désactiver / Réactiver
     default_sort = (0, Qt.AscendingOrder)  # (column, order) when the list opens
@@ -96,10 +99,12 @@ class CatalogPage(Page):
         head.addLayout(titles, 1)
         # Actions sit on the title row (right): the filter row below keeps the
         # whole width, so several filters fit at 1366x768 without overlapping.
-        self.refresh_button = button("Actualiser", tooltip="Recharger la liste (F5)")
-        self.edit_button = button("Modifier")
-        self.toggle_button = button("Désactiver", "danger")
-        self.add_button = button("Ajouter", "primary", tooltip=f"Ajouter {self.a} {self.noun} (Ctrl+N)")
+        self.refresh_button = button(tr("Actualiser"), tooltip=tr("Recharger la liste (F5)"))
+        self.edit_button = button(tr("Modifier"))
+        self.toggle_button = button(tr("Désactiver"), "danger")
+        self.add_button = button(
+            tr("Ajouter"), "primary", tooltip=tr("Ajouter {0} {1} (Ctrl+N)", self.a, self.noun_label)
+        )
         actions = QHBoxLayout()
         actions.setSpacing(8)
         self.toggle_button.setVisible(self.has_toggle)
@@ -120,11 +125,11 @@ class CatalogPage(Page):
         tools = QHBoxLayout()
         tools.setSpacing(8)
         self.search = QLineEdit(placeholderText=self.search_placeholder, clearButtonEnabled=True)
-        self.search.setAccessibleName("Rechercher")
+        self.search.setAccessibleName(tr("Rechercher"))
         self.search.setMinimumWidth(220)
         self.status = QComboBox()
-        self.status.setAccessibleName("Filtrer par statut")
-        self.status.setToolTip("Filtrer par statut")
+        self.status.setAccessibleName(tr("Filtrer par statut"))
+        self.status.setToolTip(tr("Filtrer par statut"))
         filters = self.status_filters
         if filters is STATUS_FILTERS and not self.feminine:
             filters = MASCULINE_STATUS_FILTERS
@@ -229,30 +234,41 @@ class CatalogPage(Page):
         """How a row is named in confirmations."""
         return f"{row.code} — {row.name}"
 
-    # --- French agreement (une catégorie / un niveau) -------------------------
+    # --- grammar of the messages (French agreement / English articles) ------------
+    @property
+    def noun_label(self):
+        """The noun in the current language (« catégorie » / « category »)."""
+        return tr(self.noun)
+
     @property
     def plural(self):
-        return self.plural_noun or f"{self.noun}s"
+        return tr(self.plural_noun or f"{self.noun}s")
 
     @property
     def a(self):
+        if is_english():
+            return "an" if self.noun_label[:1].lower() in "aeiou" else "a"
         return "une" if self.feminine else "un"
 
     @property
     def the(self):
+        if is_english():
+            return "the "
         return "l'" if self.noun[:1] in "aeiouyéèh" else ("la " if self.feminine else "le ")
 
     @property
     def none(self):
-        return "Aucune" if self.feminine else "Aucun"
+        return tr("Aucune") if self.feminine else tr("Aucun")
 
     def agree(self, participle):
-        """« créé » -> « créée » for a feminine noun."""
+        """« créé » -> « créée » for a feminine noun (French only)."""
+        if is_english():
+            return participle
         return f"{participle}e" if self.feminine else participle
 
     # --- list -------------------------------------------------------------------
     def reload(self):
-        self.call(self.fetch, self.show_rows, action=f"Impossible de charger les {self.plural}")
+        self.call(self.fetch, self.show_rows, action=tr("Impossible de charger les {0}", self.plural))
 
     def show_rows(self, rows):
         self.rows = rows
@@ -260,7 +276,7 @@ class CatalogPage(Page):
         self.table.setRowCount(len(rows))
         for r, row in enumerate(rows):
             for c, value in enumerate(self.cells(row)):
-                if self.columns[c] == STATUS_COLUMN_TITLE:
+                if self.columns[c] == tr(STATUS_COLUMN_TITLE):
                     item = self.status_cell(row)
                 elif isinstance(value, tuple):
                     value, key = value
@@ -268,17 +284,19 @@ class CatalogPage(Page):
                 else:
                     item = QTableWidgetItem(value)
                 item.setData(Qt.UserRole, row.id)
-                if value and self.columns[c] != STATUS_COLUMN_TITLE:
+                if value and self.columns[c] != tr(STATUS_COLUMN_TITLE):
                     item.setToolTip(value)
                 self.table.setItem(r, c, item)
         self.table.setSortingEnabled(self.sortable)
         count = len(rows)
-        self.count_label.setText(f"{count} {self.noun if count < 2 else self.plural}")
+        self.count_label.setText(f"{count} {self.noun_label if count < 2 else self.plural}")
         filtered = self.is_filtered()
         self.empty.setText(
-            f"{self.none} {self.noun} ne correspond à ces critères."
+            tr("{0} {1} ne correspond à ces critères.", self.none, self.noun_label)
             if filtered
-            else f"{self.none} {self.noun} pour le moment. Cliquez sur « Ajouter » pour en créer {self.a}."
+            else tr(
+                "{0} {1} pour le moment. Cliquez sur « Ajouter » pour en créer {2}.", self.none, self.noun_label, self.a
+            )
         )
         self.table_stack.setCurrentWidget(self.table if rows else self.empty)
         self._update_actions()
@@ -302,11 +320,13 @@ class CatalogPage(Page):
         self.edit_button.setEnabled(available)
         self.toggle_button.setEnabled(available)
         reactivate = row is not None and not row.active
-        self.toggle_button.setText("Réactiver" if reactivate else "Désactiver")
+        self.toggle_button.setText(tr("Réactiver") if reactivate else tr("Désactiver"))
         set_variant(self.toggle_button, "secondary" if reactivate else "danger")
-        why = "" if row is not None else f"Sélectionnez d'abord {self.a} {self.noun} dans la liste."
-        self.edit_button.setToolTip(why or "Modifier la ligne sélectionnée (Entrée)")
-        self.toggle_button.setToolTip(why or ("Réactiver" if reactivate else "Désactiver (l'historique est conservé)"))
+        why = "" if row is not None else tr("Sélectionnez d'abord {0} {1} dans la liste.", self.a, self.noun_label)
+        self.edit_button.setToolTip(why or tr("Modifier la ligne sélectionnée (Entrée)"))
+        self.toggle_button.setToolTip(
+            why or (tr("Réactiver") if reactivate else tr("Désactiver (l'historique est conservé)"))
+        )
         self.add_button.setEnabled(not self.busy)
         self.update_extra_actions(row if not self.busy else None)
 
@@ -327,34 +347,37 @@ class CatalogPage(Page):
         if row is None:
             return
         if row.active:
-            when_used = "si elle" if self.feminine else "s'il"
-            text = (
-                f"« {self.describe_row(row)} » ne sera plus {self.agree('proposé')} dans les nouvelles "
-                f"saisies. Son historique est conservé et vous pourrez {'la' if self.feminine else 'le'} "
-                f"réactiver.\n\nLe serveur refusera la désactivation {when_used} "
-                f"est encore {self.agree('utilisé')}."
+            when_used = tr("si elle") if self.feminine else "s'il"
+            text = tr(
+                "« {0} » ne sera plus {1} dans les nouvelles saisies. Son historique est conservé et vous pourrez "
+                "{2} réactiver.\n\nLe serveur refusera la désactivation {3} est encore {4}.",
+                self.describe_row(row),
+                self.agree("proposé"),
+                "la" if self.feminine else "le",
+                when_used,
+                self.agree("utilisé"),
             )
-            title = f"Désactiver {self.the}{self.noun} ?"
-            if not self.confirm(self, title, text, confirm_text="Désactiver", danger=True):
+            title = tr("Désactiver {0}{1} ?", self.the, self.noun_label)
+            if not self.confirm(self, title, text, confirm_text=tr("Désactiver"), danger=True):
                 return
             self.call(
                 lambda: self.deactivate(row.id),
-                lambda saved: self._saved(saved, self.agree("désactivé")),
-                action=f"Impossible de désactiver {self.the}{self.noun}",
+                lambda saved: self._saved(saved, self.agree(tr("désactivé"))),
+                action=tr("Impossible de désactiver {0}{1}", self.the, self.noun_label),
             )
         else:
             self.call(
                 lambda: self.reactivate(row.id),
-                lambda saved: self._saved(saved, self.agree("réactivé")),
-                action=f"Impossible de réactiver {self.the}{self.noun}",
+                lambda saved: self._saved(saved, self.agree(tr("réactivé"))),
+                action=tr("Impossible de réactiver {0}{1}", self.the, self.noun_label),
             )
 
     def _saved(self, saved, verb):
-        self.success(f"{self.noun.capitalize()} « {saved.code} » {verb} avec succès.")
+        self.success(tr("{0} « {1} » {2} avec succès.", self.noun_label.capitalize(), saved.code, verb))
         self.call(
             self.fetch,
             lambda rows: (self.show_rows(rows), self.select_id(saved.id)),
-            action=f"Impossible de charger les {self.plural}",
+            action=tr("Impossible de charger les {0}", self.plural),
         )
 
 
@@ -379,9 +402,9 @@ class PagedCatalogPage(CatalogPage):
         self.status.currentIndexChanged.connect(lambda _: self.reload_first_page())
         pager = QHBoxLayout()
         pager.addStretch()
-        self.previous_button = button("‹ Précédente", tooltip="Page précédente")
+        self.previous_button = button(tr("‹ Précédente"), tooltip=tr("Page précédente"))
         self.page_label = QLabel("", objectName="countLabel")
-        self.next_button = button("Suivante ›", tooltip="Page suivante")
+        self.next_button = button(tr("Suivante ›"), tooltip=tr("Page suivante"))
         for widget in (self.previous_button, self.page_label, self.next_button):
             pager.addWidget(widget)
         self.layout_.addLayout(pager)
@@ -404,13 +427,13 @@ class PagedCatalogPage(CatalogPage):
     def show_rows(self, result):
         rows, self.total = result
         super().show_rows(rows)
-        self.count_label.setText(f"{self.total} {self.noun if self.total < 2 else self.plural}")
+        self.count_label.setText(f"{self.total} {self.noun_label if self.total < 2 else self.plural}")
         self._update_pager()
 
     def _update_pager(self):
         if not hasattr(self, "page_label"):
             return
-        self.page_label.setText(f"Page {self.page_number} / {self.pages}")
+        self.page_label.setText(tr("Page {0} / {1}", self.page_number, self.pages))
         self.previous_button.setEnabled(self.page_number > 1)
         self.next_button.setEnabled(self.page_number < self.pages)
 
@@ -420,5 +443,5 @@ class PagedCatalogPage(CatalogPage):
         self.call(
             self.fetch,
             lambda result: (self.show_rows(result), self.select_id(saved_id)),
-            action=f"Impossible de charger les {self.plural}",
+            action=tr("Impossible de charger les {0}", self.plural),
         )

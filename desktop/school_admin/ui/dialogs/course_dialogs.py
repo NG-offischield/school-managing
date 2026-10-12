@@ -15,6 +15,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QDoubleValidator
 from PySide6.QtWidgets import QComboBox, QGridLayout, QLabel, QLineEdit, QWidget
 
+from ...i18n import Labels, tr
 from ..widgets import FormDialog, button
 
 CHOOSE_YEAR = "Choisir une année scolaire…"
@@ -22,12 +23,14 @@ CHOOSE_CLASS = "Choisir une classe…"
 CHOOSE_SUBJECT = "Choisir une matière…"
 CHOOSE_TEACHER = "Choisir un enseignant…"
 DEFAULT_SCALE = "Barème de la matière ou de l'école"
-EXCLUSION_REASONS = {
-    "teacher_inactive": "inactif",
-    "teacher_not_qualified": "matière non validée",
-    "incompatible_subject": "incompatible à ce niveau",
-    "teacher_other_school": "autre école",
-}
+EXCLUSION_REASONS = Labels(
+    {
+        "teacher_inactive": "inactif",
+        "teacher_not_qualified": "matière non validée",
+        "incompatible_subject": "incompatible à ce niveau",
+        "teacher_other_school": "autre école",
+    }
+)
 
 
 def _number_field(placeholder):
@@ -43,9 +46,11 @@ class CourseDialog(FormDialog):
         years, classes, subjects, scales = references
         editing = course is not None
         super().__init__(
-            "Modifier le cours" if editing else "Nouveau cours",
-            "Un cours = une matière, un enseignant, une classe, pour l'année de la classe. "
-            "Seuls les enseignants autorisés par le serveur sont proposés.",
+            tr("Modifier le cours") if editing else tr("Nouveau cours"),
+            tr(
+                "Un cours = une matière, un enseignant, une classe, pour l'année de la classe. Seuls les enseignants "
+                "autorisés par le serveur sont proposés."
+            ),
             parent,
             width=600,
         )
@@ -54,39 +59,41 @@ class CourseDialog(FormDialog):
         self.course = course
         self.excluded = []
 
-        self.add_section("Classe et matière")
+        self.add_section(tr("Classe et matière"))
         year = QComboBox()
-        year.addItem(CHOOSE_YEAR, None)
+        year.addItem(tr(CHOOSE_YEAR), None)
         for item in years:
             year.addItem(item.short_label, item.id)
-        self.year = self.add_field("academic_year", "Année scolaire", year, required=True, width="medium")
+        self.year = self.add_field("academic_year", tr("Année scolaire"), year, required=True, width="medium")
         self.school_class = self.add_field(
-            "school_class", "Classe", QComboBox(), required=True, width="medium", beside=True
+            "school_class", tr("Classe"), QComboBox(), required=True, width="medium", beside=True
         )
         subject = QComboBox()
-        subject.addItem(CHOOSE_SUBJECT, None)
+        subject.addItem(tr(CHOOSE_SUBJECT), None)
         for item in subjects:
             subject.addItem(f"{item.code} — {item.name}", item.id)
-        self.subject = self.add_field("subject", "Matière", subject, required=True, width="medium")
+        self.subject = self.add_field("subject", tr("Matière"), subject, required=True, width="medium")
 
-        self.add_section("Enseignant", "Liste calculée par le serveur : actif, matière validée, compatible au niveau.")
-        self.teacher = self.add_field("teacher", "Enseignant", QComboBox(), required=True, width="medium")
+        self.add_section(
+            tr("Enseignant"), tr("Liste calculée par le serveur : actif, matière validée, compatible au niveau.")
+        )
+        self.teacher = self.add_field("teacher", tr("Enseignant"), QComboBox(), required=True, width="medium")
         self.teacher_hint = QLabel("", objectName="help")
         self.teacher_hint.setWordWrap(True)
         self.body.addWidget(self.teacher_hint)
 
-        self.add_section("Évaluation")
+        self.add_section(tr("Évaluation"))
         self.coefficient = self.add_field(
-            "coefficient", "Coefficient", _number_field("Ex. 4"), width="short", help_text="Défaut : 1."
+            "coefficient", tr("Coefficient"), _number_field(tr("Ex. 4")), width="short", help_text=tr("Défaut : 1.")
         )
         self.weekly_hours = self.add_field(
-            "weekly_hours", "Heures / semaine", _number_field("Ex. 5"), width="short", beside=True
+            "weekly_hours", tr("Heures / semaine"), _number_field(tr("Ex. 5")), width="short", beside=True
         )
         scale = QComboBox()
-        scale.addItem(DEFAULT_SCALE, None)
+        scale.addItem(tr(DEFAULT_SCALE), None)
         for item in scales:
             scale.addItem(f"{item['code']} — {item['label']}", item["id"])
-        self.scale = self.add_field("scale", "Barème", scale, width="medium")
+        self.scale = self.add_field("scale", tr("Barème"), scale, width="medium")
 
         if editing:
             if self.year.findData(course.year_id) < 0:  # e.g. a closed year: shown, not offered
@@ -119,7 +126,7 @@ class CourseDialog(FormDialog):
         year = self.year.currentData()
         self.school_class.blockSignals(True)
         self.school_class.clear()
-        self.school_class.addItem(CHOOSE_CLASS, None)
+        self.school_class.addItem(tr(CHOOSE_CLASS), None)
         for item in self.classes:
             if item.year_id == year:
                 self.school_class.addItem(item.name, item.id)
@@ -132,13 +139,13 @@ class CourseDialog(FormDialog):
     def _reload_teachers(self, _index=None):
         class_id, subject_id = self.school_class.currentData(), self.subject.currentData()
         self.teacher.clear()
-        self.teacher.addItem(CHOOSE_TEACHER, None)
+        self.teacher.addItem(tr(CHOOSE_TEACHER), None)
         self.teacher.setEnabled(False)
         if not (class_id and subject_id):
-            self.teacher_hint.setText("Choisissez d'abord la classe et la matière.")
+            self.teacher_hint.setText(tr("Choisissez d'abord la classe et la matière."))
             self.refresh_state()
             return
-        self.teacher_hint.setText("Recherche des enseignants autorisés…")
+        self.teacher_hint.setText(tr("Recherche des enseignants autorisés…"))
         self.find_teachers(class_id, subject_id, self.show_teachers)
 
     def show_teachers(self, result):
@@ -146,19 +153,19 @@ class CourseDialog(FormDialog):
         self.excluded = excluded
         self.teacher.blockSignals(True)
         self.teacher.clear()
-        self.teacher.addItem(CHOOSE_TEACHER, None)
+        self.teacher.addItem(tr(CHOOSE_TEACHER), None)
         for item in eligible:
             self.teacher.addItem(item.label, item.id)
         if self.course is not None:
             self.teacher.setCurrentIndex(max(0, self.teacher.findData(self.course.teacher_id)))
         self.teacher.blockSignals(False)
         self.teacher.setEnabled(bool(eligible))
-        lines = [f"{len(eligible)} enseignant(s) autorisé(s) pour cette classe et cette matière."]
+        lines = [tr("{0} enseignant(s) autorisé(s) pour cette classe et cette matière.", len(eligible))]
         if not eligible:
-            lines = ["Aucun enseignant autorisé : ajoutez ou validez la qualification dans « Enseignants »."]
+            lines = [tr("Aucun enseignant autorisé : ajoutez ou validez la qualification dans « Enseignants ».")]
         if excluded:
             lines.append(
-                "Non proposés : "
+                tr("Non proposés : ")
                 + " ; ".join(f"{t.name} ({EXCLUSION_REASONS.get(t.reason, t.reason)})" for t in excluded)
                 + "."
             )
@@ -171,13 +178,13 @@ class CourseDialog(FormDialog):
             return []
         missing = []
         if not self.year.currentData():
-            missing.append("Année scolaire")
+            missing.append(tr("Année scolaire"))
         if not self.school_class.currentData():
-            missing.append("Classe")
+            missing.append(tr("Classe"))
         if not self.subject.currentData():
-            missing.append("Matière")
+            missing.append(tr("Matière"))
         if not self.teacher.currentData():
-            missing.append("Enseignant")
+            missing.append(tr("Enseignant"))
         return missing
 
     def values(self):
@@ -213,47 +220,50 @@ def _grid(pairs):
 class CourseRecordDialog(FormDialog):
     def __init__(self, course, parent=None):
         super().__init__(
-            f"Fiche du cours — {course.subject_code} · {course.class_name}", "", parent, save_text="Fermer"
+            tr("Fiche du cours — {0} · {1}", course.subject_code, course.class_name), "", parent, save_text=tr("Fermer")
         )
         self.action = None
         self.cancel_button.hide()
-        self.add_section("Cours")
+        self.add_section(tr("Cours"))
         self.body.addWidget(
             _grid(
                 [
-                    ("Matière", course.subject_label),
-                    ("Classe", course.class_name),
-                    ("Niveau", course.level_code or "—"),
-                    ("Année scolaire", course.year_name),
-                    ("Statut", "Actif" if course.active else "Inactif"),
+                    (tr("Matière"), course.subject_label),
+                    (tr("Classe"), course.class_name),
+                    (tr("Niveau"), course.level_code or "—"),
+                    (tr("Année scolaire"), course.year_name),
+                    (tr("Statut"), tr("Actif") if course.active else tr("Inactif")),
                 ]
             )
         )
-        self.add_section("Enseignant")
-        self.body.addWidget(_grid([("Enseignant", f"{course.teacher_name} ({course.teacher_number})")]))
-        self.add_section("Évaluation")
+        self.add_section(tr("Enseignant"))
+        self.body.addWidget(_grid([(tr("Enseignant"), f"{course.teacher_name} ({course.teacher_number})")]))
+        self.add_section(tr("Évaluation"))
         self.body.addWidget(
             _grid(
                 [
-                    ("Coefficient", course.coefficient),
-                    ("Heures / semaine", course.weekly_hours),
-                    ("Barème", course.scale_label or DEFAULT_SCALE),
+                    (tr("Coefficient"), course.coefficient),
+                    (tr("Heures / semaine"), course.weekly_hours),
+                    (tr("Barème"), course.scale_label or tr(DEFAULT_SCALE)),
                 ]
             )
         )
-        self.add_section("Planning", "Le planning se gère dans son module ; il utilise ce cours tel quel.")
+        self.add_section(tr("Planning"), tr("Le planning se gère dans son module ; il utilise ce cours tel quel."))
         self.body.addWidget(
             _grid(
                 [
-                    ("Créneaux en cours", "—" if course.published_slot_count is None else course.published_slot_count),
                     (
-                        "Séances à venir",
+                        tr("Créneaux en cours"),
+                        "—" if course.published_slot_count is None else course.published_slot_count,
+                    ),
+                    (
+                        tr("Séances à venir"),
                         "—" if course.upcoming_session_count is None else course.upcoming_session_count,
                     ),
                 ]
             )
         )
-        self.edit_button = button("Modifier le cours…")
+        self.edit_button = button(tr("Modifier le cours…"))
         self.edit_button.clicked.connect(self._edit)
         self.body.addWidget(self.edit_button, 0, Qt.AlignLeft)
         self.finish(required_note=False)

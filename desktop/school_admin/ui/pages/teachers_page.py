@@ -15,6 +15,7 @@ from the server only (QualificationsDialog).
 
 from PySide6.QtWidgets import QComboBox, QDialog, QHBoxLayout
 
+from ...i18n import Texts, Tr, tr
 from ..dialogs.teacher_dialogs import (
     ActivationCodeDialog,
     QualificationsDialog,
@@ -25,18 +26,18 @@ from ..dialogs.teacher_dialogs import (
 from ..widgets import button
 from .catalog_base import STATUS_COLUMN_TITLE, PagedCatalogPage
 
-TEACHER_FILTERS = [("Actifs", "active"), ("Inactifs", "inactive"), ("Tous", None)]
+TEACHER_FILTERS = Texts([("Actifs", "active"), ("Inactifs", "inactive"), ("Tous", None)])
 ALL_CATEGORIES = "Toutes les catégories"
 ALL_SUBJECTS = "Toutes les matières"
 
 
 class TeachersPage(PagedCatalogPage):
-    title = "Enseignants"
-    description = "Fiches des enseignants, leurs matières qualifiées et leur statut. Les cours se créent ensuite."
-    columns = ["Matricule", "Nom", "Prénom(s)", "Catégorie", "Matière principale", "Matières", STATUS_COLUMN_TITLE]
+    title = Tr("Enseignants")
+    description = Tr("Fiches des enseignants, leurs matières qualifiées et leur statut. Les cours se créent ensuite.")
+    columns = Tr(["Matricule", "Nom", "Prénom(s)", "Catégorie", "Matière principale", "Matières", STATUS_COLUMN_TITLE])
     noun = "enseignant"
     feminine = False
-    search_placeholder = "Rechercher par nom, prénom, e-mail ou matricule…"
+    search_placeholder = Tr("Rechercher par nom, prénom, e-mail ou matricule…")
     status_filters = TEACHER_FILTERS
 
     def __init__(
@@ -59,7 +60,7 @@ class TeachersPage(PagedCatalogPage):
         return {1, 2, 5}
 
     def leading_actions(self):
-        self.record_button = button("Fiche", tooltip="Consulter la fiche de l'enseignant (Entrée)")
+        self.record_button = button(tr("Fiche"), tooltip=tr("Consulter la fiche de l'enseignant (Entrée)"))
         return [self.record_button]
 
     def extra_actions(self):
@@ -71,15 +72,15 @@ class TeachersPage(PagedCatalogPage):
         layout = QHBoxLayout()
         layout.setSpacing(8)
         self.category_filter = QComboBox()
-        self.category_filter.setAccessibleName("Filtrer par catégorie pédagogique")
-        self.category_filter.setToolTip("Filtrer par catégorie pédagogique")
+        self.category_filter.setAccessibleName(tr("Filtrer par catégorie pédagogique"))
+        self.category_filter.setToolTip(tr("Filtrer par catégorie pédagogique"))
         self.category_filter.setMinimumWidth(170)
-        self.category_filter.addItem(ALL_CATEGORIES, None)
+        self.category_filter.addItem(tr(ALL_CATEGORIES), None)
         self.subject_filter = QComboBox()
-        self.subject_filter.setAccessibleName("Filtrer par matière qualifiée")
-        self.subject_filter.setToolTip("Filtrer par matière qualifiée")
+        self.subject_filter.setAccessibleName(tr("Filtrer par matière qualifiée"))
+        self.subject_filter.setToolTip(tr("Filtrer par matière qualifiée"))
         self.subject_filter.setMinimumWidth(170)
-        self.subject_filter.addItem(ALL_SUBJECTS, None)
+        self.subject_filter.addItem(tr(ALL_SUBJECTS), None)
         for combo in (self.category_filter, self.subject_filter):
             combo.currentIndexChanged.connect(lambda _: self._filters_ready and self.reload_first_page())
             layout.addWidget(combo)
@@ -89,10 +90,10 @@ class TeachersPage(PagedCatalogPage):
     def update_extra_actions(self, row):
         if not hasattr(self, "qualifications_button"):
             return
-        why = "Sélectionnez d'abord un enseignant dans la liste."
+        why = tr("Sélectionnez d'abord un enseignant dans la liste.")
         for widget, tip in (
-            (self.record_button, "Consulter la fiche de l'enseignant (Entrée)"),
-            (self.qualifications_button, "Matières, compatibilité et dérogations"),
+            (self.record_button, tr("Consulter la fiche de l'enseignant (Entrée)")),
+            (self.qualifications_button, tr("Matières, compatibilité et dérogations")),
         ):
             widget.setEnabled(row is not None)
             widget.setToolTip(why if row is None else tip)
@@ -110,15 +111,15 @@ class TeachersPage(PagedCatalogPage):
         self.call(
             lambda: (self.categories.list(active=None), self.subjects.list(active=None)),
             self._fill_filters,
-            action="Impossible de charger les catégories et les matières",
+            action=tr("Impossible de charger les catégories et les matières"),
         )
 
     def _fill_filters(self, loaded):
         categories, subjects = loaded
         self._filters_ready = False
         for combo, first, items in (
-            (self.category_filter, ALL_CATEGORIES, categories),
-            (self.subject_filter, ALL_SUBJECTS, subjects),
+            (self.category_filter, tr(ALL_CATEGORIES), categories),
+            (self.subject_filter, tr(ALL_SUBJECTS), subjects),
         ):
             chosen = combo.currentData()
             combo.clear()
@@ -183,9 +184,11 @@ class TeachersPage(PagedCatalogPage):
         if kind == "suspend":
             return ask_reason(
                 self,
-                f"Suspendre le compte de {context['teacher'].name} ?",
-                "Connexion impossible et sessions fermées. La fiche enseignant est conservée ; "
-                "le compte peut être réactivé.",
+                tr("Suspendre le compte de {0} ?", context["teacher"].name),
+                tr(
+                    "Connexion impossible et sessions fermées. La fiche enseignant est conservée ; le compte peut "
+                    "être réactivé."
+                ),
                 danger=True,
             )
         if kind == "record":
@@ -218,12 +221,12 @@ class TeachersPage(PagedCatalogPage):
                 self.call(
                     lambda: self.service.create(**values),
                     lambda saved: self._reselect(
-                        saved.id, f"Enseignant « {saved.name} » ({saved.number}) créé avec succès."
+                        saved.id, tr("Enseignant « {0} » ({1}) créé avec succès.", saved.name, saved.number)
                     ),
-                    action="Impossible de créer l'enseignant",
+                    action=tr("Impossible de créer l'enseignant"),
                 )
 
-        self.call(self._form_lists, open_form, action="Impossible de charger les catégories et les matières")
+        self.call(self._form_lists, open_form, action=tr("Impossible de charger les catégories et les matières"))
 
     def edit(self, teacher=None):
         row = teacher or self.selected()
@@ -237,15 +240,15 @@ class TeachersPage(PagedCatalogPage):
                 self.call(
                     lambda: self.service.update(current.id, **values),
                     lambda saved: self._reselect(
-                        saved.id, f"Enseignant « {saved.name} » ({saved.number}) modifié avec succès."
+                        saved.id, tr("Enseignant « {0} » ({1}) modifié avec succès.", saved.name, saved.number)
                     ),
-                    action="Impossible de modifier l'enseignant",
+                    action=tr("Impossible de modifier l'enseignant"),
                 )
 
         self.call(
             lambda: (self.service.get(row.id), self._form_lists()),
             open_form,
-            action="Impossible de charger la fiche de l'enseignant",
+            action=tr("Impossible de charger la fiche de l'enseignant"),
         )
 
     def open_row(self):
@@ -271,7 +274,7 @@ class TeachersPage(PagedCatalogPage):
         self.call(
             lambda: self._record(row.id),
             show,
-            action="Impossible de charger la fiche de l'enseignant",
+            action=tr("Impossible de charger la fiche de l'enseignant"),
         )
 
     def _record(self, teacher_id):
@@ -298,9 +301,9 @@ class TeachersPage(PagedCatalogPage):
                 and account.state == "PENDING_ACTIVATION"
                 and not self.confirm(
                     self,
-                    "Générer un nouveau code ?",
-                    "Le code déjà remis ne fonctionnera plus.",
-                    confirm_text="Générer",
+                    tr("Générer un nouveau code ?"),
+                    tr("Le code déjà remis ne fonctionnera plus."),
+                    confirm_text=tr("Générer"),
                 )
             ):
                 return
@@ -309,16 +312,20 @@ class TeachersPage(PagedCatalogPage):
                 self.ask("code", teacher=teacher, issued=issued)
                 expires = f"{issued.expires_at:%d/%m/%Y %H:%M}" if issued.expires_at else "—"
                 # The code itself is never written in the banner (nor anywhere else).
-                self._reselect(teacher.id, f"Code d'activation remis pour {teacher.name} (valable jusqu'au {expires}).")
+                self._reselect(
+                    teacher.id, tr("Code d'activation remis pour {0} (valable jusqu'au {1}).", teacher.name, expires)
+                )
 
             self.call(
-                lambda: self.accounts.issue_code(member), show_code, action="Impossible de générer le code d'activation"
+                lambda: self.accounts.issue_code(member),
+                show_code,
+                action=tr("Impossible de générer le code d'activation"),
             )
         elif action == "revoke_code":
             self.call(
                 lambda: self.accounts.revoke_code(member),
-                lambda _: self._reselect(teacher.id, f"Code d'activation de {teacher.name} révoqué."),
-                action="Impossible de révoquer le code",
+                lambda _: self._reselect(teacher.id, tr("Code d'activation de {0} révoqué.", teacher.name)),
+                action=tr("Impossible de révoquer le code"),
             )
         elif action == "disable_account":
             values = self.ask("suspend", teacher=teacher)
@@ -326,15 +333,15 @@ class TeachersPage(PagedCatalogPage):
                 self.call(
                     lambda: self.accounts.disable(member, values["reason"]),
                     lambda _: self._reselect(
-                        teacher.id, f"Compte de {teacher.name} suspendu : connexion impossible, sessions fermées."
+                        teacher.id, tr("Compte de {0} suspendu : connexion impossible, sessions fermées.", teacher.name)
                     ),
-                    action="Impossible de suspendre le compte",
+                    action=tr("Impossible de suspendre le compte"),
                 )
         elif action == "enable_account":
             self.call(
                 lambda: self.accounts.enable(member),
-                lambda _: self._reselect(teacher.id, f"Compte de {teacher.name} réactivé."),
-                action="Impossible de réactiver le compte",
+                lambda _: self._reselect(teacher.id, tr("Compte de {0} réactivé.", teacher.name)),
+                action=tr("Impossible de réactiver le compte"),
             )
 
     def show_remuneration(self, teacher):
@@ -372,7 +379,7 @@ class TeachersPage(PagedCatalogPage):
                 date_to=date_to,
             )
 
-        self.call(load, show, action="Impossible de charger la rémunération")
+        self.call(load, show, action=tr("Impossible de charger la rémunération"))
 
     def _rates(self, teacher_id):
         """Payroll rates are optional here: a refusal of the payroll module never
@@ -393,12 +400,12 @@ class TeachersPage(PagedCatalogPage):
             subjects, levels = lists
             changed = self.ask("qualifications", teacher=row, subjects=subjects, levels=levels)
             if changed:
-                self._reselect(row.id, f"Qualifications de « {row.name} » mises à jour.")
+                self._reselect(row.id, tr("Qualifications de « {0} » mises à jour.", row.name))
 
         self.call(
             lambda: (self.subjects.list(active=True), self.references.levels()),
             open_dialog,
-            action="Impossible de charger les matières",
+            action=tr("Impossible de charger les matières"),
         )
 
     def deactivate(self, row_id):
@@ -408,4 +415,4 @@ class TeachersPage(PagedCatalogPage):
         return self.service.reactivate(row_id)
 
     def _saved(self, saved, verb):
-        self._reselect(saved.id, f"Enseignant « {saved.name} » ({saved.number}) {verb} avec succès.")
+        self._reselect(saved.id, tr("Enseignant « {0} » ({1}) {2} avec succès.", saved.name, saved.number, verb))

@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..i18n import tr
 from .branding import SOFTWARE_NAME, SOFTWARE_TAGLINE, brand_mark, software_icon
 from .navigation import NAVIGATION
 from .pages.placeholder_page import PlaceholderPage
@@ -43,7 +44,7 @@ class MainWindow(QMainWindow):
     def __init__(self, identity, page_factories, runner, parent=None):
         super().__init__(parent)
         self.identity = identity
-        self.setWindowTitle(f"{SOFTWARE_NAME} — {identity.school_name}")
+        self.setWindowTitle(f"{tr(SOFTWARE_NAME)} — {identity.school_name}")
         self.setWindowIcon(software_icon())
         self.setMinimumSize(1100, 640)
         self.resize(1280, 800)
@@ -57,14 +58,14 @@ class MainWindow(QMainWindow):
         # The SOFTWARE's identity (School Managing); the school's name is in the header.
         self.brand = brand_mark("compact", 32, object_name="brand")
         side.addWidget(self.brand)
-        side.addWidget(QLabel(SOFTWARE_TAGLINE, objectName="brandSub"))
+        side.addWidget(QLabel(tr(SOFTWARE_TAGLINE), objectName="brandSub"))
         self.nav = QListWidget()
-        self.nav.setAccessibleName("Navigation")
+        self.nav.setAccessibleName(tr("Navigation"))
         self.nav.setSpacing(1)
         self.nav.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.nav.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         side.addWidget(self.nav)
-        self.about_button = QPushButton(f"À propos de {SOFTWARE_NAME}", objectName="aboutLink")
+        self.about_button = QPushButton(tr("À propos de {0}", SOFTWARE_NAME), objectName="aboutLink")
         self.about_button.setCursor(Qt.PointingHandCursor)
         self.about_button.clicked.connect(self.show_about)
         side.addWidget(self.about_button)
@@ -77,7 +78,7 @@ class MainWindow(QMainWindow):
         top.setSpacing(12)
         self.school_label = QLabel(identity.school_name, objectName="schoolName")
         self.school_code = QLabel(identity.school_code, objectName="schoolCode")
-        self.school_code.setToolTip("Code de l'école")
+        self.school_code.setToolTip(tr("Code de l'école"))
         self.school_code.setFixedHeight(24)
         top.addWidget(self.school_label)
         top.addWidget(self.school_code, 0, Qt.AlignVCenter)
@@ -91,10 +92,10 @@ class MainWindow(QMainWindow):
         who.addWidget(self.user_label)
         who.addWidget(self.role_label)
         self.account_button = button(
-            "Mon compte", "secondary", tooltip="Coordonnées, photo, mot de passe, appareils connectés"
+            tr("Mon compte"), "secondary", tooltip=tr("Coordonnées, photo, mot de passe, appareils connectés")
         )
         self.account_button.clicked.connect(self.account_requested.emit)
-        self.logout_button = button("Se déconnecter", tooltip="Fermer la session sur ce poste")
+        self.logout_button = button(tr("Se déconnecter"), tooltip=tr("Fermer la session sur ce poste"))
         top.addWidget(avatar)
         top.addLayout(who)
         top.addSpacing(8)
@@ -168,24 +169,25 @@ class MainWindow(QMainWindow):
         for entry in NAVIGATION:
             if entry.section and entry.section != section:
                 section = entry.section
-                title = QListWidgetItem(section.upper())
+                title = QListWidgetItem(tr(section).upper())
                 title.setFlags(Qt.NoItemFlags)  # not selectable, not focusable
                 title.setFont(section_font)
                 title.setForeground(soon_brush)
                 title.setSizeHint(QSize(0, 34))
                 self.nav.addItem(title)
             available = entry.available and entry.key in page_factories
-            item = QListWidgetItem(entry.label if available else f"{entry.label}   ·  Bientôt")
+            label = tr(entry.label)  # NAVIGATION holds the French sources
+            item = QListWidgetItem(label if available else tr("{0}   ·  Bientôt", label))
             item.setData(Qt.UserRole, entry.key)
             item.setSizeHint(QSize(0, 38))
             if available:
                 page = page_factories[entry.key]()
                 page.session_expired.connect(self.session_expired.emit)
-                item.setToolTip(entry.label)
+                item.setToolTip(label)
             else:
-                page = PlaceholderPage(entry.label, entry.description, runner)
+                page = PlaceholderPage(label, tr(entry.description), runner)
                 item.setForeground(soon_brush)
-                item.setToolTip(f"{entry.label} : module prévu dans une prochaine version")
+                item.setToolTip(tr("{0} : module prévu dans une prochaine version", label))
             self.pages[entry.key] = page
             self.stack.addWidget(page)
             self.nav.addItem(item)

@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ...i18n import tr
 from ...models import (
     COMPLAINT_CATEGORIES,
     COMPLAINT_NEXT,
@@ -43,7 +44,7 @@ def _when(moment):
 
 def choose_files(parent):
     """Local files chosen by the user (PDF / PNG / JPEG); the server re-checks the content."""
-    paths, _ = QFileDialog.getOpenFileNames(parent, "Joindre des fichiers", "", FILE_FILTER)
+    paths, _ = QFileDialog.getOpenFileNames(parent, tr("Joindre des fichiers"), "", tr(FILE_FILTER))
     return paths
 
 
@@ -63,8 +64,8 @@ class AttachmentPicker(QWidget):
         self.paths = []
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
-        self.add_button = button("Joindre…", tooltip="PDF, PNG ou JPEG (vérifiés par le serveur)")
-        self.label = QLabel("Aucun fichier", objectName="help")
+        self.add_button = button(tr("Joindre…"), tooltip=tr("PDF, PNG ou JPEG (vérifiés par le serveur)"))
+        self.label = QLabel(tr("Aucun fichier"), objectName="help")
         self.label.setWordWrap(True)
         row.addWidget(self.add_button)
         row.addWidget(self.label, 1)
@@ -72,7 +73,7 @@ class AttachmentPicker(QWidget):
 
     def pick(self):
         self.paths += [p for p in self.choose(self) if p not in self.paths]
-        self.label.setText(", ".join(Path(p).name for p in self.paths) or "Aucun fichier")
+        self.label.setText(", ".join(Path(p).name for p in self.paths) or tr("Aucun fichier"))
 
     def files(self):
         return [read_attachment(path) for path in self.paths]
@@ -80,22 +81,25 @@ class AttachmentPicker(QWidget):
 
 class NotificationDialog(FormDialog):
     def __init__(self, notification, parent=None):
-        super().__init__(notification.title, "", parent, save_text="Fermer", width=520)
+        super().__init__(notification.title, "", parent, save_text=tr("Fermer"), width=520)
         self.cancel_button.hide()
         self.body.addWidget(
             _grid(
                 [
-                    ("Type", NOTIFICATION_TYPES.get(notification.kind, notification.kind)),
-                    ("Importance", SEVERITIES.get(notification.severity, notification.severity)),
-                    ("Reçue le", _when(notification.created_at)),
-                    ("Statut", f"Lue le {_when(notification.read_at)}" if notification.is_read else "Non lue"),
+                    (tr("Type"), NOTIFICATION_TYPES.get(notification.kind, notification.kind)),
+                    (tr("Importance"), SEVERITIES.get(notification.severity, notification.severity)),
+                    (tr("Reçue le"), _when(notification.created_at)),
+                    (
+                        tr("Statut"),
+                        tr("Lue le {0}", _when(notification.read_at)) if notification.is_read else tr("Non lue"),
+                    ),
                 ]
             )
         )
         message = QLabel(notification.message or "—")
         message.setWordWrap(True)
         message.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.add_section("Message")
+        self.add_section(tr("Message"))
         self.body.addWidget(message)
         self.finish(required_note=False)
 
@@ -107,7 +111,7 @@ class MemberList(QWidget):
         super().__init__(parent)
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
-        self.filter = QLineEdit(placeholderText="Filtrer par nom")
+        self.filter = QLineEdit(placeholderText=tr("Filtrer par nom"))
         self.list = QListWidget()
         self.list.setMaximumHeight(150)
         for member in members:
@@ -142,23 +146,23 @@ class MemberList(QWidget):
 class NewConversationDialog(FormDialog):
     def __init__(self, members, parent=None, *, choose=choose_files):
         super().__init__(
-            "Nouvelle conversation",
-            "Message de l'administration. Les participants verront la conversation et ses pièces jointes.",
+            tr("Nouvelle conversation"),
+            tr("Message de l'administration. Les participants verront la conversation et ses pièces jointes."),
             parent,
-            save_text="Envoyer",
+            save_text=tr("Envoyer"),
             width=600,
         )
-        self.people = self.add_field("participants", "Participants", MemberList(members), required=True)
-        self.title = self.add_field("title", "Objet", QLineEdit(placeholderText="ex. Réunion de rentrée"))
-        self.message = self.add_field("body", "Message", _text("Votre message"), required=True)
-        self.files = self.add_field("files", "Pièces jointes", AttachmentPicker(choose))
+        self.people = self.add_field("participants", tr("Participants"), MemberList(members), required=True)
+        self.title = self.add_field("title", tr("Objet"), QLineEdit(placeholderText=tr("ex. Réunion de rentrée")))
+        self.message = self.add_field("body", tr("Message"), _text(tr("Votre message")), required=True)
+        self.files = self.add_field("files", tr("Pièces jointes"), AttachmentPicker(choose))
         self.people.list.itemChanged.connect(lambda _: self.refresh_state())
         self.message.textChanged.connect(self.refresh_state)
         self.finish()
 
     def missing_fields(self):
-        missing = [] if self.people.ids else ["Participants"]
-        return missing + ([] if self.message.toPlainText().strip() else ["Message"])
+        missing = [] if self.people.ids else [tr("Participants")]
+        return missing + ([] if self.message.toPlainText().strip() else [tr("Message")])
 
     def values(self):
         return {
@@ -173,17 +177,19 @@ class AddParticipantDialog(FormDialog):
     """The administration brings in a colleague (the server only accepts administrators here)."""
 
     def __init__(self, members, parent=None):
-        super().__init__("Ajouter un participant", "Seuls les administrateurs peuvent rejoindre.", parent, width=520)
+        super().__init__(
+            tr("Ajouter un participant"), tr("Seuls les administrateurs peuvent rejoindre."), parent, width=520
+        )
         self.member = QComboBox()
-        self.member.addItem("— choisir —", None)
+        self.member.addItem(tr("— choisir —"), None)
         for member in members:
             self.member.addItem(member.label, member.id)
-        self.member = self.add_field("member", "Membre", self.member, required=True)
+        self.member = self.add_field("member", tr("Membre"), self.member, required=True)
         self.member.currentIndexChanged.connect(lambda _: self.refresh_state())
         self.finish()
 
     def missing_fields(self):
-        return [] if self.member.currentData() else ["Membre"]
+        return [] if self.member.currentData() else [tr("Membre")]
 
     def values(self):
         return {"member_id": self.member.currentData()}
@@ -192,16 +198,16 @@ class AddParticipantDialog(FormDialog):
 class SpaceDialog(FormDialog):
     def __init__(self, classes, parent=None):
         super().__init__(
-            "Nouvel espace de forum",
-            "Les membres sont calculés par le serveur (rôles choisis, ou communauté d'une classe).",
+            tr("Nouvel espace de forum"),
+            tr("Les membres sont calculés par le serveur (rôles choisis, ou communauté d'une classe)."),
             parent,
             width=560,
         )
-        self.name = self.add_field("name", "Nom", QLineEdit(), required=True, width="medium")
+        self.name = self.add_field("name", tr("Nom"), QLineEdit(), required=True, width="medium")
         self.audience = QComboBox()
         for code, label in SPACE_AUDIENCES.items():
             self.audience.addItem(label, code)
-        self.audience = self.add_field("audience", "Public", self.audience, required=True, width="medium")
+        self.audience = self.add_field("audience", tr("Public"), self.audience, required=True, width="medium")
         self.roles = {}
         holder = QWidget()
         row = QHBoxLayout(holder)
@@ -210,16 +216,16 @@ class SpaceDialog(FormDialog):
             self.roles[code] = QCheckBox(label)
             row.addWidget(self.roles[code])
         row.addStretch()
-        self.add_field("roles", "Rôles (école)", holder)
+        self.add_field("roles", tr("Rôles (école)"), holder)
         self.school_class = QComboBox()
-        self.school_class.addItem("— choisir —", None)
+        self.school_class.addItem(tr("— choisir —"), None)
         for school_class in classes:
             self.school_class.addItem(school_class.name, school_class.id)
-        self.school_class = self.add_field("class", "Classe", self.school_class, width="medium")
+        self.school_class = self.add_field("class", tr("Classe"), self.school_class, width="medium")
         self.announcements = self.add_field(
-            "announcements", "Usage", QCheckBox("Annonces seulement (seule l'administration publie)")
+            "announcements", tr("Usage"), QCheckBox(tr("Annonces seulement (seule l'administration publie)"))
         )
-        self.description = self.add_field("description", "Description", QLineEdit())
+        self.description = self.add_field("description", tr("Description"), QLineEdit())
         self.name.textChanged.connect(self.refresh_state)
         self.audience.currentIndexChanged.connect(lambda _: self._audience())
         self.school_class.currentIndexChanged.connect(lambda _: self.refresh_state())
@@ -236,11 +242,11 @@ class SpaceDialog(FormDialog):
         self.refresh_state()
 
     def missing_fields(self):
-        missing = [] if self.name.text().strip() else ["Nom"]
+        missing = [] if self.name.text().strip() else [tr("Nom")]
         if self.audience.currentData() == "SCHOOL" and not any(b.isChecked() for b in self.roles.values()):
-            missing.append("Rôles")
+            missing.append(tr("Rôles"))
         if self.audience.currentData() == "CLASS" and not self.school_class.currentData():
-            missing.append("Classe")
+            missing.append(tr("Classe"))
         return missing
 
     def values(self):
@@ -257,25 +263,27 @@ class SpaceDialog(FormDialog):
 
 class ThreadDialog(FormDialog):
     def __init__(self, spaces, parent=None, *, space_id=None):
-        super().__init__("Publier", "Annonce ou discussion dans un espace du forum.", parent, save_text="Publier")
+        super().__init__(
+            tr("Publier"), tr("Annonce ou discussion dans un espace du forum."), parent, save_text=tr("Publier")
+        )
         self.space = QComboBox()
         for space in spaces:
             self.space.addItem(space.name, space.id)
         if space_id:
             self.space.setCurrentIndex(max(0, self.space.findData(space_id)))
-        self.space = self.add_field("space", "Espace", self.space, required=True, width="medium")
-        self.announcement = self.add_field("kind", "Type", QCheckBox("Annonce officielle"))
+        self.space = self.add_field("space", tr("Espace"), self.space, required=True, width="medium")
+        self.announcement = self.add_field("kind", tr("Type"), QCheckBox(tr("Annonce officielle")))
         self.announcement.setChecked(True)
-        self.title = self.add_field("title", "Titre", QLineEdit(), required=True)
-        self.message = self.add_field("body", "Texte", _text("Texte de la publication", 120), required=True)
+        self.title = self.add_field("title", tr("Titre"), QLineEdit(), required=True)
+        self.message = self.add_field("body", tr("Texte"), _text(tr("Texte de la publication"), 120), required=True)
         self.title.textChanged.connect(self.refresh_state)
         self.message.textChanged.connect(self.refresh_state)
         self.finish()
 
     def missing_fields(self):
-        missing = [] if self.space.currentData() else ["Espace"]
-        missing += [] if self.title.text().strip() else ["Titre"]
-        return missing + ([] if self.message.toPlainText().strip() else ["Texte"])
+        missing = [] if self.space.currentData() else [tr("Espace")]
+        missing += [] if self.title.text().strip() else [tr("Titre")]
+        return missing + ([] if self.message.toPlainText().strip() else [tr("Texte")])
 
     def values(self):
         return {
@@ -293,9 +301,9 @@ class ThreadViewDialog(FormDialog):
     def __init__(self, thread, posts, parent=None):
         super().__init__(
             thread.title,
-            f"Par {thread.author_name} · {_when(thread.created_at)}",
+            tr("Par {0} · {1}", thread.author_name, _when(thread.created_at)),
             parent,
-            save_text="Fermer",
+            save_text=tr("Fermer"),
             width=640,
         )
         self.cancel_button.hide()
@@ -305,7 +313,7 @@ class ThreadViewDialog(FormDialog):
         self.list.setMinimumHeight(180)
         for post in posts:
             if post.deleted:
-                text = f"[Masqué par la modération{' : ' + post.deletion_reason if post.deletion_reason else ''}]"
+                text = tr("[Masqué par la modération{0}]", " : " + post.deletion_reason if post.deletion_reason else "")
                 text = f"{post.author_name} · {_when(post.created_at)}\n{text}\n{post.body or ''}".rstrip()
             else:
                 text = f"{post.author_name} · {_when(post.created_at)}\n{post.body}"
@@ -314,18 +322,18 @@ class ThreadViewDialog(FormDialog):
             if post.deleted:
                 item.setForeground(Qt.gray)
             self.list.addItem(item)
-        self.add_field("posts", "Messages", self.list)
-        self.reply_text = self.add_field("reply", "Répondre", _text("Votre réponse", 72))
+        self.add_field("posts", tr("Messages"), self.list)
+        self.reply_text = self.add_field("reply", tr("Répondre"), _text(tr("Votre réponse"), 72))
         actions = QWidget()
         row = QHBoxLayout(actions)
         row.setContentsMargins(0, 0, 0, 0)
         self.buttons = {}
         for name, text, variant in (
-            ("reply", "Répondre", "primary"),
-            ("moderate", "Masquer le message…", "danger"),
-            ("LOCKED", "Verrouiller", "secondary"),
-            ("ARCHIVED", "Archiver", "secondary"),
-            ("OPEN", "Rouvrir", "secondary"),
+            ("reply", tr("Répondre"), "primary"),
+            ("moderate", tr("Masquer le message…"), "danger"),
+            ("LOCKED", tr("Verrouiller"), "secondary"),
+            ("ARCHIVED", tr("Archiver"), "secondary"),
+            ("OPEN", tr("Rouvrir"), "secondary"),
         ):
             widget = button(text, variant)
             widget.clicked.connect(lambda _=False, n=name: self._start(n))
@@ -358,27 +366,27 @@ class ComplaintDialog(FormDialog):
     (status / cancel / attach) or `download` = the chosen attachment."""
 
     def __init__(self, complaint, names, parent=None):
-        super().__init__(complaint.subject, "", parent, save_text="Fermer", width=640)
+        super().__init__(complaint.subject, "", parent, save_text=tr("Fermer"), width=640)
         self.cancel_button.hide()
         self.action = self.download = None
         name = lambda member: names.get(member, "—") if member else "—"  # noqa: E731
         self.body.addWidget(
             _grid(
                 [
-                    ("Statut", COMPLAINT_STATUSES.get(complaint.status, complaint.status)),
-                    ("Catégorie", COMPLAINT_CATEGORIES.get(complaint.category, complaint.category)),
-                    ("Priorité", COMPLAINT_PRIORITIES.get(complaint.priority, complaint.priority)),
-                    ("Auteur", name(complaint.author_id)),
-                    ("Assignée à", name(complaint.assigned_to)),
-                    ("Créée le", _when(complaint.created_at)),
+                    (tr("Statut"), COMPLAINT_STATUSES.get(complaint.status, complaint.status)),
+                    (tr("Catégorie"), COMPLAINT_CATEGORIES.get(complaint.category, complaint.category)),
+                    (tr("Priorité"), COMPLAINT_PRIORITIES.get(complaint.priority, complaint.priority)),
+                    (tr("Auteur"), name(complaint.author_id)),
+                    (tr("Assignée à"), name(complaint.assigned_to)),
+                    (tr("Créée le"), _when(complaint.created_at)),
                 ]
             )
         )
         description = QLabel(complaint.description)
         description.setWordWrap(True)
-        self.add_section("Description")
+        self.add_section(tr("Description"))
         self.body.addWidget(description)
-        self.add_section("Historique", "Chaque changement est conservé.")
+        self.add_section(tr("Historique"), tr("Chaque changement est conservé."))
         self.body.addWidget(
             _grid(
                 [
@@ -391,23 +399,23 @@ class ComplaintDialog(FormDialog):
                 ]
             )
             if complaint.history
-            else QLabel("Aucun changement.", objectName="help")
+            else QLabel(tr("Aucun changement."), objectName="help")
         )
-        self.add_section("Pièces jointes")
+        self.add_section(tr("Pièces jointes"))
         for attachment in complaint.attachments:
-            link = button(f"Télécharger « {attachment.name} » ({attachment.size_label})")
+            link = button(tr("Télécharger « {0} » ({1})", attachment.name, attachment.size_label))
             link.clicked.connect(lambda _=False, a=attachment: self._download(a))
             self.body.addWidget(link, 0, Qt.AlignLeft)
         if not complaint.attachments:
-            self.body.addWidget(QLabel("Aucune pièce jointe.", objectName="help"))
+            self.body.addWidget(QLabel(tr("Aucune pièce jointe."), objectName="help"))
         actions = QWidget()
         row = QHBoxLayout(actions)
         row.setContentsMargins(0, 0, 0, 0)
         self.buttons = {}
         for name_, text, variant in (
-            ("status", "Changer le statut…", "primary"),
-            ("attach", "Joindre…", "secondary"),
-            ("cancel", "Annuler la réclamation…", "danger"),
+            ("status", tr("Changer le statut…"), "primary"),
+            ("attach", tr("Joindre…"), "secondary"),
+            ("cancel", tr("Annuler la réclamation…"), "danger"),
         ):
             widget = button(text, variant)
             widget.clicked.connect(lambda _=False, n=name_: self._start(n))
@@ -430,28 +438,28 @@ class ComplaintDialog(FormDialog):
 class ComplaintStatusDialog(FormDialog):
     def __init__(self, complaint, assignees, parent=None):
         super().__init__(
-            f"Réclamation — {complaint.subject}",
-            "Le serveur vérifie la transition. Un motif est exigé pour résoudre, clôturer ou rouvrir.",
+            tr("Réclamation — {0}", complaint.subject),
+            tr("Le serveur vérifie la transition. Un motif est exigé pour résoudre, clôturer ou rouvrir."),
             parent,
             width=560,
         )
         self.new_status = QComboBox()
-        self.new_status.addItem("— inchangé —", None)
+        self.new_status.addItem(tr("— inchangé —"), None)
         for code in COMPLAINT_NEXT.get(complaint.status, ()):
             self.new_status.addItem(COMPLAINT_STATUSES[code], code)
-        self.new_status = self.add_field("status", "Nouveau statut", self.new_status, width="medium")
+        self.new_status = self.add_field("status", tr("Nouveau statut"), self.new_status, width="medium")
         self.assignee = QComboBox()
-        self.assignee.addItem("— inchangé —", None)
+        self.assignee.addItem(tr("— inchangé —"), None)
         for member in assignees:
             self.assignee.addItem(member.label, member.id)
-        self.assignee = self.add_field("assignee", "Assigner à", self.assignee, width="medium")
-        self.reason = self.add_field("reason", "Motif / commentaire", _text("Motif", 72))
+        self.assignee = self.add_field("assignee", tr("Assigner à"), self.assignee, width="medium")
+        self.reason = self.add_field("reason", tr("Motif / commentaire"), _text(tr("Motif"), 72))
         self.new_status.currentIndexChanged.connect(lambda _: self.refresh_state())
         self.assignee.currentIndexChanged.connect(lambda _: self.refresh_state())
         self.finish(required_note=False)
 
     def missing_fields(self):
-        return [] if (self.new_status.currentData() or self.assignee.currentData()) else ["Statut ou assignation"]
+        return [] if (self.new_status.currentData() or self.assignee.currentData()) else [tr("Statut ou assignation")]
 
     def values(self):
         return {

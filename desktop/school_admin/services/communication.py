@@ -22,13 +22,14 @@ import uuid
 from pathlib import Path
 
 from ..api.errors import ValidationFailed
+from ..i18n import tr
 from ..models import ChatMessage, Complaint, Conversation, ForumSpace, Member, Notification, Post, Thread
 
 ACCEPTED = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
 
 
 def _require(**fields):
-    missing = {name: ["Obligatoire."] for name, value in fields.items() if value in (None, "", [])}
+    missing = {name: [tr("Obligatoire.")] for name, value in fields.items() if value in (None, "", [])}
     if missing:
         raise ValidationFailed("Formulaire incomplet.", details=missing)
 
@@ -184,7 +185,7 @@ class CommunicationService:
 
     def change_status(self, complaint_id, *, status=None, reason=None, assigned_to=None):
         if not status and not assigned_to:
-            raise ValidationFailed("Formulaire incomplet.", details={"status": ["Choisissez un statut."]})
+            raise ValidationFailed("Formulaire incomplet.", details={"status": [tr("Choisissez un statut.")]})
         payload = {"reason": (reason or "").strip()}
         if status:
             payload["status"] = status

@@ -17,6 +17,7 @@ server decides every rule and the page explains its refusals.
 from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import QComboBox, QDialog, QHBoxLayout, QTableWidgetItem
 
+from ...i18n import Texts, Tr, tr
 from ...models import SEXES
 from ..dialogs.student_dialogs import ChangeClassDialog, EnrollDialog, StudentDialog, StudentRecordDialog
 from ..theme import TOKENS
@@ -26,22 +27,24 @@ from .catalog_base import STATUS_COLUMN_TITLE, PagedCatalogPage
 ALL_YEARS = "Toutes les années"
 ALL_LEVELS = "Tous les niveaux"
 ALL_CLASSES = "Toutes les classes"
-STUDENT_FILTERS = [("Actifs", "ACTIVE"), ("Archivés", "ARCHIVED"), ("Tous", None)]
-ENROLLMENT_FILTERS = [
-    ("Toutes les situations", None),
-    ("Inscrits (en cours)", "ACTIVE"),
-    ("Retirés", "WITHDRAWN"),
-    ("Non inscrits", "NONE"),
-]
+STUDENT_FILTERS = Texts([("Actifs", "ACTIVE"), ("Archivés", "ARCHIVED"), ("Tous", None)])
+ENROLLMENT_FILTERS = Texts(
+    [
+        ("Toutes les situations", None),
+        ("Inscrits (en cours)", "ACTIVE"),
+        ("Retirés", "WITHDRAWN"),
+        ("Non inscrits", "NONE"),
+    ]
+)
 
 
 class StudentsPage(PagedCatalogPage):
-    title = "Élèves"
-    description = "Fiches administratives et inscriptions des élèves : une classe par année scolaire."
-    columns = ["Matricule", "Nom", "Prénom(s)", "Sexe", "Classe", "Niveau", "Année scolaire", STATUS_COLUMN_TITLE]
+    title = Tr("Élèves")
+    description = Tr("Fiches administratives et inscriptions des élèves : une classe par année scolaire.")
+    columns = Tr(["Matricule", "Nom", "Prénom(s)", "Sexe", "Classe", "Niveau", "Année scolaire", STATUS_COLUMN_TITLE])
     noun = "élève"
     feminine = False
-    search_placeholder = "Rechercher par nom, prénom ou matricule…"
+    search_placeholder = Tr("Rechercher par nom, prénom ou matricule…")
     status_filters = STUDENT_FILTERS
     has_toggle = False
 
@@ -57,10 +60,10 @@ class StudentsPage(PagedCatalogPage):
 
         filters = QHBoxLayout()
         filters.setSpacing(8)
-        self.year_filter = self._combo("Filtrer par année scolaire", ALL_YEARS, 200)
-        self.level_filter = self._combo("Filtrer par niveau", ALL_LEVELS, 170)
-        self.class_filter = self._combo("Filtrer par classe", ALL_CLASSES, 150)
-        self.enrollment_filter = self._combo("Filtrer par situation d'inscription", None, 180)
+        self.year_filter = self._combo(tr("Filtrer par année scolaire"), tr(ALL_YEARS), 200)
+        self.level_filter = self._combo(tr("Filtrer par niveau"), tr(ALL_LEVELS), 170)
+        self.class_filter = self._combo(tr("Filtrer par classe"), tr(ALL_CLASSES), 150)
+        self.enrollment_filter = self._combo(tr("Filtrer par situation d'inscription"), None, 180)
         for label, value in ENROLLMENT_FILTERS:
             self.enrollment_filter.addItem(label, value)
         for combo in (self.year_filter, self.level_filter, self.class_filter, self.enrollment_filter):
@@ -86,31 +89,33 @@ class StudentsPage(PagedCatalogPage):
         return {1, 2}
 
     def leading_actions(self):
-        self.record_button = button("Fiche", tooltip="Consulter la fiche de l'élève (Entrée)")
+        self.record_button = button(tr("Fiche"), tooltip=tr("Consulter la fiche de l'élève (Entrée)"))
         return [self.record_button]
 
     def extra_actions(self):
-        self.archive_button = button("Archiver", "danger")
+        self.archive_button = button(tr("Archiver"), "danger")
         return [self.archive_button]
 
     def update_extra_actions(self, row):
         if not hasattr(self, "archive_button"):
             return
-        why = "Sélectionnez d'abord un élève dans la liste."
+        why = tr("Sélectionnez d'abord un élève dans la liste.")
         self.record_button.setEnabled(row is not None)
-        self.record_button.setToolTip(why if row is None else "Consulter la fiche de l'élève (Entrée)")
+        self.record_button.setToolTip(why if row is None else tr("Consulter la fiche de l'élève (Entrée)"))
         archived = row is not None and row.status == "ARCHIVED"
-        self.archive_button.setText("Réactiver" if archived else "Archiver")
+        self.archive_button.setText(tr("Réactiver") if archived else tr("Archiver"))
         set_variant(self.archive_button, "secondary" if archived else "danger")
         self.archive_button.setEnabled(row is not None)
         self.archive_button.setToolTip(
             why
             if row is None
-            else ("Réactiver l'élève" if archived else "Archiver : quitte les listes actives, historique conservé")
+            else (
+                tr("Réactiver l'élève") if archived else tr("Archiver : quitte les listes actives, historique conservé")
+            )
         )
         self.edit_button.setEnabled(row is not None and not archived)
         if archived:
-            self.edit_button.setToolTip("Élève archivé : réactivez-le pour modifier sa fiche.")
+            self.edit_button.setToolTip(tr("Élève archivé : réactivez-le pour modifier sa fiche."))
 
     def describe_row(self, row):
         return f"{row.name} ({row.student_number})"
@@ -141,7 +146,7 @@ class StudentsPage(PagedCatalogPage):
                 self.references.classes(),
             ),
             self._fill_filters,
-            action="Impossible de charger les années, niveaux et classes",
+            action=tr("Impossible de charger les années, niveaux et classes"),
         )
 
     def _fill_filters(self, references):
@@ -150,16 +155,16 @@ class StudentsPage(PagedCatalogPage):
         self._filters_ready = False
         year, level = self.year_filter.currentData(), self.level_filter.currentData()
         self.year_filter.clear()
-        self.year_filter.addItem(ALL_YEARS, None)
+        self.year_filter.addItem(tr(ALL_YEARS), None)
         for item in years:
             self.year_filter.addItem(item.label, item.id)
         if first_time:  # default: the current year
             year = next((y.id for y in years if y.is_current), None)
         self.year_filter.setCurrentIndex(max(0, self.year_filter.findData(year)))
         self.level_filter.clear()
-        self.level_filter.addItem(ALL_LEVELS, None)
+        self.level_filter.addItem(tr(ALL_LEVELS), None)
         for item in levels:
-            self.level_filter.addItem(item.label if item.active else f"{item.label} (inactif)", item.id)
+            self.level_filter.addItem(item.label if item.active else tr("{0} (inactif)", item.label), item.id)
         self.level_filter.setCurrentIndex(max(0, self.level_filter.findData(level)))
         self._fill_classes()
         self._filters_ready = True
@@ -171,7 +176,7 @@ class StudentsPage(PagedCatalogPage):
         year, level = self.year_filter.currentData(), self.level_filter.currentData()
         self.class_filter.blockSignals(True)
         self.class_filter.clear()
-        self.class_filter.addItem(ALL_CLASSES, None)
+        self.class_filter.addItem(tr(ALL_CLASSES), None)
         for item in self.classes:
             if (not year or item.year_id == year) and (not level or item.level_id == level):
                 self.class_filter.addItem(item.name, item.id)
@@ -201,7 +206,7 @@ class StudentsPage(PagedCatalogPage):
             row.last_name,
             row.first_name,
             SEXES.get(row.sex, row.sex),
-            enrollment.class_name if enrollment else "Non inscrit",
+            enrollment.class_name if enrollment else tr("Non inscrit"),
             enrollment.level_code if enrollment else "—",
             enrollment.year_name if enrollment else "—",
             "",
@@ -242,11 +247,11 @@ class StudentsPage(PagedCatalogPage):
                 photo = values.pop("photo_change")
                 self.call(
                     lambda: self._save_photo(self.service.create(**values), photo),
-                    lambda saved: self._saved(saved, "créé"),
-                    action="Impossible de créer l'élève",
+                    lambda saved: self._saved(saved, tr("créé")),
+                    action=tr("Impossible de créer l'élève"),
                 )
 
-        self.call(self._school_references, open_form, action="Impossible de charger les années, niveaux et classes")
+        self.call(self._school_references, open_form, action=tr("Impossible de charger les années, niveaux et classes"))
 
     def edit(self, student=None):
         row = student or self.selected()
@@ -261,14 +266,14 @@ class StudentsPage(PagedCatalogPage):
                 values.pop("class_id", None)
                 self.call(
                     lambda: self._save_photo(self.service.update(current.id, **values), change),
-                    lambda saved: self._saved(saved, "modifié"),
-                    action="Impossible de modifier l'élève",
+                    lambda saved: self._saved(saved, tr("modifié")),
+                    action=tr("Impossible de modifier l'élève"),
                 )
 
         self.call(
             lambda: (self.service.get(row.id), self.service.photo(row.id) if row.has_photo else None),
             open_form,
-            action="Impossible de charger la fiche de l'élève",
+            action=tr("Impossible de charger la fiche de l'élève"),
         )
 
     def _save_photo(self, student, change):
@@ -308,7 +313,7 @@ class StudentsPage(PagedCatalogPage):
                 self.service.photo(row.id) if row.has_photo else None,
             ),
             show,
-            action="Impossible de charger la fiche de l'élève",
+            action=tr("Impossible de charger la fiche de l'élève"),
         )
 
     def enroll(self, student):
@@ -318,12 +323,18 @@ class StudentsPage(PagedCatalogPage):
                 self.call(
                     lambda: self.service.enroll(student.id, values["class_id"], values.get("enrollment_date")),
                     lambda enrollment: self._done(
-                        student, f"{student.name} est inscrit(e) en {enrollment.class_name} ({enrollment.year_name})."
+                        student,
+                        tr(
+                            "{0} est inscrit(e) en {1} ({2}).",
+                            student.name,
+                            enrollment.class_name,
+                            enrollment.year_name,
+                        ),
                     ),
-                    action="Impossible d'inscrire l'élève",
+                    action=tr("Impossible d'inscrire l'élève"),
                 )
 
-        self.call(self._school_references, open_form, action="Impossible de charger les années, niveaux et classes")
+        self.call(self._school_references, open_form, action=tr("Impossible de charger les années, niveaux et classes"))
 
     def change_class(self, student, enrollment):
         def open_form(references):
@@ -332,9 +343,9 @@ class StudentsPage(PagedCatalogPage):
                 self.call(
                     lambda: self.service.change_class(enrollment.id, values["class_id"]),
                     lambda moved: self._done(
-                        student, f"{student.name} passe de {enrollment.class_name} à {moved.class_name}."
+                        student, tr("{0} passe de {1} à {2}.", student.name, enrollment.class_name, moved.class_name)
                     ),
-                    action="Impossible de changer l'élève de classe",
+                    action=tr("Impossible de changer l'élève de classe"),
                 )
 
         self.call(
@@ -344,21 +355,23 @@ class StudentsPage(PagedCatalogPage):
                 self.references.classes(academic_year_id=enrollment.year_id),
             ),
             open_form,
-            action="Impossible de charger les classes",
+            action=tr("Impossible de charger les classes"),
         )
 
     def withdraw(self, student, enrollment):
-        text = (
-            f"{student.name} quittera la classe {enrollment.class_name} ({enrollment.year_name}) à partir "
-            f"d'aujourd'hui : l'inscription passe « Retirée ».\n\nNotes, présences, QR, factures et documents "
-            f"déjà enregistrés sont conservés dans l'historique."
+        text = tr(
+            "{0} quittera la classe {1} ({2}) à partir d'aujourd'hui : l'inscription passe « Retirée ».\n\nNotes, "
+            "présences, QR, factures et documents déjà enregistrés sont conservés dans l'historique.",
+            student.name,
+            enrollment.class_name,
+            enrollment.year_name,
         )
-        if not self.confirm(self, "Retirer l'élève de sa classe ?", text, confirm_text="Retirer", danger=True):
+        if not self.confirm(self, tr("Retirer l'élève de sa classe ?"), text, confirm_text=tr("Retirer"), danger=True):
             return
         self.call(
             lambda: self.service.withdraw(enrollment.id),
-            lambda _: self._done(student, f"{student.name} a été retiré(e) de {enrollment.class_name}."),
-            action="Impossible de retirer l'élève de sa classe",
+            lambda _: self._done(student, tr("{0} a été retiré(e) de {1}.", student.name, enrollment.class_name)),
+            action=tr("Impossible de retirer l'élève de sa classe"),
         )
 
     def toggle_archive(self):
@@ -368,21 +381,22 @@ class StudentsPage(PagedCatalogPage):
         if row.status == "ARCHIVED":
             self.call(
                 lambda: self.service.reactivate(row.id),
-                lambda saved: self._saved(saved, "réactivé"),
-                action="Impossible de réactiver l'élève",
+                lambda saved: self._saved(saved, tr("réactivé")),
+                action=tr("Impossible de réactiver l'élève"),
             )
             return
-        text = (
-            f"« {self.describe_row(row)} » quittera les listes actives. Rien n'est supprimé : inscriptions, "
-            f"notes, bulletins, présences, QR, paiements et documents restent dans l'historique, et vous "
-            f"pourrez le réactiver.\n\nLe serveur refusera l'archivage tant que l'élève est inscrit dans une classe."
+        text = tr(
+            "« {0} » quittera les listes actives. Rien n'est supprimé : inscriptions, notes, bulletins, présences, "
+            "QR, paiements et documents restent dans l'historique, et vous pourrez le réactiver.\n\nLe serveur "
+            "refusera l'archivage tant que l'élève est inscrit dans une classe.",
+            self.describe_row(row),
         )
-        if not self.confirm(self, "Archiver l'élève ?", text, confirm_text="Archiver", danger=True):
+        if not self.confirm(self, tr("Archiver l'élève ?"), text, confirm_text=tr("Archiver"), danger=True):
             return
         self.call(
             lambda: self.service.archive(row.id),
-            lambda saved: self._saved(saved, "archivé"),
-            action="Impossible d'archiver l'élève",
+            lambda saved: self._saved(saved, tr("archivé")),
+            action=tr("Impossible d'archiver l'élève"),
         )
 
     def _done(self, student, message):
@@ -390,13 +404,13 @@ class StudentsPage(PagedCatalogPage):
         self.call(
             self.fetch,
             lambda result: (self.show_rows(result), self.select_id(student.id)),
-            action="Impossible de charger les élèves",
+            action=tr("Impossible de charger les élèves"),
         )
 
     def _saved(self, saved, verb):
-        self.success(f"Élève « {saved.name} » ({saved.student_number}) {verb} avec succès.")
+        self.success(tr("Élève « {0} » ({1}) {2} avec succès.", saved.name, saved.student_number, verb))
         self.call(
             self.fetch,
             lambda result: (self.show_rows(result), self.select_id(saved.id)),
-            action="Impossible de charger les élèves",
+            action=tr("Impossible de charger les élèves"),
         )

@@ -14,6 +14,7 @@ the banner.
 
 from PySide6.QtWidgets import QDialog, QTabWidget
 
+from ...i18n import Tr, tr
 from ...models import LINK_REQUEST_STATUSES, REGISTRATION_STATUSES
 from ..dialogs.parent_dialogs import IdentityCheckDialog, LinkApprovalDialog, LinkRequestDialog, StudentApprovalDialog
 from ..dialogs.teacher_dialogs import ReasonDialog
@@ -53,24 +54,26 @@ class _DecisionPage(PagedCatalogPage):
 
 
 class RegistrationsPage(_DecisionPage):
-    title = "Inscriptions"
-    description = "Comptes parents créés depuis l'application : validez-les après avoir reconnu la personne."
-    columns = ["Demandeur", "E-mail", "Téléphone", "Reçue le", STATUS_COLUMN_TITLE]
+    title = Tr("Inscriptions")
+    description = Tr("Comptes parents créés depuis l'application : validez-les après avoir reconnu la personne.")
+    columns = Tr(["Demandeur", "E-mail", "Téléphone", "Reçue le", STATUS_COLUMN_TITLE])
     noun = "inscription"
-    search_placeholder = "Rechercher par nom ou e-mail…"
-    status_filters = [
-        ("En attente", "PENDING"),
-        *((label, code) for code, label in REGISTRATION_STATUSES.items() if code != "PENDING"),
-        ("Toutes", None),
-    ]
+    search_placeholder = Tr("Rechercher par nom ou e-mail…")
+    status_filters = Tr(
+        [
+            ("En attente", "PENDING"),
+            *((label, code) for code, label in REGISTRATION_STATUSES.items() if code != "PENDING"),
+            ("Toutes", None),
+        ]
+    )
     narrow_hidden = (2,)
 
     def stretch_columns(self):
         return {0}
 
     def extra_actions(self):
-        self.reject_button = button("Refuser…", "danger")
-        self.approve_button = button("Valider", "primary", tooltip="Activer le compte parent")
+        self.reject_button = button(tr("Refuser…"), "danger")
+        self.approve_button = button(tr("Valider"), "primary", tooltip=tr("Activer le compte parent"))
         self.reject_button.clicked.connect(lambda: self.reject(self.selected()))
         self.approve_button.clicked.connect(lambda: self.approve(self.selected()))
         return [self.reject_button, self.approve_button]
@@ -78,7 +81,7 @@ class RegistrationsPage(_DecisionPage):
     def update_extra_actions(self, row):
         if hasattr(self, "approve_button"):
             pending = row is not None and row.status == "PENDING"
-            why = "" if pending else "Sélectionnez une inscription en attente."
+            why = "" if pending else tr("Sélectionnez une inscription en attente.")
             for widget in (self.approve_button, self.reject_button):
                 widget.setEnabled(pending)
                 widget.setToolTip(why or widget.text().rstrip("…"))
@@ -101,7 +104,7 @@ class RegistrationsPage(_DecisionPage):
         self.open_row()
 
     def ask(self, kind, **context):
-        dialog = ReasonDialog(context["title"], context["instruction"], self, save_text="Refuser", danger=True)
+        dialog = ReasonDialog(context["title"], context["instruction"], self, save_text=tr("Refuser"), danger=True)
         return dialog.values() if dialog.exec() == QDialog.Accepted else None
 
     def approve(self, row):
@@ -109,51 +112,58 @@ class RegistrationsPage(_DecisionPage):
             return
         if not self.confirm(
             self,
-            "Valider l'inscription ?",
-            f"{self.describe_row(row)} pourra se connecter comme parent. Il devra ensuite demander le "
-            "rattachement de son enfant (vérification d'identité à l'école).",
-            confirm_text="Valider",
+            tr("Valider l'inscription ?"),
+            tr(
+                "{0} pourra se connecter comme parent. Il devra ensuite demander le rattachement de son enfant "
+                "(vérification d'identité à l'école).",
+                self.describe_row(row),
+            ),
+            confirm_text=tr("Valider"),
         ):
             return
         self.call(
             lambda: self.parents.approve_registration(row.id),
-            lambda saved: self._reselect(saved.id, f"Inscription de {saved.applicant_name} validée."),
-            action="Impossible de valider l'inscription",
+            lambda saved: self._reselect(saved.id, tr("Inscription de {0} validée.", saved.applicant_name)),
+            action=tr("Impossible de valider l'inscription"),
         )
 
     def reject(self, row):
         if row is None or row.status != "PENDING":
             return
-        values = self._reason("Refuser l'inscription ?", f"{self.describe_row(row)} ne pourra plus se connecter.")
+        values = self._reason(
+            tr("Refuser l'inscription ?"), tr("{0} ne pourra plus se connecter.", self.describe_row(row))
+        )
         if values:
             self.call(
                 lambda: self.parents.reject_registration(row.id, values["reason"]),
-                lambda saved: self._reselect(saved.id, f"Inscription de {saved.applicant_name} refusée."),
-                action="Impossible de refuser l'inscription",
+                lambda saved: self._reselect(saved.id, tr("Inscription de {0} refusée.", saved.applicant_name)),
+                action=tr("Impossible de refuser l'inscription"),
             )
 
 
 class LinkRequestsPage(_DecisionPage):
-    title = "Rattachements"
-    description = (
+    title = Tr("Rattachements")
+    description = Tr(
         "Demandes « c'est mon enfant » : identité vérifiée sur pièce originale, désignation par l'élève, "
         "puis décision de l'école avec les droits du parent."
     )
-    columns = ["Élève", "Classe", "Parent", "Lien", "Identité", "Désignation", STATUS_COLUMN_TITLE]
+    columns = Tr(["Élève", "Classe", "Parent", "Lien", "Identité", "Désignation", STATUS_COLUMN_TITLE])
     noun = "demande"
-    search_placeholder = "Rechercher par élève ou parent…"
-    status_filters = [
-        ("En cours", "PENDING"),
-        *((label, code) for code, label in LINK_REQUEST_STATUSES.items() if code != "PENDING"),
-        ("Toutes", None),
-    ]
+    search_placeholder = Tr("Rechercher par élève ou parent…")
+    status_filters = Tr(
+        [
+            ("En cours", "PENDING"),
+            *((label, code) for code, label in LINK_REQUEST_STATUSES.items() if code != "PENDING"),
+            ("Toutes", None),
+        ]
+    )
     narrow_hidden = (1, 3, 5)
 
     def stretch_columns(self):
         return {0, 2}
 
     def leading_actions(self):
-        self.detail_button = button("Traiter…", tooltip="Fiche de la demande et actions (Entrée)")
+        self.detail_button = button(tr("Traiter…"), tooltip=tr("Fiche de la demande et actions (Entrée)"))
         self.detail_button.clicked.connect(self.open_row)
         return [self.detail_button]
 
@@ -190,7 +200,7 @@ class LinkRequestsPage(_DecisionPage):
             dialog = LinkRequestDialog(request, self)
             return dialog.action if dialog.exec() == QDialog.Accepted else None
         if kind == "reason":
-            dialog = ReasonDialog(context["title"], context["instruction"], self, save_text="Refuser", danger=True)
+            dialog = ReasonDialog(context["title"], context["instruction"], self, save_text=tr("Refuser"), danger=True)
         else:
             dialog = {
                 "identity": IdentityCheckDialog,
@@ -215,7 +225,7 @@ class LinkRequestsPage(_DecisionPage):
             if handler is not None:
                 handler(request)
 
-        self.call(lambda: self.parents.link_request(row.id), show, action="Impossible de charger la demande")
+        self.call(lambda: self.parents.link_request(row.id), show, action=tr("Impossible de charger la demande"))
 
     def _done(self, message):
         return lambda saved: self._reselect(saved.id, message(saved))
@@ -225,8 +235,8 @@ class LinkRequestsPage(_DecisionPage):
         if values:
             self.call(
                 lambda: self.parents.verify_identity(request.id, values["document_type"], values["document_number"]),
-                self._done(lambda saved: f"Identité de {saved.parent_name} vérifiée."),
-                action="Identité non vérifiée",
+                self._done(lambda saved: tr("Identité de {0} vérifiée.", saved.parent_name)),
+                action=tr("Identité non vérifiée"),
             )
 
     def student_approval(self, request):
@@ -234,8 +244,8 @@ class LinkRequestsPage(_DecisionPage):
         if values:
             self.call(
                 lambda: self.parents.record_student_approval(request.id, values["decision"], values["note"]),
-                self._done(lambda saved: f"Réponse de l'élève enregistrée : {saved.approval_label.lower()}."),
-                action="Impossible d'enregistrer la réponse de l'élève",
+                self._done(lambda saved: tr("Réponse de l'élève enregistrée : {0}.", saved.approval_label.lower())),
+                action=tr("Impossible d'enregistrer la réponse de l'élève"),
             )
 
     def approve(self, request):
@@ -243,22 +253,26 @@ class LinkRequestsPage(_DecisionPage):
         if values:
             self.call(
                 lambda: self.parents.approve(request.id, **values),
-                self._done(lambda saved: f"{saved.parent_name} est maintenant parent vérifié de {saved.student_name}."),
-                action="Impossible de valider le rattachement",
+                self._done(
+                    lambda saved: tr("{0} est maintenant parent vérifié de {1}.", saved.parent_name, saved.student_name)
+                ),
+                action=tr("Impossible de valider le rattachement"),
             )
 
     def reject(self, request):
-        values = self._reason("Refuser le rattachement ?", f"{self.describe_row(request)} : aucun accès ne sera donné.")
+        values = self._reason(
+            tr("Refuser le rattachement ?"), tr("{0} : aucun accès ne sera donné.", self.describe_row(request))
+        )
         if values:
             self.call(
                 lambda: self.parents.reject(request.id, values["reason"]),
-                self._done(lambda saved: f"Rattachement {saved.parent_name} → {saved.student_name} refusé."),
-                action="Impossible de refuser le rattachement",
+                self._done(lambda saved: tr("Rattachement {0} → {1} refusé.", saved.parent_name, saved.student_name)),
+                action=tr("Impossible de refuser le rattachement"),
             )
 
 
 class ParentsPage(Page):
-    title = "Parents"
+    title = Tr("Parents")
 
     def __init__(self, parents, runner, parent=None, **kwargs):
         super().__init__(runner, parent, **kwargs)
@@ -267,7 +281,7 @@ class ParentsPage(Page):
         self.tabs.setDocumentMode(True)
         self.registrations = RegistrationsPage(parents, runner, **kwargs)
         self.links = LinkRequestsPage(parents, runner, **kwargs)
-        for page, label in ((self.links, "Rattachements"), (self.registrations, "Inscriptions")):
+        for page, label in ((self.links, tr("Rattachements")), (self.registrations, tr("Inscriptions"))):
             self.tabs.addTab(page, label)
             page.session_expired.connect(self.session_expired.emit)
         self.layout_.addWidget(self.tabs)

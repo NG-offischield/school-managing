@@ -13,6 +13,7 @@ traces downloads and answers the authenticity checks. No PDF logic here.
 """
 
 from ..api.errors import ValidationFailed
+from ..i18n import tr
 from ..models import Document
 
 # Source fields required per kind (the server re-checks them).
@@ -58,7 +59,7 @@ class DocumentService:
         if kind == "TIMETABLE" and bool(values.get("school_class")) == bool(values.get("teacher")):
             missing.append("school_class")
         if missing:
-            raise ValidationFailed("Formulaire incomplet.", details={name: ["Obligatoire."] for name in missing})
+            raise ValidationFailed("Formulaire incomplet.", details={name: [tr("Obligatoire.")] for name in missing})
         payload = {"kind": kind, **{k: v.isoformat() if hasattr(v, "isoformat") else v for k, v in values.items()}}
         return Document.from_api(self.api.post("documents/", payload))
 
@@ -72,7 +73,7 @@ class DocumentService:
     def verify(self, code):
         """{"valid", "kind", "status", "title", "generated_at", "sha256", "current"} or NotFound."""
         if not (code or "").strip():
-            raise ValidationFailed("Formulaire incomplet.", details={"code": ["Saisissez le code imprimé."]})
+            raise ValidationFailed("Formulaire incomplet.", details={"code": [tr("Saisissez le code imprimé.")]})
         return self.api.get("documents/verify/", code=code.strip())
 
     # --- sources ----------------------------------------------------------------------
@@ -85,5 +86,5 @@ class DocumentService:
     def compute_report_cards(self, class_id, period_id):
         """Gradebook API: (re)compute the DRAFT report cards of a class for a period."""
         if not (class_id and period_id):
-            raise ValidationFailed("Formulaire incomplet.", details={"school_class": ["Obligatoire."]})
+            raise ValidationFailed("Formulaire incomplet.", details={"school_class": [tr("Obligatoire.")]})
         return self.api.post("report-cards/generate/", {"school_class": class_id, "academic_period": period_id})

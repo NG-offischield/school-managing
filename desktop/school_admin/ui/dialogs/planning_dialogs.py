@@ -13,6 +13,7 @@ from PySide6.QtCore import QDate, Qt, QTime
 from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import QCheckBox, QComboBox, QGridLayout, QLabel, QLineEdit, QPlainTextEdit, QWidget
 
+from ...i18n import Tr, tr
 from ...messages import explain_conflicts
 from ...models import BREAK_TYPES, ROOM_TYPES, WEEKDAY_NAMES
 from ..widgets import FormDialog, button, date_field, time_field
@@ -34,7 +35,10 @@ def _qtime(text):
     return QTime(hours, minutes)
 
 
-def _reason(placeholder="Motif (obligatoire, visible dans l'historique)"):
+def _reason(placeholder=None):
+    placeholder = (
+        tr("Motif (obligatoire, visible dans l'historique)") if placeholder is None else placeholder
+    )  # read now: follows the language
     field = QPlainTextEdit(placeholderText=placeholder)
     field.setFixedHeight(60)
     field.setTabChangesFocus(True)
@@ -94,47 +98,51 @@ class SlotDialog(FormDialog, _TimesMixin):
 
     def __init__(self, courses, rooms, check, parent=None):
         super().__init__(
-            "Nouveau créneau",
-            "Un créneau répète un cours chaque semaine. Les conflits (classe, enseignant, salle) sont "
-            "vérifiés par le serveur.",
+            tr("Nouveau créneau"),
+            tr(
+                "Un créneau répète un cours chaque semaine. Les conflits (classe, enseignant, salle) sont vérifiés "
+                "par le serveur."
+            ),
             parent,
             width=600,
         )
         self.check_fn = check
         self.result = None
         course = QComboBox()
-        course.addItem(CHOOSE_COURSE, None)
+        course.addItem(tr(CHOOSE_COURSE), None)
         for item in courses:
             course.addItem(f"{item.subject_code} — {item.class_name} · {item.teacher_name}", item.id)
-        self.course = self.add_field("course", "Cours", course, required=True, width="long")
-        self.weekday = self.add_field("weekday", "Jour", _weekday_combo(), required=True, width="short")
+        self.course = self.add_field("course", tr("Cours"), course, required=True, width="long")
+        self.weekday = self.add_field("weekday", tr("Jour"), _weekday_combo(), required=True, width="short")
         self.start_time = self.add_field(
-            "start", "Début", time_field(QTime(8, 0)), required=True, width="short", beside=True
+            "start", tr("Début"), time_field(QTime(8, 0)), required=True, width="short", beside=True
         )
         self.end_time = self.add_field(
-            "end", "Fin", time_field(QTime(10, 0)), required=True, width="short", beside=True
+            "end", tr("Fin"), time_field(QTime(10, 0)), required=True, width="short", beside=True
         )
         self.room = self.add_field(
             "room",
-            "Salle",
-            _rooms_combo(rooms, MAIN_ROOM),
+            tr("Salle"),
+            _rooms_combo(rooms, tr(MAIN_ROOM)),
             width="medium",
-            help_text="Par défaut : la salle principale.",
+            help_text=tr("Par défaut : la salle principale."),
         )
-        self.effective_from = self.add_field("effective_from", "À partir du", _optional_date(YEAR_START), width="short")
+        self.effective_from = self.add_field(
+            "effective_from", tr("À partir du"), _optional_date(tr(YEAR_START)), width="short"
+        )
         self.effective_to = self.add_field(
-            "effective_to", "Jusqu'au", _optional_date(YEAR_END), width="short", beside=True
+            "effective_to", tr("Jusqu'au"), _optional_date(tr(YEAR_END)), width="short", beside=True
         )
-        self.check_button = button("Vérifier les conflits")
+        self.check_button = button(tr("Vérifier les conflits"))
         self.body.addWidget(self.check_button, 0, Qt.AlignLeft)
         self.verdict = QLabel("", objectName="banner")
         self.verdict.setWordWrap(True)
         self.verdict.hide()
         self.body.addWidget(self.verdict)
         self.force = self.add_field(
-            "force", "Indisponibilité déclarée", QCheckBox("Programmer malgré tout (motif requis)")
+            "force", tr("Indisponibilité déclarée"), QCheckBox(tr("Programmer malgré tout (motif requis)"))
         )
-        self.reason = self.add_field("reason", "Motif", _reason("Motif de la dérogation à la disponibilité"))
+        self.reason = self.add_field("reason", tr("Motif"), _reason(tr("Motif de la dérogation à la disponibilité")))
         self.force.setEnabled(False)
         self.check_button.clicked.connect(self.check)
         for signal in (
@@ -171,12 +179,12 @@ class SlotDialog(FormDialog, _TimesMixin):
         conflicts = result.get("conflicts") or []
         unavailable = result.get("teacher_declared_unavailable")
         if conflicts:
-            kind, text = "warning", "Conflits : " + explain_conflicts(conflicts) + "."
+            kind, text = "warning", tr("Conflits : ") + explain_conflicts(conflicts) + "."
         else:
-            kind, text = "success", "Aucun conflit de classe, d'enseignant ou de salle."
+            kind, text = "success", tr("Aucun conflit de classe, d'enseignant ou de salle.")
         if unavailable:
             kind = "warning"
-            text += " L'enseignant s'est déclaré indisponible sur ce créneau."
+            text += tr(" L'enseignant s'est déclaré indisponible sur ce créneau.")
         self.force.setEnabled(bool(unavailable))
         self.verdict.setProperty("kind", kind)
         self.verdict.style().unpolish(self.verdict)
@@ -187,11 +195,11 @@ class SlotDialog(FormDialog, _TimesMixin):
     def missing_fields(self):
         if not hasattr(self, "reason"):
             return []
-        missing = [] if self.course.currentData() else ["Cours"]
+        missing = [] if self.course.currentData() else [tr("Cours")]
         if not self._times_ok():
-            missing.append("une heure de fin après le début")
+            missing.append(tr("une heure de fin après le début"))
         if self.force.isChecked() and not self.reason.toPlainText().strip():
-            missing.append("Motif")
+            missing.append(tr("Motif"))
         return missing
 
     def values(self):
@@ -204,19 +212,23 @@ class SlotDialog(FormDialog, _TimesMixin):
 class EndSlotDialog(FormDialog):
     def __init__(self, slot, parent=None):
         super().__init__(
-            "Terminer le créneau",
-            f"{slot.code} · {slot.when}. Les séances après la dernière date sont annulées (familles prévenues).",
+            tr("Terminer le créneau"),
+            tr(
+                "{0} · {1}. Les séances après la dernière date sont annulées (familles prévenues).",
+                slot.code,
+                slot.when,
+            ),
             parent,
-            save_text="Terminer",
+            save_text=tr("Terminer"),
         )
-        self.last_date = self.add_field("last_date", "Dernier jour", date_field(), required=True, width="short")
+        self.last_date = self.add_field("last_date", tr("Dernier jour"), date_field(), required=True, width="short")
         self.last_date.setDate(QDate.currentDate())
-        self.reason = self.add_field("reason", "Motif", _reason(), required=True)
+        self.reason = self.add_field("reason", tr("Motif"), _reason(), required=True)
         self.reason.textChanged.connect(self.refresh_state)
         self.finish()
 
     def missing_fields(self):
-        return [] if self.reason.toPlainText().strip() else ["Motif"]
+        return [] if self.reason.toPlainText().strip() else [tr("Motif")]
 
     def values(self):
         return {"last_date": self.last_date.date().toPython(), "reason": self.reason.toPlainText().strip()}
@@ -225,32 +237,34 @@ class EndSlotDialog(FormDialog):
 class RescheduleDialog(FormDialog, _TimesMixin):
     def __init__(self, slot, rooms, parent=None):
         super().__init__(
-            "Reprogrammer le créneau",
-            f"{slot.code} · {slot.when}. L'ancien créneau s'arrête la veille, un nouveau commence.",
+            tr("Reprogrammer le créneau"),
+            tr("{0} · {1}. L'ancien créneau s'arrête la veille, un nouveau commence.", slot.code, slot.when),
             parent,
-            save_text="Reprogrammer",
+            save_text=tr("Reprogrammer"),
         )
-        self.from_date = self.add_field("from_date", "À partir du", date_field(), required=True, width="short")
+        self.from_date = self.add_field("from_date", tr("À partir du"), date_field(), required=True, width="short")
         self.from_date.setDate(QDate.currentDate())
-        self.weekday = self.add_field("weekday", "Jour", _weekday_combo(), required=True, width="short", beside=True)
+        self.weekday = self.add_field(
+            "weekday", tr("Jour"), _weekday_combo(), required=True, width="short", beside=True
+        )
         self.weekday.setCurrentIndex(max(0, self.weekday.findData(slot.weekday)))
         self.start_time = self.add_field(
-            "start", "Début", time_field(_qtime(slot.start_time)), required=True, width="short"
+            "start", tr("Début"), time_field(_qtime(slot.start_time)), required=True, width="short"
         )
         self.end_time = self.add_field(
-            "end", "Fin", time_field(_qtime(slot.end_time)), required=True, width="short", beside=True
+            "end", tr("Fin"), time_field(_qtime(slot.end_time)), required=True, width="short", beside=True
         )
-        self.room = self.add_field("room", "Salle", _rooms_combo(rooms, MAIN_ROOM), width="medium")
+        self.room = self.add_field("room", tr("Salle"), _rooms_combo(rooms, tr(MAIN_ROOM)), width="medium")
         self.room.setCurrentIndex(max(0, self.room.findData(slot.room_id)))
-        self.reason = self.add_field("reason", "Motif", _reason(), required=True)
+        self.reason = self.add_field("reason", tr("Motif"), _reason(), required=True)
         for signal in (self.reason.textChanged, self.start_time.timeChanged, self.end_time.timeChanged):
             signal.connect(self.refresh_state)
         self.finish()
 
     def missing_fields(self):
-        missing = [] if self.reason.toPlainText().strip() else ["Motif"]
+        missing = [] if self.reason.toPlainText().strip() else [tr("Motif")]
         if not self._times_ok():
-            missing.append("une heure de fin après le début")
+            missing.append(tr("une heure de fin après le début"))
         return missing
 
     def values(self):
@@ -272,26 +286,29 @@ class RescheduleDialog(FormDialog, _TimesMixin):
 class GenerateDialog(FormDialog):
     def __init__(self, classes, monday, parent=None):
         super().__init__(
-            "Générer les séances",
-            "Crée les séances des créneaux publiés sur la période (vacances exclues, séances existantes conservées).",
+            tr("Générer les séances"),
+            tr(
+                "Crée les séances des créneaux publiés sur la période (vacances exclues, séances existantes "
+                "conservées)."
+            ),
             parent,
-            save_text="Générer",
+            save_text=tr("Générer"),
         )
-        self.date_from = self.add_field("date_from", "Du", date_field(), required=True, width="short")
-        self.date_to = self.add_field("date_to", "Au", date_field(), required=True, width="short", beside=True)
+        self.date_from = self.add_field("date_from", tr("Du"), date_field(), required=True, width="short")
+        self.date_to = self.add_field("date_to", tr("Au"), date_field(), required=True, width="short", beside=True)
         self.date_from.setDate(_qdate(monday))
         self.date_to.setDate(_qdate(monday + timedelta(days=6)))
         school_class = QComboBox()
-        school_class.addItem("Toutes les classes", None)
+        school_class.addItem(tr("Toutes les classes"), None)
         for item in classes:
             school_class.addItem(item.name, item.id)
-        self.school_class = self.add_field("school_class", "Classe", school_class, width="medium")
+        self.school_class = self.add_field("school_class", tr("Classe"), school_class, width="medium")
         for signal in (self.date_from.dateChanged, self.date_to.dateChanged):
             signal.connect(self.refresh_state)
         self.finish()
 
     def missing_fields(self):
-        return [] if self.date_to.date() >= self.date_from.date() else ["une date de fin après le début"]
+        return [] if self.date_to.date() >= self.date_from.date() else [tr("une date de fin après le début")]
 
     def values(self):
         return {
@@ -304,16 +321,21 @@ class GenerateDialog(FormDialog):
 class MoveDialog(FormDialog, _TimesMixin):
     def __init__(self, session, parent=None):
         super().__init__(
-            "Déplacer la séance",
-            f"{session.code} · {session.date:%d/%m/%Y} {session.hours}. Les conflits sont vérifiés par le serveur.",
+            tr("Déplacer la séance"),
+            tr(
+                "{0} · {1:%d/%m/%Y} {2}. Les conflits sont vérifiés par le serveur.",
+                session.code,
+                session.date,
+                session.hours,
+            ),
             parent,
-            save_text="Déplacer",
+            save_text=tr("Déplacer"),
         )
-        self.day = self.add_field("day", "Nouvelle date", date_field(), required=True, width="short")
+        self.day = self.add_field("day", tr("Nouvelle date"), date_field(), required=True, width="short")
         self.day.setDate(_qdate(session.date))
         self.start_time = self.add_field(
             "start",
-            "Début",
+            tr("Début"),
             time_field(QTime(session.start.hour, session.start.minute)),
             required=True,
             width="short",
@@ -321,21 +343,21 @@ class MoveDialog(FormDialog, _TimesMixin):
         )
         self.end_time = self.add_field(
             "end",
-            "Fin",
+            tr("Fin"),
             time_field(QTime(session.end.hour, session.end.minute)),
             required=True,
             width="short",
             beside=True,
         )
-        self.reason = self.add_field("reason", "Motif", _reason(), required=True)
+        self.reason = self.add_field("reason", tr("Motif"), _reason(), required=True)
         for signal in (self.reason.textChanged, self.start_time.timeChanged, self.end_time.timeChanged):
             signal.connect(self.refresh_state)
         self.finish()
 
     def missing_fields(self):
-        missing = [] if self.reason.toPlainText().strip() else ["Motif"]
+        missing = [] if self.reason.toPlainText().strip() else [tr("Motif")]
         if not self._times_ok():
-            missing.append("une heure de fin après le début")
+            missing.append(tr("une heure de fin après le début"))
         return missing
 
     def values(self):
@@ -350,19 +372,25 @@ class MoveDialog(FormDialog, _TimesMixin):
 class RoomChangeDialog(FormDialog):
     def __init__(self, session, rooms, parent=None):
         super().__init__(
-            "Changer de salle",
-            f"{session.code} · {session.date:%d/%m/%Y} {session.hours} · salle actuelle : {session.room_code or '—'}",
+            tr("Changer de salle"),
+            tr(
+                "{0} · {1:%d/%m/%Y} {2} · salle actuelle : {3}",
+                session.code,
+                session.date,
+                session.hours,
+                session.room_code or "—",
+            ),
             parent,
-            save_text="Changer de salle",
+            save_text=tr("Changer de salle"),
         )
-        self.room = self.add_field("room", "Nouvelle salle", _rooms_combo(rooms, NO_ROOM), width="medium")
+        self.room = self.add_field("room", tr("Nouvelle salle"), _rooms_combo(rooms, tr(NO_ROOM)), width="medium")
         self.room.setCurrentIndex(max(0, self.room.findData(session.room_id)))
-        self.reason = self.add_field("reason", "Motif", _reason(), required=True)
+        self.reason = self.add_field("reason", tr("Motif"), _reason(), required=True)
         self.reason.textChanged.connect(self.refresh_state)
         self.finish()
 
     def missing_fields(self):
-        return [] if self.reason.toPlainText().strip() else ["Motif"]
+        return [] if self.reason.toPlainText().strip() else [tr("Motif")]
 
     def values(self):
         return {"room_id": self.room.currentData(), "reason": self.reason.toPlainText().strip()}
@@ -371,19 +399,24 @@ class RoomChangeDialog(FormDialog):
 class SubstituteDialog(FormDialog):
     def __init__(self, session, teachers, parent=None):
         super().__init__(
-            "Remplacer l'enseignant",
-            f"{session.code} · {session.date:%d/%m/%Y} {session.hours}. Enseignant prévu : "
-            f"{session.planned_teacher_name}. Le serveur vérifie compatibilité et disponibilité.",
+            tr("Remplacer l'enseignant"),
+            tr(
+                "{0} · {1:%d/%m/%Y} {2}. Enseignant prévu : {3}. Le serveur vérifie compatibilité et disponibilité.",
+                session.code,
+                session.date,
+                session.hours,
+                session.planned_teacher_name,
+            ),
             parent,
-            save_text="Remplacer",
+            save_text=tr("Remplacer"),
         )
         teacher = QComboBox()
-        teacher.addItem("Choisir un remplaçant…", None)
+        teacher.addItem(tr("Choisir un remplaçant…"), None)
         for item in teachers:
             if item.id != session.teacher_id:
                 teacher.addItem(f"{item.name} ({item.number})", item.id)
-        self.teacher = self.add_field("teacher", "Remplaçant", teacher, required=True, width="medium")
-        self.reason = self.add_field("reason", "Motif", _reason(), required=True)
+        self.teacher = self.add_field("teacher", tr("Remplaçant"), teacher, required=True, width="medium")
+        self.reason = self.add_field("reason", tr("Motif"), _reason(), required=True)
         self.teacher.currentIndexChanged.connect(self.refresh_state)
         self.reason.textChanged.connect(self.refresh_state)
         self.finish()
@@ -391,9 +424,9 @@ class SubstituteDialog(FormDialog):
     def missing_fields(self):
         if not hasattr(self, "reason"):
             return []
-        missing = [] if self.teacher.currentData() else ["Remplaçant"]
+        missing = [] if self.teacher.currentData() else [tr("Remplaçant")]
         if not self.reason.toPlainText().strip():
-            missing.append("Motif")
+            missing.append(tr("Motif"))
         return missing
 
     def values(self):
@@ -403,34 +436,36 @@ class SubstituteDialog(FormDialog):
 class SessionDialog(FormDialog):
     """Record of a session; buttons close it with `action` set."""
 
-    ACTIONS = (
-        ("move", "Déplacer…"),
-        ("room", "Changer de salle…"),
-        ("substitute", "Remplacer l'enseignant…"),
-        ("restore", "Restaurer l'enseignant prévu…"),
-        ("cancel", "Annuler la séance…"),
+    ACTIONS = Tr(
+        (
+            ("move", "Déplacer…"),
+            ("room", "Changer de salle…"),
+            ("substitute", "Remplacer l'enseignant…"),
+            ("restore", "Restaurer l'enseignant prévu…"),
+            ("cancel", "Annuler la séance…"),
+        )
     )
 
     def __init__(self, session, parent=None):
-        super().__init__(f"Séance — {session.code}", "", parent, save_text="Fermer", width=560)
+        super().__init__(tr("Séance — {0}", session.code), "", parent, save_text=tr("Fermer"), width=560)
         self.action = None
         self.cancel_button.hide()
-        self.add_section("Séance")
+        self.add_section(tr("Séance"))
         self.body.addWidget(
             _grid(
                 [
-                    ("Matière", f"{session.subject_code} — {session.subject_name}"),
-                    ("Classe", session.class_name),
-                    ("Date", f"{session.date:%d/%m/%Y}" if session.date else "—"),
-                    ("Heure", session.hours),
-                    ("Salle", session.room_code or "—"),
-                    ("Enseignant prévu", session.planned_teacher_name),
-                    ("Enseignant réel", session.teacher_name),
-                    ("Statut", session.status_label),
+                    (tr("Matière"), f"{session.subject_code} — {session.subject_name}"),
+                    (tr("Classe"), session.class_name),
+                    (tr("Date"), f"{session.date:%d/%m/%Y}" if session.date else "—"),
+                    (tr("Heure"), session.hours),
+                    (tr("Salle"), session.room_code or "—"),
+                    (tr("Enseignant prévu"), session.planned_teacher_name),
+                    (tr("Enseignant réel"), session.teacher_name),
+                    (tr("Statut"), session.status_label),
                 ]
             )
         )
-        self.add_section("Actions")
+        self.add_section(tr("Actions"))
         holder = QWidget()
         grid = QGridLayout(holder)
         grid.setContentsMargins(0, 0, 0, 0)
@@ -446,7 +481,7 @@ class SessionDialog(FormDialog):
             self.buttons[name] = widget
         self.body.addWidget(holder)
         if not scheduled:
-            self.body.addWidget(QLabel("Séance annulée ou réalisée : plus modifiable.", objectName="help"))
+            self.body.addWidget(QLabel(tr("Séance annulée ou réalisée : plus modifiable."), objectName="help"))
         self.finish(required_note=False)
         self.save_button.setFocus()
 
@@ -464,17 +499,17 @@ class RoomDialog(FormDialog):
     def __init__(self, parent=None, room=None):
         editing = room is not None
         super().__init__(
-            "Modifier la salle" if editing else "Nouvelle salle",
-            "Salle de l'école utilisée par les créneaux et les séances.",
+            tr("Modifier la salle") if editing else tr("Nouvelle salle"),
+            tr("Salle de l'école utilisée par les créneaux et les séances."),
             parent,
         )
         self.code = self.add_field(
-            "code", "Code", QLineEdit(placeholderText="Ex. R12", maxLength=30), required=True, width="short"
+            "code", tr("Code"), QLineEdit(placeholderText=tr("Ex. R12"), maxLength=30), required=True, width="short"
         )
         self.name = self.add_field(
             "name",
-            "Nom",
-            QLineEdit(placeholderText="Ex. Salle 12", maxLength=100),
+            tr("Nom"),
+            QLineEdit(placeholderText=tr("Ex. Salle 12"), maxLength=100),
             required=True,
             width="medium",
             beside=True,
@@ -482,12 +517,16 @@ class RoomDialog(FormDialog):
         room_type = QComboBox()
         for value, label in ROOM_TYPES.items():
             room_type.addItem(label, value)
-        self.room_type = self.add_field("room_type", "Type", room_type, width="medium")
+        self.room_type = self.add_field("room_type", tr("Type"), room_type, width="medium")
         self.capacity = self.add_field(
-            "capacity", "Capacité", QLineEdit(placeholderText="Ex. 40", maxLength=4), width="short"
+            "capacity", tr("Capacité"), QLineEdit(placeholderText=tr("Ex. 40"), maxLength=4), width="short"
         )
         self.bench_count = self.add_field(
-            "bench_count", "Bancs", QLineEdit(placeholderText="Facultatif", maxLength=4), width="short", beside=True
+            "bench_count",
+            tr("Bancs"),
+            QLineEdit(placeholderText=tr("Facultatif"), maxLength=4),
+            width="short",
+            beside=True,
         )
         self.capacity.setValidator(QIntValidator(1, 9999, self.capacity))
         self.bench_count.setValidator(QIntValidator(0, 9999, self.bench_count))
@@ -503,7 +542,7 @@ class RoomDialog(FormDialog):
         self.finish()
 
     def missing_fields(self):
-        return [label for field, label in ((self.code, "Code"), (self.name, "Nom")) if not field.text().strip()]
+        return [label for field, label in ((self.code, tr("Code")), (self.name, tr("Nom"))) if not field.text().strip()]
 
     def values(self):
         return {
@@ -518,24 +557,24 @@ class RoomDialog(FormDialog):
 class MainRoomDialog(FormDialog):
     def __init__(self, classes, rooms, parent=None):
         super().__init__(
-            "Salle principale d'une classe",
-            "Salle utilisée par défaut par les créneaux de la classe. Le serveur vérifie la capacité.",
+            tr("Salle principale d'une classe"),
+            tr("Salle utilisée par défaut par les créneaux de la classe. Le serveur vérifie la capacité."),
             parent,
-            save_text="Enregistrer",
+            save_text=tr("Enregistrer"),
         )
         school_class = QComboBox()
-        school_class.addItem("Choisir une classe…", None)
+        school_class.addItem(tr("Choisir une classe…"), None)
         for item in classes:
-            school_class.addItem(f"{item.name} — salle actuelle : {item.main_room_label or 'aucune'}", item.id)
-        self.school_class = self.add_field("school_class", "Classe", school_class, required=True, width="long")
+            school_class.addItem(tr("{0} — salle actuelle : {1}", item.name, item.main_room_label or "aucune"), item.id)
+        self.school_class = self.add_field("school_class", tr("Classe"), school_class, required=True, width="long")
         self.room = self.add_field(
-            "room", "Salle principale", _rooms_combo(rooms, "Aucune salle principale"), width="medium"
+            "room", tr("Salle principale"), _rooms_combo(rooms, tr("Aucune salle principale")), width="medium"
         )
         self.school_class.currentIndexChanged.connect(self.refresh_state)
         self.finish()
 
     def missing_fields(self):
-        return [] if self.school_class.currentData() else ["Classe"]
+        return [] if self.school_class.currentData() else [tr("Classe")]
 
     def values(self):
         return {"class_id": self.school_class.currentData(), "room_id": self.room.currentData()}
@@ -550,34 +589,41 @@ class DecisionDialog(FormDialog):
     """Decide a dated unavailability request; the impacted sessions listed
     are the server's (GET .../impacted-sessions/)."""
 
-    DECISIONS = (("APPROVED", "Valider"), ("REJECTED", "Refuser"), ("CHANGES_REQUESTED", "Proposer une modification"))
+    DECISIONS = Tr(
+        (("APPROVED", "Valider"), ("REJECTED", "Refuser"), ("CHANGES_REQUESTED", "Proposer une modification"))
+    )
 
     def __init__(self, request, teacher_name, impacted, parent=None):
         super().__init__(
-            "Décider de la demande",
+            tr("Décider de la demande"),
             f"{teacher_name} · {request.date:%d/%m/%Y} {request.start_time[:5]}–{request.end_time[:5]} · "
             f"« {request.reason} »",
             parent,
-            save_text="Enregistrer la décision",
+            save_text=tr("Enregistrer la décision"),
         )
         self.add_section(
-            "Séances impactées", "Calculées par le serveur ; elles restent à réorganiser après validation."
+            tr("Séances impactées"), tr("Calculées par le serveur ; elles restent à réorganiser après validation.")
         )
         if impacted:
             self.body.addWidget(
-                _grid([(f"{s.date:%d/%m}", f"{s.hours} · {s.code} · salle {s.room_code or '—'}") for s in impacted])
+                _grid(
+                    [
+                        (f"{s.date:%d/%m}", tr("{0} · {1} · salle {2}", s.hours, s.code, s.room_code or "—"))
+                        for s in impacted
+                    ]
+                )
             )
         else:
-            self.body.addWidget(QLabel("Aucune séance impactée.", objectName="help"))
-        self.add_section("Décision")
+            self.body.addWidget(QLabel(tr("Aucune séance impactée."), objectName="help"))
+        self.add_section(tr("Décision"))
         decision = QComboBox()
         for value, label in self.DECISIONS:
             decision.addItem(label, value)
-        self.decision = self.add_field("decision", "Décision", decision, required=True, width="medium")
-        comment = QPlainTextEdit(placeholderText="Commentaire pour l'enseignant (facultatif)")
+        self.decision = self.add_field("decision", tr("Décision"), decision, required=True, width="medium")
+        comment = QPlainTextEdit(placeholderText=tr("Commentaire pour l'enseignant (facultatif)"))
         comment.setFixedHeight(60)
         comment.setTabChangesFocus(True)
-        self.comment = self.add_field("comment", "Commentaire", comment)
+        self.comment = self.add_field("comment", tr("Commentaire"), comment)
         self.finish()
 
     def values(self):
@@ -588,30 +634,32 @@ class BreakDialog(FormDialog):
     def __init__(self, years, parent=None, school_break=None):
         editing = school_break is not None
         super().__init__(
-            "Modifier l'interruption" if editing else "Nouvelle interruption",
-            "Vacances, jours fériés, examens : la génération des séances les saute.",
+            tr("Modifier l'interruption") if editing else tr("Nouvelle interruption"),
+            tr("Vacances, jours fériés, examens : la génération des séances les saute."),
             parent,
         )
         year = QComboBox()
         for item in years:
             year.addItem(item.short_label, item.id)
-        self.year = self.add_field("academic_year", "Année scolaire", year, required=True, width="medium")
+        self.year = self.add_field("academic_year", tr("Année scolaire"), year, required=True, width="medium")
         self.name = self.add_field(
             "name",
-            "Nom",
-            QLineEdit(placeholderText="Ex. Vacances de Noël", maxLength=120),
+            tr("Nom"),
+            QLineEdit(placeholderText=tr("Ex. Vacances de Noël"), maxLength=120),
             required=True,
             width="medium",
         )
         break_type = QComboBox()
         for value, label in BREAK_TYPES.items():
             break_type.addItem(label, value)
-        self.break_type = self.add_field("break_type", "Type", break_type, width="short", beside=True)
-        self.start_day = self.add_field("start_day", "Début", date_field(), required=True, width="short")
-        self.start_time = self.add_field("start_time", "Heure", time_field(QTime(0, 0)), width="short", beside=True)
-        self.end_day = self.add_field("end_day", "Fin", date_field(), required=True, width="short")
-        self.end_time = self.add_field("end_time", "Heure", time_field(QTime(23, 59)), width="short", beside=True)
-        self.affects = self.add_field("affects", "Planning", QCheckBox("Aucune séance générée pendant cette période"))
+        self.break_type = self.add_field("break_type", tr("Type"), break_type, width="short", beside=True)
+        self.start_day = self.add_field("start_day", tr("Début"), date_field(), required=True, width="short")
+        self.start_time = self.add_field("start_time", tr("Heure"), time_field(QTime(0, 0)), width="short", beside=True)
+        self.end_day = self.add_field("end_day", tr("Fin"), date_field(), required=True, width="short")
+        self.end_time = self.add_field("end_time", tr("Heure"), time_field(QTime(23, 59)), width="short", beside=True)
+        self.affects = self.add_field(
+            "affects", tr("Planning"), QCheckBox(tr("Aucune séance générée pendant cette période"))
+        )
         self.affects.setChecked(True)
         if editing:
             self.year.setCurrentIndex(max(0, self.year.findData(school_break.year_id)))
@@ -645,11 +693,11 @@ class BreakDialog(FormDialog):
     def missing_fields(self):
         if not hasattr(self, "affects"):
             return []
-        missing = [] if self.name.text().strip() else ["Nom"]
+        missing = [] if self.name.text().strip() else [tr("Nom")]
         if not self.year.currentData():
-            missing.append("Année scolaire")
+            missing.append(tr("Année scolaire"))
         if self._end() <= self._start():
-            missing.append("une fin après le début")
+            missing.append(tr("une fin après le début"))
         return missing
 
     def values(self):

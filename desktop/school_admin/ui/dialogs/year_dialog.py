@@ -9,6 +9,7 @@ from datetime import date, timedelta
 from PySide6.QtCore import QDate
 from PySide6.QtWidgets import QLabel, QLineEdit
 
+from ...i18n import tr
 from ..widgets import FormDialog, date_field
 
 
@@ -37,24 +38,24 @@ class YearDialog(FormDialog):
     def __init__(self, parent=None, year=None, *, suggested=None):
         editing = year is not None
         super().__init__(
-            "Modifier l'année scolaire" if editing else "Nouvelle année scolaire",
-            "Les dates d'une année ne peuvent pas chevaucher celles d'une autre année de l'école.",
+            tr("Modifier l'année scolaire") if editing else tr("Nouvelle année scolaire"),
+            tr("Les dates d'une année ne peuvent pas chevaucher celles d'une autre année de l'école."),
             parent,
             width=520,
         )
         self.name = self.add_field(
             "name",
-            "Nom",
-            QLineEdit(placeholderText="Ex. 2026-2027", maxLength=30),
+            tr("Nom"),
+            QLineEdit(placeholderText=tr("Ex. 2026-2027"), maxLength=30),
             required=True,
             width="short",
-            help_text="Proposé à partir des dates ; modifiable.",
+            help_text=tr("Proposé à partir des dates ; modifiable."),
         )
-        self.start = self.add_field("start_date", "Début", date_field(), required=True, width="short")
-        self.end = self.add_field("end_date", "Fin", date_field(), required=True, width="short", beside=True)
+        self.start = self.add_field("start_date", tr("Début"), date_field(), required=True, width="short")
+        self.end = self.add_field("end_date", tr("Fin"), date_field(), required=True, width="short", beside=True)
         if editing:
-            state = "année courante" if year.is_current else year.status_label.lower()
-            self.body.insertWidget(0, QLabel(f"Statut actuel : {state}.", objectName="help"))
+            state = tr("année courante") if year.is_current else year.status_label.lower()
+            self.body.insertWidget(0, QLabel(tr("Statut actuel : {0}.", state), objectName="help"))
             self.name.setText(year.name)
             self.start.setDate(_qdate(year.start_date))
             self.end.setDate(_qdate(year.end_date))
@@ -82,9 +83,9 @@ class YearDialog(FormDialog):
     def missing_fields(self):
         missing = []
         if not self.name.text().strip():
-            missing.append("Nom")
+            missing.append(tr("Nom"))
         if self.end.date() <= self.start.date():
-            missing.append("une date de fin après la date de début")
+            missing.append(tr("une date de fin après la date de début"))
         return missing
 
     def values(self):

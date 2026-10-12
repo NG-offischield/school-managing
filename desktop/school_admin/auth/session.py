@@ -12,12 +12,13 @@ every permission anyway; this only avoids an unusable shell).
 """
 
 from ..api.errors import ApiError, Forbidden
+from ..i18n import Tr
 from ..models import Identity
 from .token_store import MemoryTokenStore
 
 
 class NotAnAdministrator(Forbidden):
-    default_message = "Ce poste est réservé à l'administration de l'école."
+    default_message = Tr("Ce poste est réservé à l'administration de l'école.")
 
 
 class AuthService:

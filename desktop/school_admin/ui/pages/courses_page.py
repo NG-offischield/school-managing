@@ -14,24 +14,25 @@ server while the planning still uses the course.
 
 from PySide6.QtWidgets import QComboBox, QDialog, QHBoxLayout
 
+from ...i18n import Texts, Tr, tr
 from ..dialogs.course_dialogs import CourseDialog, CourseRecordDialog
 from ..widgets import button
 from .catalog_base import STATUS_COLUMN_TITLE, PagedCatalogPage
 
-COURSE_FILTERS = [("Actifs", "active"), ("Inactifs", "inactive"), ("Tous", None)]
+COURSE_FILTERS = Texts([("Actifs", "active"), ("Inactifs", "inactive"), ("Tous", None)])
 ALL_YEARS = "Toutes les années"
 ALL_CLASSES = "Toutes les classes"
 ALL_SUBJECTS = "Toutes les matières"
 
 
 class CoursesPage(PagedCatalogPage):
-    title = "Cours"
-    description = "Qui enseigne quelle matière dans quelle classe, pour l'année de la classe."
-    columns = ["Matière", "Enseignant", "Classe", "Niveau", "Année scolaire", "Coefficient", STATUS_COLUMN_TITLE]
+    title = Tr("Cours")
+    description = Tr("Qui enseigne quelle matière dans quelle classe, pour l'année de la classe.")
+    columns = Tr(["Matière", "Enseignant", "Classe", "Niveau", "Année scolaire", "Coefficient", STATUS_COLUMN_TITLE])
     noun = "cours"
     plural_noun = "cours"
     feminine = False
-    search_placeholder = "Rechercher par matière, classe ou enseignant…"
+    search_placeholder = Tr("Rechercher par matière, classe ou enseignant…")
     status_filters = COURSE_FILTERS
 
     def __init__(self, service, subjects, references, runner, parent=None, **kwargs):
@@ -49,15 +50,15 @@ class CoursesPage(PagedCatalogPage):
         return {0, 1}
 
     def leading_actions(self):
-        self.record_button = button("Fiche", tooltip="Consulter la fiche du cours (Entrée)")
+        self.record_button = button(tr("Fiche"), tooltip=tr("Consulter la fiche du cours (Entrée)"))
         return [self.record_button]
 
     def build_filters(self):
         layout = QHBoxLayout()
         layout.setSpacing(8)
-        self.year_filter = self._combo("Filtrer par année scolaire", ALL_YEARS, 200)
-        self.class_filter = self._combo("Filtrer par classe", ALL_CLASSES, 150)
-        self.subject_filter = self._combo("Filtrer par matière", ALL_SUBJECTS, 180)
+        self.year_filter = self._combo(tr("Filtrer par année scolaire"), tr(ALL_YEARS), 200)
+        self.class_filter = self._combo(tr("Filtrer par classe"), tr(ALL_CLASSES), 150)
+        self.subject_filter = self._combo(tr("Filtrer par matière"), tr(ALL_SUBJECTS), 180)
         for combo in (self.year_filter, self.class_filter, self.subject_filter):
             layout.addWidget(combo)
         layout.addStretch()
@@ -79,9 +80,9 @@ class CoursesPage(PagedCatalogPage):
         if hasattr(self, "record_button"):
             self.record_button.setEnabled(row is not None)
             self.record_button.setToolTip(
-                "Sélectionnez d'abord un cours dans la liste."
+                tr("Sélectionnez d'abord un cours dans la liste.")
                 if row is None
-                else "Consulter la fiche du cours (Entrée)"
+                else tr("Consulter la fiche du cours (Entrée)")
             )
 
     def describe_row(self, row):
@@ -97,7 +98,7 @@ class CoursesPage(PagedCatalogPage):
         self.call(
             lambda: (self.references.years(), self.references.classes(), self.subjects.list(active=None)),
             self._fill_filters,
-            action="Impossible de charger les années, classes et matières",
+            action=tr("Impossible de charger les années, classes et matières"),
         )
 
     def _fill_filters(self, loaded):
@@ -106,7 +107,7 @@ class CoursesPage(PagedCatalogPage):
         self._filters_ready = False
         year = self.year_filter.currentData()
         self.year_filter.clear()
-        self.year_filter.addItem(ALL_YEARS, None)
+        self.year_filter.addItem(tr(ALL_YEARS), None)
         for item in years:
             self.year_filter.addItem(item.label, item.id)
         if first_time:
@@ -114,7 +115,7 @@ class CoursesPage(PagedCatalogPage):
         self.year_filter.setCurrentIndex(max(0, self.year_filter.findData(year)))
         chosen = self.subject_filter.currentData()
         self.subject_filter.clear()
-        self.subject_filter.addItem(ALL_SUBJECTS, None)
+        self.subject_filter.addItem(tr(ALL_SUBJECTS), None)
         for item in subjects:
             self.subject_filter.addItem(f"{item.code} — {item.name}", item.id)
         self.subject_filter.setCurrentIndex(max(0, self.subject_filter.findData(chosen)))
@@ -126,7 +127,7 @@ class CoursesPage(PagedCatalogPage):
         year, chosen = self.year_filter.currentData(), self.class_filter.currentData()
         self.class_filter.blockSignals(True)
         self.class_filter.clear()
-        self.class_filter.addItem(ALL_CLASSES, None)
+        self.class_filter.addItem(tr(ALL_CLASSES), None)
         for item in self.classes:
             if not year or item.year_id == year:
                 self.class_filter.addItem(item.name, item.id)
@@ -164,7 +165,7 @@ class CoursesPage(PagedCatalogPage):
         self.call(
             lambda: self.service.eligible_teachers(class_id, subject_id),
             done,
-            action="Impossible de charger les enseignants autorisés",
+            action=tr("Impossible de charger les enseignants autorisés"),
         )
 
     def ask(self, kind, **context):
@@ -190,12 +191,12 @@ class CoursesPage(PagedCatalogPage):
                 self.call(
                     lambda: self.service.create(**values),
                     lambda saved: self._reselect(
-                        saved.id, f"Cours « {saved.code} » ({saved.teacher_name}) créé avec succès."
+                        saved.id, tr("Cours « {0} » ({1}) créé avec succès.", saved.code, saved.teacher_name)
                     ),
-                    action="Impossible de créer le cours",
+                    action=tr("Impossible de créer le cours"),
                 )
 
-        self.call(self._form_references, open_form, action="Impossible de charger les listes du formulaire")
+        self.call(self._form_references, open_form, action=tr("Impossible de charger les listes du formulaire"))
 
     def edit(self, course=None):
         row = course or self.selected()
@@ -209,15 +210,15 @@ class CoursesPage(PagedCatalogPage):
                 self.call(
                     lambda: self.service.update(current.id, **values),
                     lambda saved: self._reselect(
-                        saved.id, f"Cours « {saved.code} » ({saved.teacher_name}) modifié avec succès."
+                        saved.id, tr("Cours « {0} » ({1}) modifié avec succès.", saved.code, saved.teacher_name)
                     ),
-                    action="Impossible de modifier le cours",
+                    action=tr("Impossible de modifier le cours"),
                 )
 
         self.call(
             lambda: (self.service.get(row.id), self._form_references()),
             open_form,
-            action="Impossible de charger le cours",
+            action=tr("Impossible de charger le cours"),
         )
 
     def open_row(self):
@@ -232,7 +233,7 @@ class CoursesPage(PagedCatalogPage):
             if self.ask("record", course=course) == "edit":
                 self.edit(course)
 
-        self.call(lambda: self.service.get(row.id), show, action="Impossible de charger le cours")
+        self.call(lambda: self.service.get(row.id), show, action=tr("Impossible de charger le cours"))
 
     def deactivate(self, row_id):
         return self.service.deactivate(row_id)
@@ -241,4 +242,4 @@ class CoursesPage(PagedCatalogPage):
         return self.service.reactivate(row_id)
 
     def _saved(self, saved, verb):
-        self._reselect(saved.id, f"Cours « {saved.code} » ({saved.teacher_name}) {verb} avec succès.")
+        self._reselect(saved.id, tr("Cours « {0} » ({1}) {2} avec succès.", saved.code, saved.teacher_name, verb))

@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..i18n import tr
 from .feedback import describe
 from .theme import style_calendar
 
@@ -72,7 +73,7 @@ class Banner(QLabel):
         html = f"<b>{ICONS.get(kind, '')}&nbsp;&nbsp;{escape(title)}</b>" if title else f"<b>{ICONS.get(kind, '')}</b>"
         html += f"&nbsp;&nbsp;{escape(text)}"
         if detail:
-            html += f"<br><span style='font-size:9pt'>Détail technique : {escape(detail)}</span>"
+            html += tr("<br><span style='font-size:9pt'>Détail technique : {0}</span>", escape(detail))
         self.setText(html)
         self.setAccessibleName(f"{title} {text}".strip())
         self.show()
@@ -230,7 +231,8 @@ class FormDialog(QDialog):
     through the fields (the form scrolls to the focused one).
     """
 
-    def __init__(self, title, instruction="", parent=None, *, save_text="Enregistrer", width=560):
+    def __init__(self, title, instruction="", parent=None, *, save_text=None, width=560):
+        save_text = tr("Enregistrer") if save_text is None else save_text  # read now: follows the language
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
@@ -274,7 +276,7 @@ class FormDialog(QDialog):
         self._row_break = False
         self.status = QLabel("", objectName="help")
         self.status.setWordWrap(True)
-        self.cancel_button = button("Annuler", "secondary")
+        self.cancel_button = button(tr("Annuler"), "secondary")
         self.save_button = button(save_text, "primary")
         self.save_button.setDefault(True)
         self.cancel_button.clicked.connect(self.reject)
@@ -327,7 +329,7 @@ class FormDialog(QDialog):
         """Call once the fields are added: footer (note, status, buttons)."""
         self.body.addStretch()
         if required_note:
-            self.footer_layout.addWidget(QLabel("* champ obligatoire", objectName="help"))
+            self.footer_layout.addWidget(QLabel(tr("* champ obligatoire"), objectName="help"))
         self.footer_layout.addWidget(self.status)
         actions = QHBoxLayout()
         actions.setSpacing(8)
@@ -379,10 +381,10 @@ class FormDialog(QDialog):
     def refresh_state(self):
         missing = self.missing_fields()
         self.save_button.setEnabled(not missing)
-        reason = f"Pour enregistrer, complétez : {', '.join(missing)}." if missing else ""
+        reason = tr("Pour enregistrer, complétez : {0}.", ", ".join(missing)) if missing else ""
         self.status.setText(reason)
         self.status.setVisible(bool(reason))
-        self.save_button.setToolTip(reason or "Enregistrer (Entrée)")
+        self.save_button.setToolTip(reason or tr("Enregistrer (Entrée)"))
 
     def _save(self):
         if self.save_button.isEnabled():
@@ -396,7 +398,8 @@ class FormDialog(QDialog):
 class ConfirmDialog(FormDialog):
     """Confirmation of a consequential action (themed, explicit button names)."""
 
-    def __init__(self, title, text, parent=None, *, confirm_text="Confirmer", danger=False):
+    def __init__(self, title, text, parent=None, *, confirm_text=None, danger=False):
+        confirm_text = tr("Confirmer") if confirm_text is None else confirm_text  # read now: follows the language
         super().__init__(title, parent=parent, save_text=confirm_text, width=480)
         self.message = QLabel(text)
         self.message.setWordWrap(True)
@@ -409,7 +412,8 @@ class ConfirmDialog(FormDialog):
         self.cancel_button.setDefault(True)
 
 
-def ask_confirmation(parent, title, text, *, confirm_text="Confirmer", danger=False):
+def ask_confirmation(parent, title, text, *, confirm_text=None, danger=False):
+    confirm_text = tr("Confirmer") if confirm_text is None else confirm_text  # read now: follows the language
     return ConfirmDialog(title, text, parent, confirm_text=confirm_text, danger=danger).exec() == QDialog.Accepted
 
 

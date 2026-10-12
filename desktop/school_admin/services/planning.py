@@ -9,6 +9,7 @@ messages.explain_conflicts). Nothing is recomputed here.
 from datetime import date, datetime, timedelta
 
 from ..api.errors import ValidationFailed
+from ..i18n import tr
 from ..models import Room, SchoolBreak, Session, Slot, UnavailabilityRequest
 
 
@@ -17,7 +18,7 @@ def _iso(value):
 
 
 def _require(**fields):
-    missing = {name: ["Obligatoire."] for name, value in fields.items() if value in (None, "")}
+    missing = {name: [tr("Obligatoire.")] for name, value in fields.items() if value in (None, "")}
     if missing:
         raise ValidationFailed("Formulaire incomplet.", details=missing)
 
@@ -154,7 +155,7 @@ class PlanningService:
 
     def _action(self, session_id, name, payload):
         if not (payload.get("reason") or "").strip():
-            raise ValidationFailed("Formulaire incomplet.", details={"reason": ["Indiquez le motif."]})
+            raise ValidationFailed("Formulaire incomplet.", details={"reason": [tr("Indiquez le motif.")]})
         return Session.from_api(self.api.post(f"admin/sessions/{session_id}/{name}/", payload))
 
     def cancel(self, session_id, reason):

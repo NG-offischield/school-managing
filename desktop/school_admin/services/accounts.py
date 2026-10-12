@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from ..api.errors import ValidationFailed
+from ..i18n import tr
 from ..models import AccountSummary
 
 
@@ -49,7 +50,7 @@ class AccountService:
 
     def disable(self, membership_id, reason):
         if not (reason or "").strip():
-            raise ValidationFailed("Formulaire incomplet.", details={"reason": ["Indiquez le motif."]})
+            raise ValidationFailed("Formulaire incomplet.", details={"reason": [tr("Indiquez le motif.")]})
         return AccountSummary.from_api(
             self.api.post(f"admin/accounts/{membership_id}/disable/", {"reason": reason.strip()})
         )

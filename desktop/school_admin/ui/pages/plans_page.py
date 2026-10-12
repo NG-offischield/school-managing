@@ -12,6 +12,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QComboBox, QDialog, QFileDialog
 
+from ...i18n import Tr, tr
 from ...models import PLAN_STATUSES
 from ...services.plans import FILE_FILTER
 from ..dialogs.plan_dialogs import DiffusionDialog, PlanDialog, PreviewDialog, VersionsDialog
@@ -27,26 +28,26 @@ STATUS_COLOURS = TokenColours(PUBLISHED="success", WITHDRAWN="text_secondary", D
 
 
 def choose_plan_file(parent):
-    path, _ = QFileDialog.getOpenFileName(parent, "Importer un plan (PDF, PNG ou JPEG)", "", FILE_FILTER)
+    path, _ = QFileDialog.getOpenFileName(parent, tr("Importer un plan (PDF, PNG ou JPEG)"), "", tr(FILE_FILTER))
     return path
 
 
 def ask_save_path(parent, name):
-    path, _ = QFileDialog.getSaveFileName(parent, "Enregistrer le plan", name)
+    path, _ = QFileDialog.getSaveFileName(parent, tr("Enregistrer le plan"), name)
     return path
 
 
 class PlansPage(CatalogPage):
-    title = "Plans"
-    description = (
+    title = Tr("Plans")
+    description = Tr(
         "Plans 2D des locaux, dessinés dans un logiciel d'architecture puis importés ici (PDF, PNG ou JPEG). "
         "Exportez un DWG / DXF en PDF avant de l'importer."
     )
-    columns = ["Titre", "Bâtiment · niveau", "Version publiée", "Diffusion", "Publié le", STATUS_COLUMN_TITLE]
+    columns = Tr(["Titre", "Bâtiment · niveau", "Version publiée", "Diffusion", "Publié le", STATUS_COLUMN_TITLE])
     noun = "plan"
     feminine = False
-    search_placeholder = "Rechercher par titre…"
-    status_filters = [("Statut : tous", None), *((label, code) for code, label in PLAN_STATUSES.items())]
+    search_placeholder = Tr("Rechercher par titre…")
+    status_filters = Tr([("Statut : tous", None), *((label, code) for code, label in PLAN_STATUSES.items())])
     has_toggle = False
     narrow_hidden = (3, 4)
 
@@ -63,9 +64,9 @@ class PlansPage(CatalogPage):
         return {0, 1}
 
     def extra_actions(self):
-        self.versions_button = button("Versions…", tooltip="Historique, import, aperçu et publication")
-        self.diffusion_button = button("Diffusion…", tooltip="Qui peut consulter ce plan")
-        self.withdraw_button = button("Retirer", "danger", tooltip="Le plan disparaît pour tous les lecteurs")
+        self.versions_button = button(tr("Versions…"), tooltip=tr("Historique, import, aperçu et publication"))
+        self.diffusion_button = button(tr("Diffusion…"), tooltip=tr("Qui peut consulter ce plan"))
+        self.withdraw_button = button(tr("Retirer"), "danger", tooltip=tr("Le plan disparaît pour tous les lecteurs"))
         self.versions_button.clicked.connect(self.versions)
         self.diffusion_button.clicked.connect(self.diffusion)
         self.withdraw_button.clicked.connect(self.withdraw)
@@ -80,10 +81,10 @@ class PlansPage(CatalogPage):
 
     def add_filters(self, layout):
         self.building_filter = QComboBox()
-        self.building_filter.setAccessibleName("Filtrer par bâtiment")
-        self.building_filter.setToolTip("Filtrer par bâtiment")
+        self.building_filter.setAccessibleName(tr("Filtrer par bâtiment"))
+        self.building_filter.setToolTip(tr("Filtrer par bâtiment"))
         self.building_filter.setMinimumWidth(180)
-        self.building_filter.addItem(ALL_BUILDINGS, None)
+        self.building_filter.addItem(tr(ALL_BUILDINGS), None)
         self.building_filter.currentIndexChanged.connect(lambda _: self._apply_building())
         layout.addWidget(self.building_filter)
 
@@ -106,7 +107,7 @@ class PlansPage(CatalogPage):
         current = self.building_filter.currentData()
         self.building_filter.blockSignals(True)
         self.building_filter.clear()
-        self.building_filter.addItem(ALL_BUILDINGS, None)
+        self.building_filter.addItem(tr(ALL_BUILDINGS), None)
         for building in sorted({r.building for r in rows if r.building}):
             self.building_filter.addItem(building, building)
         self.building_filter.setCurrentIndex(max(0, self.building_filter.findData(current)))
@@ -134,8 +135,8 @@ class PlansPage(CatalogPage):
         if values:
             self.call(
                 lambda: self.service.create(**values),
-                lambda saved: self._saved(saved, "créé"),
-                action="Impossible de créer le plan",
+                lambda saved: self._saved(saved, tr("créé")),
+                action=tr("Impossible de créer le plan"),
             )
 
     def edit(self):
@@ -146,8 +147,8 @@ class PlansPage(CatalogPage):
         if values:
             self.call(
                 lambda: self.service.update(row.id, **values),
-                lambda saved: self._saved(saved, "modifié"),
-                action="Impossible de modifier le plan",
+                lambda saved: self._saved(saved, tr("modifié")),
+                action=tr("Impossible de modifier le plan"),
             )
 
     # --- versions ------------------------------------------------------------------------
@@ -188,7 +189,7 @@ class PlansPage(CatalogPage):
             self.call(
                 lambda: self.service.versions(row.id),
                 lambda versions: self.open_versions(row, versions),
-                action="Impossible de charger les versions",
+                action=tr("Impossible de charger les versions"),
             )
 
     def _refresh_versions(self, dialog, message):
@@ -201,21 +202,22 @@ class PlansPage(CatalogPage):
                 dialog.show_message("success", message),
                 self.reload(),
             ),
-            "Impossible d'actualiser les versions",
+            tr("Impossible d'actualiser les versions"),
         )
 
     def import_version(self, dialog):
         path = self.choose_file(dialog)
         if not path:
             return
-        dialog.show_message("info", f"Envoi de « {Path(path).name} »… le serveur vérifie le fichier.")
+        dialog.show_message("info", tr("Envoi de « {0} »… le serveur vérifie le fichier.", Path(path).name))
         self.in_dialog(
             dialog,
             lambda: self.service.upload(dialog.plan.id, path),
             lambda version: self._refresh_versions(
-                dialog, f"Version {version.number} importée ({version.details}). Elle n'est pas encore publiée."
+                dialog,
+                tr("Version {0} importée ({1}). Elle n'est pas encore publiée.", version.number, version.details),
             ),
-            "Import refusé",
+            tr("Import refusé"),
         )
 
     def open_preview(self, title, content, mime_type, parent):
@@ -228,24 +230,28 @@ class PlansPage(CatalogPage):
             lambda content: self.open_preview(
                 f"{dialog.plan.title} v{version.number}", content, version.mime_type, dialog
             ),
-            "Aperçu impossible",
+            tr("Aperçu impossible"),
         )
 
     def publish(self, dialog, version):
-        readers = "les lecteurs autorisés (selon la diffusion) seront notifiés"
+        readers = tr("les lecteurs autorisés (selon la diffusion) seront notifiés")
         if not self.confirm(
             dialog,
-            "Publier cette version",
-            f"Publier la version {version.number} de « "
-            f"{dialog.plan.title} » ? Elle remplace la version actuelle ; {readers}.",
-            confirm_text="Publier",
+            tr("Publier cette version"),
+            tr(
+                "Publier la version {0} de « {1} » ? Elle remplace la version actuelle ; {2}.",
+                version.number,
+                dialog.plan.title,
+                readers,
+            ),
+            confirm_text=tr("Publier"),
         ):
             return
         self.in_dialog(
             dialog,
             lambda: self.service.publish(dialog.plan.id, version.id),
-            lambda plan: self._refresh_versions(dialog, f"Version {version.number} publiée."),
-            "Publication impossible",
+            lambda plan: self._refresh_versions(dialog, tr("Version {0} publiée.", version.number)),
+            tr("Publication impossible"),
         )
 
     def save_version(self, dialog, version):
@@ -256,8 +262,8 @@ class PlansPage(CatalogPage):
         self.in_dialog(
             dialog,
             lambda: Path(target).write_bytes(self.service.version_file(dialog.plan.id, version.id)),
-            lambda _: dialog.show_message("success", f"Enregistré : {Path(target).name}"),
-            "Enregistrement impossible",
+            lambda _: dialog.show_message("success", tr("Enregistré : {0}", Path(target).name)),
+            tr("Enregistrement impossible"),
         )
 
     # --- distribution ----------------------------------------------------------------------
@@ -285,8 +291,8 @@ class PlansPage(CatalogPage):
 
             self.call(
                 steps,
-                lambda saved: self._saved(saved, "mis à jour (diffusion)"),
-                action="Impossible de modifier la diffusion",
+                lambda saved: self._saved(saved, tr("mis à jour (diffusion)")),
+                action=tr("Impossible de modifier la diffusion"),
             )
 
         def open_form(loaded):
@@ -298,7 +304,7 @@ class PlansPage(CatalogPage):
         self.call(
             lambda: (self.service.get(row.id), self.references.classes(), self.service.access(row.id)),
             open_form,
-            action="Impossible de charger la diffusion",
+            action=tr("Impossible de charger la diffusion"),
         )
 
     # --- withdraw -----------------------------------------------------------------------------
@@ -308,15 +314,18 @@ class PlansPage(CatalogPage):
             return
         answer = self.ask_withdraw(
             self,
-            "Retirer le plan",
-            f"« {row.title} » disparaîtra aussitôt des applications Parent et Enseignant ; les versions restent "
-            "conservées et le plan pourra être republié. Personne n'est notifié.",
-            save_text="Retirer",
+            tr("Retirer le plan"),
+            tr(
+                "« {0} » disparaîtra aussitôt des applications Parent et Enseignant ; les versions restent "
+                "conservées et le plan pourra être republié. Personne n'est notifié.",
+                row.title,
+            ),
+            save_text=tr("Retirer"),
             danger=True,
         )
         if answer:
             self.call(
                 lambda: self.service.withdraw(row.id, answer["reason"]),
-                lambda saved: self._saved(saved, "retiré"),
-                action="Impossible de retirer le plan",
+                lambda saved: self._saved(saved, tr("retiré")),
+                action=tr("Impossible de retirer le plan"),
             )

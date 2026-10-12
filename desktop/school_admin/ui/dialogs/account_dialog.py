@@ -24,22 +24,25 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ...i18n import LANGUAGES, Labels, tr
 from ...services.me import FIELD_LABELS, PHOTO_FILTER
 from ..feedback import describe
 from ..theme import THEME_MODES
 from ..widgets import Banner, FormDialog, ask_confirmation, button
 
-ROLE_LABELS = {"ADMIN": "Administrateur", "SUPER_ADMIN": "Super-administrateur", "TEACHER": "Enseignant"}
-PHOTO_MESSAGES = {
-    "photo_invalid": "Ce fichier n'est pas une image lisible.",
-    "photo_format": "Utilisez une photo JPEG, PNG ou WebP.",
-    "photo_too_small": "La photo est trop petite (120 px minimum de côté).",
-    "photo_too_large": "La photo est trop grande (3 Mo maximum).",
-}
+ROLE_LABELS = Labels({"ADMIN": "Administrateur", "SUPER_ADMIN": "Super-administrateur", "TEACHER": "Enseignant"})
+PHOTO_MESSAGES = Labels(
+    {
+        "photo_invalid": "Ce fichier n'est pas une image lisible.",
+        "photo_format": "Utilisez une photo JPEG, PNG ou WebP.",
+        "photo_too_small": "La photo est trop petite (120 px minimum de côté).",
+        "photo_too_large": "La photo est trop grande (3 Mo maximum).",
+    }
+)
 
 
 def choose_photo_file(parent):
-    path, _ = QFileDialog.getOpenFileName(parent, "Choisir une photo", "", PHOTO_FILTER)
+    path, _ = QFileDialog.getOpenFileName(parent, tr("Choisir une photo"), "", tr(PHOTO_FILTER))
     return path
 
 
@@ -57,12 +60,14 @@ class AccountDialog(FormDialog):
         confirm=ask_confirmation,
         theme_mode="light",
         on_theme=None,
+        language="fr",
+        on_language=None,
     ):
         super().__init__(
-            "Mon compte",
-            "Vos coordonnées, votre photo, votre mot de passe et vos appareils connectés.",
+            tr("Mon compte"),
+            tr("Vos coordonnées, votre photo, votre mot de passe et vos appareils connectés."),
             parent,
-            save_text="Fermer",
+            save_text=tr("Fermer"),
             width=640,
         )
         self.service, self.runner = service, runner
@@ -75,7 +80,9 @@ class AccountDialog(FormDialog):
         self.banner = Banner()
         self.body.addWidget(self.banner)
 
-        self.add_section("Identité", "Gérés par l'administration de l'école : nom, e-mail, rôle, établissement.")
+        self.add_section(
+            tr("Identité"), tr("Gérés par l'administration de l'école : nom, e-mail, rôle, établissement.")
+        )
         identity = QWidget()
         row = QHBoxLayout(identity)
         row.setContentsMargins(0, 0, 0, 0)
@@ -90,8 +97,8 @@ class AccountDialog(FormDialog):
             widget.setWordWrap(True)
             text.addWidget(widget)
         photo_actions = QHBoxLayout()
-        self.photo_button = button("Changer la photo…", "secondary")
-        self.remove_photo_button = button("Retirer la photo", "secondary")
+        self.photo_button = button(tr("Changer la photo…"), "secondary")
+        self.remove_photo_button = button(tr("Retirer la photo"), "secondary")
         self.photo_button.clicked.connect(self.change_photo)
         self.remove_photo_button.clicked.connect(self.remove_photo)
         photo_actions.addWidget(self.photo_button)
@@ -101,39 +108,50 @@ class AccountDialog(FormDialog):
         row.addLayout(text, 1)
         self.body.addWidget(identity)
 
-        self.add_section("Coordonnées")
+        self.add_section(tr("Coordonnées"))
         self.fields_box = QVBoxLayout()
         holder = QWidget()
         holder.setLayout(self.fields_box)
         self.fields_box.setContentsMargins(0, 0, 0, 0)
         self.body.addWidget(holder)
-        self.save_details_button = button("Enregistrer les coordonnées", "primary")
+        self.save_details_button = button(tr("Enregistrer les coordonnées"), "primary")
         self.save_details_button.clicked.connect(self.save_details)
         self.body.addWidget(self.save_details_button, 0, Qt.AlignLeft)
 
         self.add_section(
-            "Mot de passe", "Après le changement, vos autres appareils sont déconnectés ; ce poste reste connecté."
+            tr("Mot de passe"),
+            tr("Après le changement, vos autres appareils sont déconnectés ; ce poste reste connecté."),
         )
-        self.current_password = self._password("Mot de passe actuel")
-        self.new_password = self._password("Nouveau mot de passe (10 caractères au minimum)")
-        self.confirm_password = self._password("Confirmer le nouveau mot de passe")
-        self.password_button = button("Changer le mot de passe", "secondary")
+        self.current_password = self._password(tr("Mot de passe actuel"))
+        self.new_password = self._password(tr("Nouveau mot de passe (10 caractères au minimum)"))
+        self.confirm_password = self._password(tr("Confirmer le nouveau mot de passe"))
+        self.password_button = button(tr("Changer le mot de passe"), "secondary")
         self.password_button.clicked.connect(self.change_password)
         self.body.addWidget(self.password_button, 0, Qt.AlignLeft)
 
-        self.add_section("Apparence", "« Système » suit le réglage de Windows. Le choix est gardé sur ce poste.")
+        self.add_section(
+            tr("Apparence"), tr("« Système » suit le réglage de Windows. Le choix est gardé sur ce poste.")
+        )
         self.on_theme = on_theme
         self.theme = QComboBox()
         for code, label in THEME_MODES.items():
             self.theme.addItem(label, code)
         self.theme.setCurrentIndex(max(0, self.theme.findData(theme_mode)))
         self.theme.setEnabled(on_theme is not None)
-        self.add_field("theme", "Thème", self.theme, width="medium")
+        self.add_field("theme", tr("Thème"), self.theme, width="medium")
         self.theme.currentIndexChanged.connect(self._theme_chosen)
+        self.on_language = on_language
+        self.language = QComboBox()
+        for code, label in LANGUAGES.items():
+            self.language.addItem(label, code)  # each language named in its own language
+        self.language.setCurrentIndex(max(0, self.language.findData(language)))
+        self.language.setEnabled(on_language is not None)
+        self.add_field("language", tr("Langue"), self.language, width="medium", beside=True)
+        self.language.currentIndexChanged.connect(self._language_chosen)
 
-        self.add_section("Appareils connectés")
+        self.add_section(tr("Appareils connectés"))
         self.table = QTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels(["Appareil", "Dernière activité", ""])
+        self.table.setHorizontalHeaderLabels([tr("Appareil"), tr("Dernière activité"), ""])
         self.table.verticalHeader().hide()
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -143,8 +161,8 @@ class AccountDialog(FormDialog):
         self.table.itemSelectionChanged.connect(self._selection_changed)
         self.body.addWidget(self.table)
         sessions_actions = QHBoxLayout()
-        self.revoke_button = button("Déconnecter cet appareil", "secondary")
-        self.revoke_all_button = button("Déconnecter tous mes appareils", "danger")
+        self.revoke_button = button(tr("Déconnecter cet appareil"), "secondary")
+        self.revoke_all_button = button(tr("Déconnecter tous mes appareils"), "danger")
         self.revoke_button.clicked.connect(self.revoke_selected)
         self.revoke_all_button.clicked.connect(self.revoke_all)
         sessions_actions.addWidget(self.revoke_button)
@@ -207,7 +225,7 @@ class AccountDialog(FormDialog):
             photo = self.service.photo() if profile.has_photo else None
             return profile, photo, self.service.sessions()
 
-        self._call(load, self._loaded, "Impossible de charger votre compte")
+        self._call(load, self._loaded, tr("Impossible de charger votre compte"))
 
     def _loaded(self, result):
         profile, photo, sessions = result
@@ -222,7 +240,7 @@ class AccountDialog(FormDialog):
         self.role_label.setText(f"{roles} · {profile.school_name}")
         self._show_photo(photo)
         self.remove_photo_button.setEnabled(profile.has_photo)
-        self.photo_button.setText("Changer la photo…" if profile.has_photo else "Ajouter une photo…")
+        self.photo_button.setText(tr("Changer la photo…") if profile.has_photo else tr("Ajouter une photo…"))
         if not self.inputs:  # the editable fields come from the server
             for name in profile.editable:
                 if name == "preferred_language":
@@ -263,7 +281,7 @@ class AccountDialog(FormDialog):
         self.table.setRowCount(len(sessions))
         for row, session in enumerate(sessions):
             when = f"{session.last_used_at:%d/%m/%Y %H:%M}" if session.last_used_at else "—"
-            for column, text in enumerate([session.device_name, when, "Ce poste" if session.current else ""]):
+            for column, text in enumerate([session.device_name, when, tr("Ce poste") if session.current else ""]):
                 self.table.setItem(row, column, QTableWidgetItem(text))
         self._selection_changed()
 
@@ -276,13 +294,20 @@ class AccountDialog(FormDialog):
         return self.sessions[rows[0].row()] if rows else None
 
     # --- actions ----------------------------------------------------------------------------
+    def _language_chosen(self, _index):
+        if self.on_language is None:
+            return
+        code = self.language.currentData()
+        self.accept()  # the windows are rebuilt in the new language; « Mon compte » reopens
+        self.on_language(code)
+
     def _theme_chosen(self, _index):
         if self.on_theme is None:
             return
         if self.on_theme(self.theme.currentData()):
-            self.show_message("success", f"Thème : {self.theme.currentText()}.")
+            self.show_message("success", tr("Thème : {0}.", self.theme.currentText()))
         else:
-            self.show_message("warning", "Thème appliqué, mais il n'a pas pu être enregistré sur ce poste.")
+            self.show_message("warning", tr("Thème appliqué, mais il n'a pas pu être enregistré sur ce poste."))
 
     def values(self):
         result = {}
@@ -300,14 +325,14 @@ class AccountDialog(FormDialog):
             return
         changes = {k: v for k, v in self.values().items() if v != self.profile.values.get(k, "")}
         if not changes:
-            self.show_message("info", "Aucune modification à enregistrer.")
+            self.show_message("info", tr("Aucune modification à enregistrer."))
             return
 
         def saved(profile):
             self._show_profile(profile)
-            self.show_message("success", "Coordonnées enregistrées.")
+            self.show_message("success", tr("Coordonnées enregistrées."))
 
-        self._call(lambda: self.service.update(changes), saved, "Coordonnées refusées")
+        self._call(lambda: self.service.update(changes), saved, tr("Coordonnées refusées"))
 
     def change_photo(self):
         path = self.choose_photo(self)
@@ -320,16 +345,16 @@ class AccountDialog(FormDialog):
 
         def done(result):
             self._show_profile(result[0], result[1])
-            self.show_message("success", "Photo mise à jour.")
+            self.show_message("success", tr("Photo mise à jour."))
 
-        self._call(upload, done, "Photo refusée")
+        self._call(upload, done, tr("Photo refusée"))
 
     def remove_photo(self):
         def done(profile):
             self._show_profile(profile, None)
-            self.show_message("success", "Photo retirée.")
+            self.show_message("success", tr("Photo retirée."))
 
-        self._call(self.service.delete_photo, done, "Impossible de retirer la photo")
+        self._call(self.service.delete_photo, done, tr("Impossible de retirer la photo"))
 
     def change_password(self):
         current, new, again = (
@@ -338,19 +363,19 @@ class AccountDialog(FormDialog):
             self.confirm_password.text(),
         )
         if not current or not new:
-            self.show_message("warning", "Saisissez le mot de passe actuel et le nouveau.")
+            self.show_message("warning", tr("Saisissez le mot de passe actuel et le nouveau."))
             return
         if new != again:
-            self.show_message("warning", "La confirmation ne correspond pas au nouveau mot de passe.")
+            self.show_message("warning", tr("La confirmation ne correspond pas au nouveau mot de passe."))
             return
 
         def done(_):
             for field in (self.current_password, self.new_password, self.confirm_password):
                 field.clear()
-            self.show_message("success", "Mot de passe changé. Vos autres appareils ont été déconnectés.")
-            self._call(self.service.sessions, self._show_sessions, "Impossible d'actualiser les appareils")
+            self.show_message("success", tr("Mot de passe changé. Vos autres appareils ont été déconnectés."))
+            self._call(self.service.sessions, self._show_sessions, tr("Impossible d'actualiser les appareils"))
 
-        self._call(lambda: self.service.change_password(current, new), done, "Mot de passe refusé")
+        self._call(lambda: self.service.change_password(current, new), done, tr("Mot de passe refusé"))
 
     def revoke_selected(self):
         session = self.selected_session()
@@ -359,20 +384,20 @@ class AccountDialog(FormDialog):
 
         def done(sessions):
             self._show_sessions(sessions)
-            self.show_message("success", f"« {session.device_name} » est déconnecté.")
+            self.show_message("success", tr("« {0} » est déconnecté.", session.device_name))
 
         def revoke():
             self.service.revoke(session.id)
             return self.service.sessions()
 
-        self._call(revoke, done, "Impossible de déconnecter l'appareil")
+        self._call(revoke, done, tr("Impossible de déconnecter l'appareil"))
 
     def revoke_all(self):
         if not self.confirm(
             self,
-            "Déconnecter tous mes appareils",
-            "Tous vos appareils, ce poste compris, devront se reconnecter.",
-            confirm_text="Tout déconnecter",
+            tr("Déconnecter tous mes appareils"),
+            tr("Tous vos appareils, ce poste compris, devront se reconnecter."),
+            confirm_text=tr("Tout déconnecter"),
             danger=True,
         ):
             return
@@ -381,4 +406,4 @@ class AccountDialog(FormDialog):
             self.accept()
             self.signed_out.emit()
 
-        self._call(self.service.revoke_all, done, "Impossible de déconnecter vos appareils")
+        self._call(self.service.revoke_all, done, tr("Impossible de déconnecter vos appareils"))
