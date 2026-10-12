@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 
 from ...services.me import FIELD_LABELS, PHOTO_FILTER
 from ..feedback import describe
+from ..theme import THEME_MODES
 from ..widgets import Banner, FormDialog, ask_confirmation, button
 
 ROLE_LABELS = {"ADMIN": "Administrateur", "SUPER_ADMIN": "Super-administrateur", "TEACHER": "Enseignant"}
@@ -46,7 +47,17 @@ class AccountDialog(FormDialog):
     signed_out = Signal()  # every device disconnected, this one included
     session_expired = Signal()
 
-    def __init__(self, service, runner, parent=None, *, choose_photo=choose_photo_file, confirm=ask_confirmation):
+    def __init__(
+        self,
+        service,
+        runner,
+        parent=None,
+        *,
+        choose_photo=choose_photo_file,
+        confirm=ask_confirmation,
+        theme_mode="light",
+        on_theme=None,
+    ):
         super().__init__(
             "Mon compte",
             "Vos coordonnées, votre photo, votre mot de passe et vos appareils connectés.",
@@ -109,6 +120,16 @@ class AccountDialog(FormDialog):
         self.password_button = button("Changer le mot de passe", "secondary")
         self.password_button.clicked.connect(self.change_password)
         self.body.addWidget(self.password_button, 0, Qt.AlignLeft)
+
+        self.add_section("Apparence", "« Système » suit le réglage de Windows. Le choix est gardé sur ce poste.")
+        self.on_theme = on_theme
+        self.theme = QComboBox()
+        for code, label in THEME_MODES.items():
+            self.theme.addItem(label, code)
+        self.theme.setCurrentIndex(max(0, self.theme.findData(theme_mode)))
+        self.theme.setEnabled(on_theme is not None)
+        self.add_field("theme", "Thème", self.theme, width="medium")
+        self.theme.currentIndexChanged.connect(self._theme_chosen)
 
         self.add_section("Appareils connectés")
         self.table = QTableWidget(0, 3)
@@ -255,6 +276,14 @@ class AccountDialog(FormDialog):
         return self.sessions[rows[0].row()] if rows else None
 
     # --- actions ----------------------------------------------------------------------------
+    def _theme_chosen(self, _index):
+        if self.on_theme is None:
+            return
+        if self.on_theme(self.theme.currentData()):
+            self.show_message("success", f"Thème : {self.theme.currentText()}.")
+        else:
+            self.show_message("warning", "Thème appliqué, mais il n'a pas pu être enregistré sur ce poste.")
+
     def values(self):
         result = {}
         for name, widget in self.inputs.items():

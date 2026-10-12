@@ -89,7 +89,7 @@ class _SessionScreenState extends State<SessionScreen> {
                     children: [
                       Text(session.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
                       const SizedBox(height: 4),
-                      Text(session.subject.extra, style: const TextStyle(color: Tokens.textSecondary)),
+                      Text(session.subject.extra, style: TextStyle(color: Tokens.textSecondary)),
                       const SizedBox(height: 12),
                       StatusChip(session.statusLabel, tone: sessionTone(session)),
                       const Divider(height: 28),
@@ -113,7 +113,7 @@ class _SessionScreenState extends State<SessionScreen> {
               ),
               if (!session.cancelled) ...[
                 const SectionTitle('Ma présence'),
-                const Text(
+                Text(
                   'Déclarez votre présence une fois la séance commencée. Elle sera validée par l\'administration.',
                   style: TextStyle(color: Tokens.textSecondary),
                 ),
@@ -142,14 +142,14 @@ class _SessionScreenState extends State<SessionScreen> {
               ],
               SectionTitle('Changements (${changes.length})'),
               if (changes.isEmpty)
-                const Text('Aucun changement pour cette séance.', style: TextStyle(color: Tokens.textSecondary))
+                Text('Aucun changement pour cette séance.', style: TextStyle(color: Tokens.textSecondary))
               else
                 Card(
                   child: Column(
                     children: [
                       for (final change in changes)
                         ListTile(
-                          leading: const Icon(Icons.history, color: Tokens.primary),
+                          leading: Icon(Icons.history, color: Tokens.primary),
                           title: Text(change.label),
                           subtitle: Text(
                             [
@@ -177,7 +177,7 @@ class _SessionScreenState extends State<SessionScreen> {
         const SizedBox(width: 10),
         SizedBox(
           width: 108,
-          child: Text(label, style: const TextStyle(color: Tokens.textSecondary)),
+          child: Text(label, style: TextStyle(color: Tokens.textSecondary)),
         ),
         Expanded(
           child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),

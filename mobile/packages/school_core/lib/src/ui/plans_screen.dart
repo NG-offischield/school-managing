@@ -86,7 +86,7 @@ class _PlanCard extends StatelessWidget {
                 'Version ${plan.number}',
                 if (plan.publishedAt != null) 'publiée le ${dateOnly.format(plan.publishedAt!)}',
               ].join(' · '),
-              style: const TextStyle(color: Tokens.textSecondary, fontSize: 13),
+              style: TextStyle(color: Tokens.textSecondary, fontSize: 13),
             ),
           ],
         ),
@@ -244,9 +244,9 @@ class _PlanViewerScreenState extends State<PlanViewerScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.picture_as_pdf_outlined, size: 56, color: Tokens.primary),
+            Icon(Icons.picture_as_pdf_outlined, size: 56, color: Tokens.primary),
             const SizedBox(height: 12),
-            Text(loaded.plan.details, style: const TextStyle(color: Tokens.textSecondary)),
+            Text(loaded.plan.details, style: TextStyle(color: Tokens.textSecondary)),
             const SizedBox(height: 16),
             FilledButton.icon(
               key: const Key('plan.openPdf'),
@@ -255,7 +255,7 @@ class _PlanViewerScreenState extends State<PlanViewerScreen> {
               label: const Text('Ouvrir le plan (PDF)'),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Le PDF s\'ouvre dans le lecteur du téléphone, où vous pouvez zoomer.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Tokens.textSecondary, fontSize: 12.5),
@@ -287,7 +287,7 @@ class _Header extends StatelessWidget {
               'version ${plan.number}',
               if (plan.publishedAt != null) 'publiée le ${dateOnly.format(plan.publishedAt!)}',
             ].where((p) => p.isNotEmpty).join(' · '),
-            style: const TextStyle(color: Tokens.textSecondary, fontSize: 13),
+            style: TextStyle(color: Tokens.textSecondary, fontSize: 13),
           ),
           if (plan.description.isNotEmpty) ...[const SizedBox(height: 6), Text(plan.description)],
         ],

@@ -85,7 +85,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               backgroundColor: Tokens.primarySoft,
               child: Text(
                 auth.identity?.initials ?? '?',
-                style: const TextStyle(fontSize: 12, color: Tokens.primaryDark, fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 12, color: Tokens.primaryDark, fontWeight: FontWeight.w700),
               ),
             ),
           ),
@@ -100,7 +100,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               'Bonjour ${auth.identity?.firstName ?? ''}',
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
             ),
-            Text(auth.identity?.current?.schoolName ?? '', style: const TextStyle(color: Tokens.textSecondary)),
+            Text(auth.identity?.current?.schoolName ?? '', style: TextStyle(color: Tokens.textSecondary)),
             SectionTitle(
               scope.children.length > 1 ? 'Mes enfants (${scope.children.length})' : 'Mon enfant',
               trailing: TextButton(
@@ -127,13 +127,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Card(
                         color: Tokens.warningBg,
                         child: ListTile(
-                          leading: const Icon(Icons.event_note, color: Tokens.warning),
+                          leading: Icon(Icons.event_note, color: Tokens.warning),
                           title: Text('Convocation · ${c.start == null ? '' : dateTime.format(c.start!)}'),
                           subtitle: Text(c.reason),
                         ),
                       ),
                   if (data.notifications.isEmpty)
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.all(12),
                       child: Text('Aucune notification.', style: TextStyle(color: Tokens.textSecondary)),
                     ),
@@ -219,7 +219,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           shape: child.id == scope.selected?.id
               ? RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
-                  side: const BorderSide(color: Tokens.primary, width: 1.5),
+                  side: BorderSide(color: Tokens.primary, width: 1.5),
                 )
               : null,
           child: ListTile(
@@ -229,13 +229,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
               backgroundColor: Tokens.primarySoft,
               child: Text(
                 child.firstName.isEmpty ? '?' : child.firstName[0],
-                style: const TextStyle(color: Tokens.primaryDark, fontWeight: FontWeight.w700),
+                style: TextStyle(color: Tokens.primaryDark, fontWeight: FontWeight.w700),
               ),
             ),
             title: Text(child.name, style: const TextStyle(fontWeight: FontWeight.w700)),
             subtitle: Text(child.schooling),
             trailing: child.id == scope.selected?.id
-                ? const Icon(Icons.check_circle, color: Tokens.primary, semanticLabel: 'Enfant sélectionné')
+                ? Icon(Icons.check_circle, color: Tokens.primary, semanticLabel: 'Enfant sélectionné')
                 : null,
           ),
         ),

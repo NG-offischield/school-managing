@@ -107,7 +107,7 @@ class ErrorState extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, color: Tokens.text),
+              style: TextStyle(fontSize: 16, color: Tokens.text),
             ),
             const SizedBox(height: 16),
             OutlinedButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh), label: const Text('Réessayer')),
@@ -137,7 +137,7 @@ class EmptyState extends StatelessWidget {
             Text(
               text,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Tokens.textSecondary, fontSize: 15),
+              style: TextStyle(color: Tokens.textSecondary, fontSize: 15),
             ),
           ],
         ),

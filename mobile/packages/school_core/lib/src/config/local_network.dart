@@ -151,7 +151,7 @@ class _LocalNetworkGateState extends State<LocalNetworkGate> with WidgetsBinding
   Widget build(BuildContext context) {
     final status = _status;
     if (status == null) {
-      return const ColoredBox(
+      return ColoredBox(
         color: Tokens.navy,
         child: Center(child: CircularProgressIndicator(color: Colors.white)),
       );
@@ -188,7 +188,7 @@ class _PermissionScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 24),
-              const Icon(Icons.wifi_tethering, size: 56, color: Tokens.primary),
+              Icon(Icons.wifi_tethering, size: 56, color: Tokens.primary),
               const SizedBox(height: 16),
               const Text(
                 'Accès au réseau local',
@@ -248,7 +248,7 @@ class ConfigErrorApp extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 24),
-              const Icon(Icons.dns_outlined, size: 56, color: Tokens.error),
+              Icon(Icons.dns_outlined, size: 56, color: Tokens.error),
               const SizedBox(height: 16),
               const Text(
                 'Configuration du serveur',

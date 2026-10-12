@@ -85,7 +85,7 @@ class _ChildAttendanceState extends State<_ChildAttendance> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
             Text(widget.child.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            Text(widget.child.schooling, style: const TextStyle(color: Tokens.textSecondary)),
+            Text(widget.child.schooling, style: TextStyle(color: Tokens.textSecondary)),
             const SectionTitle('Bilan de l\'année'),
             Card(
               child: Padding(
@@ -112,7 +112,7 @@ class _ChildAttendanceState extends State<_ChildAttendance> {
               for (final c in data.convocations)
                 Card(
                   child: ListTile(
-                    leading: const Icon(Icons.event_note, color: Tokens.warning),
+                    leading: Icon(Icons.event_note, color: Tokens.warning),
                     title: Text(c.start == null ? 'Convocation' : capitalize(dayLong.format(c.start!))),
                     subtitle: Text(
                       '${c.start == null ? '' : hm.format(c.start!)}${c.end == null ? '' : ' – ${hm.format(c.end!)}'}'
@@ -130,7 +130,7 @@ class _ChildAttendanceState extends State<_ChildAttendance> {
                     for (final s in data.scans.take(5))
                       ListTile(
                         dense: true,
-                        leading: const Icon(Icons.qr_code_2, color: Tokens.textSecondary),
+                        leading: Icon(Icons.qr_code_2, color: Tokens.textSecondary),
                         title: Text(s.at == null ? '' : dateTime.format(s.at!)),
                         subtitle: Text(scanResults[s.result] ?? s.result),
                       ),
@@ -140,7 +140,7 @@ class _ChildAttendanceState extends State<_ChildAttendance> {
             ],
             const SectionTitle('Historique'),
             if (data.report.days.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.all(8),
                 child: Text('Aucun relevé pour cette année.', style: TextStyle(color: Tokens.textSecondary)),
               ),

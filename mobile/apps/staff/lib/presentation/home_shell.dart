@@ -179,10 +179,10 @@ class _StaffHomeState extends State<StaffHome> {
                 'Bonjour ${auth.identity?.firstName ?? ''}',
                 style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
               ),
-              Text(auth.identity?.current?.schoolName ?? '', style: const TextStyle(color: Tokens.textSecondary)),
+              Text(auth.identity?.current?.schoolName ?? '', style: TextStyle(color: Tokens.textSecondary)),
               const _Title('Mes fonctions'),
               if (data.me == null || data.me!.functions.isEmpty)
-                const Text('Aucune fonction attribuée.', style: TextStyle(color: Tokens.textSecondary))
+                Text('Aucune fonction attribuée.', style: TextStyle(color: Tokens.textSecondary))
               else
                 Wrap(
                   spacing: 6,
@@ -193,7 +193,7 @@ class _StaffHomeState extends State<StaffHome> {
               Card(
                 child: ListTile(
                   key: const Key('home.today'),
-                  leading: const Icon(Icons.calendar_today, color: Tokens.primary),
+                  leading: Icon(Icons.calendar_today, color: Tokens.primary),
                   title: Text('${data.today.length} séance(s) au planning'),
                   subtitle: Text(cancelled == 0 ? 'Aucune annulation' : '$cancelled annulation(s)'),
                   trailing: const Icon(Icons.chevron_right),
@@ -205,7 +205,7 @@ class _StaffHomeState extends State<StaffHome> {
                 for (final b in data.breaks)
                   Card(
                     child: ListTile(
-                      leading: const Icon(Icons.event_busy, color: Tokens.warning),
+                      leading: Icon(Icons.event_busy, color: Tokens.warning),
                       title: Text(b.name),
                       subtitle: Text(
                         '${b.typeLabel} · ${b.start == null ? '' : dateOnly.format(b.start!)}'
@@ -216,7 +216,7 @@ class _StaffHomeState extends State<StaffHome> {
               ],
               const _Title('Dernières notifications'),
               if (data.notifications.isEmpty)
-                const Text('Aucune notification.', style: TextStyle(color: Tokens.textSecondary)),
+                Text('Aucune notification.', style: TextStyle(color: Tokens.textSecondary)),
               for (final n in data.notifications)
                 Card(
                   child: ListTile(
@@ -312,7 +312,7 @@ class _StaffPlanningState extends State<StaffPlanning> {
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                   children: [
                     if (data.sessions.isEmpty)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.all(12),
                         child: Text('Aucune séance.', style: TextStyle(color: Tokens.textSecondary)),
                       ),
@@ -325,7 +325,7 @@ class _StaffPlanningState extends State<StaffPlanning> {
                       for (final c in data.changes)
                         Card(
                           child: ListTile(
-                            leading: const Icon(Icons.change_circle_outlined, color: Tokens.warning),
+                            leading: Icon(Icons.change_circle_outlined, color: Tokens.warning),
                             title: Text(c.typeLabel),
                             subtitle: Text(
                               [
@@ -418,12 +418,12 @@ class _StaffProfileState extends State<StaffProfile> {
                     backgroundColor: Tokens.primary,
                     child: Text(
                       identity.initials,
-                      style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
+                      style: TextStyle(color: Tokens.onPrimary, fontSize: 22, fontWeight: FontWeight.w700),
                     ),
                   ),
                   const SizedBox(height: 10),
                   Text(identity.fullName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-                  Text(identity.username, style: const TextStyle(color: Tokens.textSecondary)),
+                  Text(identity.username, style: TextStyle(color: Tokens.textSecondary)),
                   FutureBuilder<StaffMe?>(
                     future: _future,
                     builder: (context, snapshot) {
@@ -489,7 +489,7 @@ class _StaffProfileState extends State<StaffProfile> {
             key: const Key('profile.logout'),
             style: OutlinedButton.styleFrom(
               foregroundColor: Tokens.error,
-              side: const BorderSide(color: Tokens.error),
+              side: BorderSide(color: Tokens.error),
             ),
             onPressed: () => auth.logout(),
             icon: const Icon(Icons.logout),

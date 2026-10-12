@@ -5,6 +5,8 @@ Backend URL, by priority:
     2. `api_url` in the user config file (see config_dir(): desktop.json)
     3. default http://127.0.0.1:8000/api/v1/ (development backend)
 
+Display preference: `theme` = "system" (follows Windows, default) | "light" | "dark".
+
 Nothing secret lives here: no password, no token (tokens: auth/token_store).
 """
 
@@ -18,6 +20,7 @@ from urllib.parse import urlparse
 DEFAULT_API_URL = "http://127.0.0.1:8000/api/v1/"
 APP_DIR_NAME = "SchoolManagingDesktop"
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+THEMES = ("system", "light", "dark")
 
 
 def config_dir():
@@ -36,6 +39,7 @@ class AppConfig:
     api_url: str = DEFAULT_API_URL
     timeout: float = 10.0
     language: str = "fr"
+    theme: str = "system"
 
     @property
     def insecure_transport(self):
@@ -62,4 +66,25 @@ def load_config(env=None, directory=None):
             values = {}
     api_url = env.get("SCHOOL_ADMIN_API_URL") or values.get("api_url") or DEFAULT_API_URL
     timeout = float(env.get("SCHOOL_ADMIN_TIMEOUT") or values.get("timeout") or 10.0)
-    return AppConfig(api_url=_normalise(api_url), timeout=timeout, language=values.get("language", "fr"))
+    theme = values.get("theme") if values.get("theme") in THEMES else "system"
+    return AppConfig(api_url=_normalise(api_url), timeout=timeout, language=values.get("language", "fr"), theme=theme)
+
+
+def save_preference(key, value, directory=None):
+    """Writes ONE display preference into desktop.json, keeping the other keys
+    (api_url...). Returns False when the file cannot be read or written (the
+    choice then lasts until the application closes; the file is left as is)."""
+    path = Path(directory or config_dir()) / "desktop.json"
+    try:
+        values = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    except (OSError, ValueError):
+        return False  # unreadable: never overwrite the user's file (api_url...)
+    if not isinstance(values, dict):
+        return False
+    values[key] = value
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(values, indent=2, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        return False
+    return True

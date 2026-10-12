@@ -429,7 +429,7 @@ class _ForumThreadScreenState extends State<ForumThreadScreen> {
                                         padding: const EdgeInsets.only(top: 4),
                                         child: Text(
                                           dateTime.format(p.createdAt!),
-                                          style: const TextStyle(fontSize: 12, color: Tokens.textSecondary),
+                                          style: TextStyle(fontSize: 12, color: Tokens.textSecondary),
                                         ),
                                       ),
                                   ],
@@ -545,7 +545,7 @@ class _NewForumThreadScreenState extends State<NewForumThreadScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text(
+          Text(
             'Une discussion visible par les membres de l\'espace choisi. Pour une question personnelle, utilisez '
             'plutôt les messages privés.',
             style: TextStyle(color: Tokens.textSecondary),
@@ -629,7 +629,7 @@ class _Empty extends StatelessWidget {
           Text(
             text,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Tokens.textSecondary),
+            style: TextStyle(color: Tokens.textSecondary),
           ),
         ],
       ),

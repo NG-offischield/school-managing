@@ -95,7 +95,7 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
           ),
           if (_toTeacher && child != null) ...[
             const SizedBox(height: 14),
-            Text('Au sujet de ${child.name}', style: const TextStyle(color: Tokens.textSecondary)),
+            Text('Au sujet de ${child.name}', style: TextStyle(color: Tokens.textSecondary)),
             const SizedBox(height: 8),
             FutureBuilder<List<TeacherContact>>(
               future: _teachers,

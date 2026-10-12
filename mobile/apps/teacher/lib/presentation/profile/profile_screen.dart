@@ -27,12 +27,12 @@ class ProfileScreen extends StatelessWidget {
                     backgroundColor: Tokens.primary,
                     child: Text(
                       identity.initials,
-                      style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
+                      style: TextStyle(color: Tokens.onPrimary, fontSize: 22, fontWeight: FontWeight.w700),
                     ),
                   ),
                   const SizedBox(height: 10),
                   Text(identity.fullName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-                  Text(identity.username, style: const TextStyle(color: Tokens.textSecondary)),
+                  Text(identity.username, style: TextStyle(color: Tokens.textSecondary)),
                 ],
               ),
             ),
@@ -79,7 +79,7 @@ class ProfileScreen extends StatelessWidget {
             key: const Key('profile.logout'),
             style: OutlinedButton.styleFrom(
               foregroundColor: Tokens.error,
-              side: const BorderSide(color: Tokens.error),
+              side: BorderSide(color: Tokens.error),
             ),
             onPressed: () => auth.logout(),
             icon: const Icon(Icons.logout),
@@ -88,7 +88,7 @@ class ProfileScreen extends StatelessWidget {
           const SizedBox(height: 28),
           const Center(child: SoftwareBrand(size: 18, subtitle: 'Application enseignant · version 0.1.0')),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Les documents officiels (bulletins, emplois du temps…) portent l\'identité de votre établissement.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Tokens.textSecondary, fontSize: 12.5),

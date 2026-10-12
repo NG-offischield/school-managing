@@ -31,7 +31,10 @@ from PySide6.QtWidgets import (
 from .theme import TOKENS, TYPE
 from .widgets import button, set_variant
 
-SERIES_COLOURS = (TOKENS.chart_1, TOKENS.chart_2, TOKENS.chart_3)
+
+def series_colours():
+    """Read when painting: follows the active theme."""
+    return (TOKENS.chart_1, TOKENS.chart_2, TOKENS.chart_3)
 
 
 def nice_ceiling(value, ticks=4):
@@ -172,7 +175,8 @@ class LineChart(ChartBase):
     def draw_series(self, painter, rect):
         points = self.data.points
         for serie in range(len(self.data.series)):
-            colour = QColor(SERIES_COLOURS[serie % len(SERIES_COLOURS)])
+            colours = series_colours()
+            colour = QColor(colours[serie % len(colours)])
             path = QPainterPath()
             coords = [QPointF(self.x_at(i, rect), self.y_at(p.values[serie], rect)) for i, p in enumerate(points)]
             path.moveTo(coords[0])
@@ -242,8 +246,7 @@ class BarChart(ChartBase):
 
 def legend_html(series):
     return "&nbsp;&nbsp;&nbsp;".join(
-        f"<span style='color:{SERIES_COLOURS[i % len(SERIES_COLOURS)]}'>■</span>&nbsp;{name}"
-        for i, name in enumerate(series)
+        f"<span style='color:{series_colours()[i % 3]}'>■</span>&nbsp;{name}" for i, name in enumerate(series)
     )
 
 

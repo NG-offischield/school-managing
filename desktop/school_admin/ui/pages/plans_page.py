@@ -17,13 +17,13 @@ from ...services.plans import FILE_FILTER
 from ..dialogs.plan_dialogs import DiffusionDialog, PlanDialog, PreviewDialog, VersionsDialog
 from ..dialogs.teacher_dialogs import ask_reason
 from ..feedback import describe
-from ..theme import TOKENS
+from ..theme import TOKENS, TokenColours
 from ..widgets import button
 from .catalog_base import STATUS_COLUMN_TITLE, CatalogPage
 from .finance_page import coloured
 
 ALL_BUILDINGS = "Tous les bâtiments"
-STATUS_COLOURS = {"PUBLISHED": TOKENS.success, "WITHDRAWN": TOKENS.text_secondary, "DRAFT": TOKENS.warning}
+STATUS_COLOURS = TokenColours(PUBLISHED="success", WITHDRAWN="text_secondary", DRAFT="warning")
 
 
 def choose_plan_file(parent):

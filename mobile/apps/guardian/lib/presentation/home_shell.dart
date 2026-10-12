@@ -187,12 +187,12 @@ class _GuardianHomeState extends State<GuardianHome> {
                 'Bonjour ${auth.identity?.firstName ?? ''}',
                 style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
               ),
-              Text(auth.identity?.current?.schoolName ?? '', style: const TextStyle(color: Tokens.textSecondary)),
+              Text(auth.identity?.current?.schoolName ?? '', style: TextStyle(color: Tokens.textSecondary)),
               const SizedBox(height: 14),
               Card(
                 child: ListTile(
                   key: const Key('home.scans'),
-                  leading: const Icon(Icons.how_to_reg, color: Tokens.primary),
+                  leading: Icon(Icons.how_to_reg, color: Tokens.primary),
                   title: Text('$accepted arrivée(s) enregistrée(s) aujourd\'hui'),
                   subtitle: Text('${data.todayScans.length} passage(s) au total, par vous'),
                   trailing: const Icon(Icons.chevron_right),
@@ -211,7 +211,7 @@ class _GuardianHomeState extends State<GuardianHome> {
                 for (final b in data.breaks)
                   Card(
                     child: ListTile(
-                      leading: const Icon(Icons.event_busy, color: Tokens.warning),
+                      leading: Icon(Icons.event_busy, color: Tokens.warning),
                       title: Text(b.name),
                       subtitle: Text(
                         '${b.typeLabel} · ${b.start == null ? '' : dateOnly.format(b.start!)}'
@@ -222,7 +222,7 @@ class _GuardianHomeState extends State<GuardianHome> {
               ],
               const _Title('Dernières notifications'),
               if (data.notifications.isEmpty)
-                const Text('Aucune notification.', style: TextStyle(color: Tokens.textSecondary)),
+                Text('Aucune notification.', style: TextStyle(color: Tokens.textSecondary)),
               for (final n in data.notifications)
                 Card(
                   child: ListTile(
@@ -279,12 +279,12 @@ class GuardianProfile extends StatelessWidget {
                     backgroundColor: Tokens.primary,
                     child: Text(
                       identity.initials,
-                      style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
+                      style: TextStyle(color: Tokens.onPrimary, fontSize: 22, fontWeight: FontWeight.w700),
                     ),
                   ),
                   const SizedBox(height: 10),
                   Text(identity.fullName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-                  Text(identity.username, style: const TextStyle(color: Tokens.textSecondary)),
+                  Text(identity.username, style: TextStyle(color: Tokens.textSecondary)),
                 ],
               ),
             ),
@@ -322,7 +322,7 @@ class GuardianProfile extends StatelessWidget {
             key: const Key('profile.logout'),
             style: OutlinedButton.styleFrom(
               foregroundColor: Tokens.error,
-              side: const BorderSide(color: Tokens.error),
+              side: BorderSide(color: Tokens.error),
             ),
             onPressed: () => auth.logout(),
             icon: const Icon(Icons.logout),

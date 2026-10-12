@@ -8,7 +8,7 @@ from ..api.client import ApiClient
 from ..auth.device import device_info
 from ..auth.session import AuthService
 from ..auth.token_store import KeyringTokenStore
-from ..config import load_config
+from ..config import load_config, save_preference
 from ..realtime import RealtimeClient, socket_url
 from ..services.accounts import AccountService
 from ..services.catalog import CategoryService, SubjectService
@@ -44,7 +44,7 @@ from .pages.structure_pages import LevelsPage, YearsPage
 from .pages.students_page import StudentsPage
 from .pages.teachers_page import TeachersPage
 from .tasks import TaskRunner
-from .theme import apply_theme
+from .theme import THEME_MODES, apply_theme, follow_system_scheme
 
 
 class AppController:
@@ -54,6 +54,7 @@ class AppController:
         self.realtime = None
         self.api, self.auth, self.runner, self.config = api, auth, runner, config
         self.page_options = page_options or {}  # test hooks (dialogs, confirmation)
+        self.config_directory = None  # desktop.json location (None = the user's; tests: a temp dir)
         self.categories = CategoryService(api)
         self.subjects = SubjectService(api)
         self.dashboard = DashboardService(api)
@@ -175,10 +176,23 @@ class AppController:
         self.main_window.show()
 
     def account_dialog(self):
-        dialog = AccountDialog(self.me, self.runner, self.main_window)
+        dialog = AccountDialog(
+            self.me, self.runner, self.main_window, theme_mode=self.theme_mode(), on_theme=self.set_theme
+        )
         dialog.signed_out.connect(self.logout)  # every device disconnected: this one too
         dialog.session_expired.connect(lambda: self.show_login("Votre session a expiré : reconnectez-vous."))
         return dialog
+
+    def theme_mode(self):
+        app = QApplication.instance()
+        return (app.property("theme_mode") if app else None) or self.config.theme
+
+    def set_theme(self, mode):
+        """Applied at once (open windows re-themed) and kept in desktop.json."""
+        if mode not in THEME_MODES:
+            return False
+        apply_theme(QApplication.instance(), mode)
+        return save_preference("theme", mode, self.config_directory)
 
     def open_account(self):
         self.account_dialog().exec()
@@ -195,8 +209,9 @@ def main(argv=None):
     app = QApplication(argv if argv is not None else sys.argv)
     app.setApplicationName(SOFTWARE_NAME)
     app.setWindowIcon(software_icon())
-    apply_theme(app)
     config = load_config()
+    apply_theme(app, config.theme)  # Système (default) / Clair / Sombre, desktop.json
+    follow_system_scheme(app)
     api = ApiClient(config.api_url, timeout=config.timeout, language=config.language)
     auth = AuthService(api, device_info(), persistent_store=KeyringTokenStore(config.api_url))
     controller = AppController(

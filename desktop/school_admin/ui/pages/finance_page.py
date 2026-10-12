@@ -42,13 +42,13 @@ from ..dialogs.finance_dialogs import (
     RefundDialog,
 )
 from ..dialogs.teacher_dialogs import ask_reason
-from ..theme import TOKENS
+from ..theme import TOKENS, TokenColours
 from ..widgets import Page, button
 from .catalog_base import STATUS_COLUMN_TITLE, CatalogPage, PagedCatalogPage
 from .dashboard_page import MetricCard
 from .planning_page import _combo
 
-PAYMENT_COLOURS = {"SUCCEEDED": TOKENS.success, "PENDING": TOKENS.warning}
+PAYMENT_COLOURS = TokenColours(SUCCEEDED="success", PENDING="warning")
 
 
 def coloured(text, colour, tooltip=""):

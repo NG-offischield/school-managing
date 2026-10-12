@@ -153,7 +153,7 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Parents vérifiés des élèves de vos classes.', style: TextStyle(color: Tokens.textSecondary)),
+            Text('Parents vérifiés des élèves de vos classes.', style: TextStyle(color: Tokens.textSecondary)),
             const SizedBox(height: 8),
             TextField(
               key: const Key('contacts.filter'),
@@ -176,7 +176,7 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
                         child: Text(pupil.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                       ),
                       if (pupil.parents.isEmpty)
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.fromLTRB(16, 2, 16, 8),
                           child: Text('Aucun parent vérifié.', style: TextStyle(color: Tokens.textSecondary)),
                         ),

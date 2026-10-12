@@ -19,7 +19,7 @@ from ...models import EMPLOYEE_KINDS, PAYROLL_STATUSES, PERIOD_STATUSES
 from ...money import format_money
 from ..dialogs.payroll_dialogs import WORKFLOW, AdjustmentDialog, PayDialog, PayrollDetailDialog, PeriodDialog
 from ..dialogs.teacher_dialogs import ask_reason
-from ..theme import TOKENS
+from ..theme import TOKENS, TokenColours
 from ..widgets import Page, button
 from .catalog_base import STATUS_COLUMN_TITLE, CatalogPage
 from .finance_page import coloured, money_cell
@@ -30,7 +30,7 @@ WARNINGS = {
     "missing_salary": "employé(s) sans salaire défini",
     "adjustment_deferred": "correction(s) reportée(s) (paie insuffisante)",
 }
-PAYROLL_COLOURS = {"CALCULATED": TOKENS.warning, "APPROVED": TOKENS.primary, "PAID": TOKENS.success}
+PAYROLL_COLOURS = TokenColours(CALCULATED="warning", APPROVED="primary", PAID="success")
 
 
 def calculation_text(summary):

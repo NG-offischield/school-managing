@@ -169,25 +169,41 @@ class _Client extends http.BaseClient {
   }
 }
 
-Future<AuthService> pump(WidgetTester tester, FakeAccountServer server, {ImageChooser? choose}) async {
+Future<AuthService> pump(WidgetTester tester, FakeAccountServer server, {ImageChooser? choose}) =>
+    pumpAccountWith(tester, server, choose: choose);
+
+/// « Mon compte » in a themed app ([theme] provided like main() does).
+Future<AuthService> pumpAccountWith(
+  WidgetTester tester,
+  FakeAccountServer server, {
+  ImageChooser? choose,
+  ThemeController? theme,
+}) async {
   tester.view.physicalSize = const Size(1080, 2400);
   tester.view.devicePixelRatio = 2.6;
   addTearDown(tester.view.reset);
   final api = ApiClient(baseUrl: 'http://h/api/v1/', client: _Client(server))..accessToken = 'acc';
   final auth = AuthService(api, MemoryTokenStore());
+  final app = Builder(
+    builder: (context) => MaterialApp(
+      theme: buildAppTheme(),
+      darkTheme: buildAppTheme(brightness: Brightness.dark),
+      themeMode: themeModeOf(context),
+      builder: themedScreens,
+      locale: const Locale('fr', 'FR'),
+      supportedLocales: const [Locale('fr', 'FR')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      home: AccountScreen(chooseImage: choose ?? () async => null),
+    ),
+  );
   await tester.pumpWidget(
     ChangeNotifierProvider<AuthService>.value(
       value: auth,
-      child: MaterialApp(
-        locale: const Locale('fr', 'FR'),
-        supportedLocales: const [Locale('fr', 'FR')],
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        home: AccountScreen(chooseImage: choose ?? () async => null),
-      ),
+      child: theme == null ? app : ChangeNotifierProvider<ThemeController>.value(value: theme, child: app),
     ),
   );
   await tester.pumpAndSettle();

@@ -168,10 +168,10 @@ class _SignInScreenState extends State<SignInScreen> {
                           key: const Key('login.submit'),
                           onPressed: _ready ? _submit : null,
                           child: _busy
-                              ? const SizedBox(
+                              ? SizedBox(
                                   width: 22,
                                   height: 22,
-                                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Tokens.onPrimary),
                                 )
                               : const Text('Se connecter'),
                         ),
@@ -181,7 +181,7 @@ class _SignInScreenState extends State<SignInScreen> {
                         Text(
                           alternative.hint,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(color: Tokens.textSecondary),
+                          style: TextStyle(color: Tokens.textSecondary),
                         ),
                         const SizedBox(height: 10),
                         OutlinedButton.icon(
@@ -196,7 +196,7 @@ class _SignInScreenState extends State<SignInScreen> {
                           'Serveur : ${server.hasPort ? '${server.host}:${server.port}' : server.host}',
                           key: const Key('login.server'),
                           textAlign: TextAlign.center,
-                          style: const TextStyle(color: Tokens.textSecondary, fontSize: 12),
+                          style: TextStyle(color: Tokens.textSecondary, fontSize: 12),
                         ),
                         // Another network, another PC address: change it here, no rebuild (ServerHost).
                         if (ServerScope.maybeOf(context) case final control?)

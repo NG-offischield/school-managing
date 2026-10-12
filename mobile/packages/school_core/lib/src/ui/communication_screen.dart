@@ -150,7 +150,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
             Text(notification.message, style: const TextStyle(fontSize: 15)),
             const SizedBox(height: 10),
             if (notification.at != null)
-              Text(dateTime.format(notification.at!), style: const TextStyle(color: Tokens.textSecondary)),
+              Text(dateTime.format(notification.at!), style: TextStyle(color: Tokens.textSecondary)),
             if (notification.threadId != null) ...[
               const SizedBox(height: 16),
               FilledButton.icon(

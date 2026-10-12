@@ -29,6 +29,9 @@ class StaffApp extends StatelessWidget {
         title: 'School Managing — Personnel',
         debugShowCheckedModeBanner: false,
         theme: buildAppTheme(),
+        darkTheme: buildAppTheme(brightness: Brightness.dark),
+        themeMode: themeModeOf(context),
+        builder: themedScreens,
         locale: const Locale('fr', 'FR'),
         supportedLocales: const [Locale('fr', 'FR')],
         localizationsDelegates: const [
@@ -51,7 +54,7 @@ class AuthGate extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthService>();
     return switch (auth.status) {
-      AuthStatus.restoring => const Scaffold(
+      AuthStatus.restoring => Scaffold(
         backgroundColor: Tokens.navy,
         body: Center(child: SoftwareBrand(light: true, size: 30, subtitle: 'Espace personnel')),
       ),

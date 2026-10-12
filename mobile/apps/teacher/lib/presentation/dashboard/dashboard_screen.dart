@@ -100,7 +100,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   backgroundColor: Tokens.primary,
                   child: Text(
                     identity.initials,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                    style: TextStyle(color: Tokens.onPrimary, fontWeight: FontWeight.w700),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -164,7 +164,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 for (final course in data.courses)
                   ListTile(
-                    leading: const Icon(Icons.menu_book_outlined, color: Tokens.primary),
+                    leading: Icon(Icons.menu_book_outlined, color: Tokens.primary),
                     title: Text(
                       '${course.subjectCode} — ${course.className}',
                       style: const TextStyle(fontWeight: FontWeight.w600),
@@ -187,7 +187,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _payRow('Acquise (validée)', data.pay!.earned, '${data.pay!.sessions['validated'] ?? 0} séance(s)'),
                   _payRow('Payée', data.pay!.paid, '${data.pay!.sessions['paid'] ?? 0} séance(s)'),
                   const SizedBox(height: 6),
-                  const Text(
+                  Text(
                     'Calculée par l\'établissement ; une séance n\'est acquise qu\'après validation.',
                     style: TextStyle(color: Tokens.textSecondary, fontSize: 12.5),
                   ),
@@ -209,7 +209,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         Text(formatMoney(amount), style: const TextStyle(fontWeight: FontWeight.w700)),
         const SizedBox(width: 8),
-        Text(detail, style: const TextStyle(color: Tokens.textSecondary, fontSize: 12.5)),
+        Text(detail, style: TextStyle(color: Tokens.textSecondary, fontSize: 12.5)),
       ],
     ),
   );
@@ -243,9 +243,9 @@ class _Metric extends StatelessWidget {
             children: [
               Text(
                 value,
-                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Tokens.navy),
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Tokens.navy),
               ),
-              Text(label, style: const TextStyle(color: Tokens.textSecondary)),
+              Text(label, style: TextStyle(color: Tokens.textSecondary)),
             ],
           ),
         ),

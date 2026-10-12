@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
 from .branding import SOFTWARE_NAME, SOFTWARE_TAGLINE, brand_mark, software_icon
 from .navigation import NAVIGATION
 from .pages.placeholder_page import PlaceholderPage
-from .theme import TOKENS, TYPE
+from .theme import TOKENS, TYPE, theme_events
 from .widgets import button
 
 
@@ -119,6 +119,8 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(root)
 
         self.pages = {}
+        theme_events().changed.connect(self.refresh_theme)
+        self._theme_connected = True
         self._build_navigation(page_factories, runner)
         self.nav.currentItemChanged.connect(self._navigate)
         shortcuts = (
@@ -135,6 +137,21 @@ class MainWindow(QMainWindow):
         for index, key in enumerate(shortcuts, start=1):
             QShortcut(QKeySequence(f"Ctrl+{index}"), self, activated=lambda k=key: self.open(k))
         self.open("dashboard")
+
+    def refresh_theme(self, _name=None):
+        """A theme switch: the style sheet already re-themed the widgets; pages
+        reload so the colours they put in table cells follow too."""
+        if not self.isVisible():
+            return
+        for page in self.pages.values():
+            page.reload()
+
+    def closeEvent(self, event):
+        # A closed shell (logout, session expiry) never reacts to a theme switch again.
+        if self._theme_connected:  # closed twice (logout then quit): disconnect once only
+            self._theme_connected = False
+            theme_events().changed.disconnect(self.refresh_theme)
+        super().closeEvent(event)
 
     def show_about(self):
         from .dialogs.about_dialog import AboutDialog

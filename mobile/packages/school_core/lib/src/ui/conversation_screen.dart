@@ -187,21 +187,30 @@ class _Bubble extends StatelessWidget {
             if (!mine)
               Text(
                 message.sender,
-                style: const TextStyle(fontWeight: FontWeight.w700, color: Tokens.navy, fontSize: 13),
+                style: TextStyle(fontWeight: FontWeight.w700, color: Tokens.navy, fontSize: 13),
               ),
             Text(
               message.body ?? '[Message masqué]',
               style: TextStyle(
-                color: mine ? Colors.white : Tokens.text,
+                color: mine ? Tokens.onPrimary : Tokens.text,
                 fontStyle: message.body == null ? FontStyle.italic : null,
               ),
             ),
             for (final name in message.attachments)
-              Text('📎 $name', style: TextStyle(color: mine ? Colors.white70 : Tokens.textSecondary, fontSize: 13)),
+              Text(
+                '📎 $name',
+                style: TextStyle(
+                  color: mine ? Tokens.onPrimary.withValues(alpha: 0.8) : Tokens.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
             if (message.at != null)
               Text(
                 hm.format(message.at!),
-                style: TextStyle(color: mine ? Colors.white70 : Tokens.textSecondary, fontSize: 11.5),
+                style: TextStyle(
+                  color: mine ? Tokens.onPrimary.withValues(alpha: 0.8) : Tokens.textSecondary,
+                  fontSize: 11.5,
+                ),
               ),
           ],
         ),

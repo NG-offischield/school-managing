@@ -183,7 +183,7 @@ class _ServerHostState extends State<ServerHost> implements ServerControl {
   Widget build(BuildContext context) {
     final resolution = _resolution;
     if (resolution == null) {
-      return const ColoredBox(
+      return ColoredBox(
         color: Tokens.navy,
         child: Center(child: CircularProgressIndicator(color: Colors.white)),
       );
@@ -195,6 +195,9 @@ class _ServerHostState extends State<ServerHost> implements ServerControl {
         ? MaterialApp(
             debugShowCheckedModeBanner: false,
             theme: buildAppTheme(),
+            darkTheme: buildAppTheme(brightness: Brightness.dark),
+            themeMode: themeModeOf(context),
+            builder: themedScreens,
             home: ServerSettingsScreen(control: this, firstRun: true),
           )
         : LocalNetworkGate(config: config, onReady: session.onReady, access: widget.access, child: session.app);
@@ -281,7 +284,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
             ),
             if (!verified) ...[
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 'La connexion à ce serveur n\'a pas été vérifiée.',
                 style: TextStyle(color: Tokens.warning, fontWeight: FontWeight.w600),
               ),
@@ -343,7 +346,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
           ),
           if (clearText) ...[
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'HTTP non chiffré : réservé au réseau local de confiance de l\'établissement, '
               'jamais pour un serveur exposé sur Internet.',
               style: TextStyle(color: Tokens.textSecondary, fontSize: 12),

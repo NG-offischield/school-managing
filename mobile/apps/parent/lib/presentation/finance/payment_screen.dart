@@ -278,7 +278,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               if (payment.at != null) InfoRow('Date', dateTime.format(payment.at!)),
               if (payment.failureReason != null) InfoRow('Motif du refus', payment.failureReason!),
               if (payment.replayed)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(top: 6),
                   child: Text(
                     'Ce paiement avait déjà été enregistré : aucun second débit.',

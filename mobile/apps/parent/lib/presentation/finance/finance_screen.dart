@@ -119,7 +119,7 @@ class _ChildFinanceState extends State<_ChildFinance> {
               ..._obligations(data.obligations!, data.invoices),
             const SectionTitle('Historique des paiements'),
             if (data.payments.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.all(8),
                 child: Text('Aucun paiement.', style: TextStyle(color: Tokens.textSecondary)),
               ),
@@ -170,7 +170,7 @@ class _ChildFinanceState extends State<_ChildFinance> {
     ),
     const SectionTitle('Factures'),
     if (invoices.isEmpty)
-      const Padding(
+      Padding(
         padding: EdgeInsets.all(8),
         child: Text('Aucune facture.', style: TextStyle(color: Tokens.textSecondary)),
       ),

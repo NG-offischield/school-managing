@@ -119,7 +119,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget _received(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      const Icon(Icons.mark_email_read_outlined, size: 56, color: Tokens.success),
+      Icon(Icons.mark_email_read_outlined, size: 56, color: Tokens.success),
       const SizedBox(height: 16),
       const Text(
         'Demande enregistrée',
@@ -127,7 +127,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
       ),
       const SizedBox(height: 10),
-      const Text(
+      Text(
         'L\'établissement va valider votre compte. Vous pouvez déjà vous connecter pour suivre la demande ; '
         'vous rattacherez ensuite votre enfant (pièce d\'identité vérifiée à l\'école).',
         textAlign: TextAlign.center,
@@ -146,7 +146,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
+        Text(
           'Votre compte sera validé par l\'établissement. Aucune donnée d\'élève n\'est visible avant la '
           'vérification de votre lien avec l\'enfant.',
           style: TextStyle(color: Tokens.textSecondary),
@@ -212,10 +212,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           key: const Key('register.submit'),
           onPressed: _ready ? _submit : null,
           child: _busy
-              ? const SizedBox(
+              ? SizedBox(
                   width: 22,
                   height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Tokens.onPrimary),
                 )
               : const Text('Créer mon compte'),
         ),

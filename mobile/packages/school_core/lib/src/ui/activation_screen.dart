@@ -110,7 +110,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
   }
 
   List<Widget> _codeStep() => [
-    const Text(
+    Text(
       'Étape 1 sur 2',
       style: TextStyle(color: Tokens.textSecondary, fontWeight: FontWeight.w600),
     ),
@@ -145,7 +145,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
         ? ''
         : DateFormat('dd/MM/yyyy HH:mm', 'fr_FR').format(preview.expiresAt!.toLocal());
     return [
-      const Text(
+      Text(
         'Étape 2 sur 2',
         style: TextStyle(color: Tokens.textSecondary, fontWeight: FontWeight.w600),
       ),
@@ -158,7 +158,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
         style: const TextStyle(fontSize: 15, height: 1.4),
       ),
       const SizedBox(height: 18),
-      const Text(
+      Text(
         'Choisissez votre mot de passe : au moins 10 caractères, ni trop courant, ni proche de votre nom.',
         style: TextStyle(color: Tokens.textSecondary),
       ),
@@ -200,7 +200,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
   }
 
   List<Widget> _done() => [
-    const Icon(Icons.verified_user_outlined, size: 56, color: Tokens.success),
+    Icon(Icons.verified_user_outlined, size: 56, color: Tokens.success),
     const SizedBox(height: 12),
     const Text(
       'Compte activé',

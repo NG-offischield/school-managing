@@ -49,7 +49,7 @@ class SessionTile extends StatelessWidget {
                     if (showDay && session.start != null)
                       Text(
                         capitalize(dayShort.format(session.start!)),
-                        style: const TextStyle(fontSize: 12, color: Tokens.textSecondary),
+                        style: TextStyle(fontSize: 12, color: Tokens.textSecondary),
                       ),
                     Text(
                       session.start == null ? '' : hm.format(session.start!),
@@ -57,7 +57,7 @@ class SessionTile extends StatelessWidget {
                     ),
                     Text(
                       session.end == null ? '' : hm.format(session.end!),
-                      style: const TextStyle(color: Tokens.textSecondary),
+                      style: TextStyle(color: Tokens.textSecondary),
                     ),
                   ],
                 ),
@@ -76,12 +76,12 @@ class SessionTile extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text('${session.subject.extra} · $room', style: const TextStyle(color: Tokens.textSecondary)),
+                    Text('${session.subject.extra} · $room', style: TextStyle(color: Tokens.textSecondary)),
                     if (note != null) ...[
                       const SizedBox(height: 4),
                       Text(
                         note,
-                        style: const TextStyle(color: Tokens.warning, fontWeight: FontWeight.w600),
+                        style: TextStyle(color: Tokens.warning, fontWeight: FontWeight.w600),
                       ),
                     ],
                     const SizedBox(height: 8),
@@ -96,7 +96,7 @@ class SessionTile extends StatelessWidget {
                   ],
                 ),
               ),
-              if (onTap != null) const Icon(Icons.chevron_right, color: Tokens.textSecondary),
+              if (onTap != null) Icon(Icons.chevron_right, color: Tokens.textSecondary),
             ],
           ),
         ),
@@ -120,7 +120,7 @@ class SectionTitle extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Tokens.text),
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Tokens.text),
             ),
           ),
           ?trailing,

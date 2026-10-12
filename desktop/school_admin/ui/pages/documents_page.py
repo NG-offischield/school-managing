@@ -22,7 +22,7 @@ from ..dialogs.document_dialogs import (
     GenerateDocumentDialog,
     VerifyDialog,
 )
-from ..theme import TOKENS
+from ..theme import TOKENS, TokenColours
 from ..widgets import Page, button
 from .catalog_base import STATUS_COLUMN_TITLE, PagedCatalogPage
 from .finance_page import coloured
@@ -37,7 +37,7 @@ TABS = (
     ("payslips", "Bulletins de paie", ("PAYSLIP",)),
     ("attendance", "Relevés de présence", ("STUDENT_ATTENDANCE", "CLASS_ATTENDANCE")),
 )
-STATUS_COLOURS = {"OFFICIAL": TOKENS.success, "PROVISIONAL": TOKENS.warning}
+STATUS_COLOURS = TokenColours(OFFICIAL="success", PROVISIONAL="warning")
 
 
 def ask_save_path(parent, name):

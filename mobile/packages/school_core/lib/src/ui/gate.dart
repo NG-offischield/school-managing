@@ -314,7 +314,7 @@ class ScanScreenState extends State<ScanScreen> {
                       'de ce qui vous est affiché.'
                 : 'Présentez la carte de l\'élève au lecteur, ou saisissez le code du QR. Le serveur enregistre '
                       'l\'arrivée et décide de ce qui vous est affiché.',
-            style: const TextStyle(color: Tokens.textSecondary),
+            style: TextStyle(color: Tokens.textSecondary),
           ),
           const SizedBox(height: 14),
           if (camera) ...[
@@ -387,7 +387,7 @@ class ScanOutcomeCard extends StatelessWidget {
             if (o.studentName != null) ...[
               const SizedBox(height: 10),
               Text(o.studentName!, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-              if (o.className != null) Text(o.className!, style: const TextStyle(color: Tokens.textSecondary)),
+              if (o.className != null) Text(o.className!, style: TextStyle(color: Tokens.textSecondary)),
             ],
             const SizedBox(height: 8),
             Wrap(
@@ -501,7 +501,7 @@ class _MyScansScreenState extends State<MyScansScreen> {
                     padding: const EdgeInsets.all(6),
                     child: Text(
                       '${rows.length} passage(s), ${rows.where((r) => acceptedScan(r.result)).length} accepté(s)',
-                      style: const TextStyle(color: Tokens.textSecondary),
+                      style: TextStyle(color: Tokens.textSecondary),
                     ),
                   ),
                   for (final r in rows)

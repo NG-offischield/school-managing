@@ -141,7 +141,7 @@ class SessionCard extends StatelessWidget {
                     s.start == null ? '' : hm.format(s.start!),
                     style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
                   ),
-                  Text(s.end == null ? '' : hm.format(s.end!), style: const TextStyle(color: Tokens.textSecondary)),
+                  Text(s.end == null ? '' : hm.format(s.end!), style: TextStyle(color: Tokens.textSecondary)),
                 ],
               ),
             ),
@@ -161,9 +161,9 @@ class SessionCard extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     '${s.teacher.label.isEmpty ? 'Enseignant à confirmer' : s.teacher.label} · $room',
-                    style: const TextStyle(color: Tokens.textSecondary),
+                    style: TextStyle(color: Tokens.textSecondary),
                   ),
-                  Text(s.schoolClass.label, style: const TextStyle(color: Tokens.textSecondary, fontSize: 12.5)),
+                  Text(s.schoolClass.label, style: TextStyle(color: Tokens.textSecondary, fontSize: 12.5)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 6,

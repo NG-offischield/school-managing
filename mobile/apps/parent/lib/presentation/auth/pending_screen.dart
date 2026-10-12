@@ -100,7 +100,7 @@ class _PendingScreenState extends State<PendingScreen> {
                         const SizedBox(height: 6),
                         Text(
                           'Demande du ${dateTime.format(last!.submittedAt!)}',
-                          style: const TextStyle(color: Tokens.textSecondary),
+                          style: TextStyle(color: Tokens.textSecondary),
                         ),
                       ],
                       if (rejected && (last?.rejectionReason ?? '').isNotEmpty) ...[
@@ -114,7 +114,7 @@ class _PendingScreenState extends State<PendingScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Une fois le compte validé, vous demanderez le rattachement de votre enfant : la pièce d\'identité '
                 'indiquée sera vérifiée à l\'école. Aucune donnée d\'élève n\'est visible avant.',
                 style: TextStyle(color: Tokens.textSecondary),

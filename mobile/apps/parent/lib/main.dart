@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:provider/provider.dart';
 import 'package:school_core/school_core.dart';
 
 import 'session.dart';
@@ -13,12 +14,16 @@ import 'session.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('fr_FR');
+  final theme = await ThemeController.load(); // Système / Clair / Sombre, kept on the phone
   runApp(
-    ServerHost(
-      store: PreferencesEndpointStore('school_managing.parent'),
-      buildApiUrl: const String.fromEnvironment('API_URL'),
-      buildWsUrl: const String.fromEnvironment('WS_URL'),
-      session: parentSession,
+    ChangeNotifierProvider<ThemeController>.value(
+      value: theme,
+      child: ServerHost(
+        store: PreferencesEndpointStore('school_managing.parent'),
+        buildApiUrl: const String.fromEnvironment('API_URL'),
+        buildWsUrl: const String.fromEnvironment('WS_URL'),
+        session: parentSession,
+      ),
     ),
   );
 }

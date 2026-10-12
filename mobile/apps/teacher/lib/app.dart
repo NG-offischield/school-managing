@@ -38,6 +38,9 @@ class TeacherApp extends StatelessWidget {
         title: 'School Managing — Enseignant',
         debugShowCheckedModeBanner: false,
         theme: buildAppTheme(),
+        darkTheme: buildAppTheme(brightness: Brightness.dark),
+        themeMode: themeModeOf(context),
+        builder: themedScreens,
         locale: const Locale('fr', 'FR'),
         supportedLocales: const [Locale('fr', 'FR')],
         localizationsDelegates: const [
@@ -77,7 +80,7 @@ class SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: Tokens.navy,
       body: Center(
         child: Column(

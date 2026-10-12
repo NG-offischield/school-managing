@@ -183,6 +183,7 @@ class _AccountScreenState extends State<AccountScreen> {
               ),
             const SizedBox(height: 12),
             _details(profile),
+            const ThemeChoice(),
             ...widget.extra,
             const SizedBox(height: 12),
             _security(),
@@ -209,7 +210,7 @@ class _AccountScreenState extends State<AccountScreen> {
               foregroundImage: _photo == null ? null : MemoryImage(_photo!),
               child: Text(
                 initials,
-                style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700),
+                style: TextStyle(color: Tokens.onPrimary, fontSize: 24, fontWeight: FontWeight.w700),
               ),
             ),
             const SizedBox(height: 8),
@@ -233,11 +234,11 @@ class _AccountScreenState extends State<AccountScreen> {
               ],
             ),
             Text(profile.fullName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-            Text(profile.email, style: const TextStyle(color: Tokens.textSecondary)),
+            Text(profile.email, style: TextStyle(color: Tokens.textSecondary)),
             const SizedBox(height: 6),
             Text('${profile.rolesLabel} · ${profile.schoolName}', textAlign: TextAlign.center),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'Le nom, l\'adresse e-mail, le rôle et l\'établissement sont gérés par l\'administration de l\'école.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Tokens.textSecondary, fontSize: 12.5),
@@ -546,13 +547,62 @@ class _SessionsScreenState extends State<SessionsScreen> {
               key: const Key('sessions.revokeAll'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Tokens.error,
-                side: const BorderSide(color: Tokens.error),
+                side: BorderSide(color: Tokens.error),
               ),
               onPressed: _revokeAll,
               icon: const Icon(Icons.logout),
               label: const Text('Déconnecter tous mes appareils'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// « Apparence »: Système / Clair / Sombre, applied at once and kept on the
+/// phone. Nothing is shown when the app provides no [ThemeController].
+class ThemeChoice extends StatelessWidget {
+  const ThemeChoice({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = context.watch<ThemeController?>();
+    if (controller == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Apparence', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 10),
+              SegmentedButton<ThemeMode>(
+                key: const Key('account.theme'),
+                segments: [
+                  for (final entry in themeModeLabels.entries)
+                    ButtonSegment(
+                      value: entry.key,
+                      label: Text(entry.value, key: Key('account.theme.${entry.key.name}')),
+                      icon: Icon(switch (entry.key) {
+                        ThemeMode.system => Icons.brightness_auto_outlined,
+                        ThemeMode.light => Icons.light_mode_outlined,
+                        ThemeMode.dark => Icons.dark_mode_outlined,
+                      }),
+                    ),
+                ],
+                selected: {controller.mode},
+                onSelectionChanged: (choice) => controller.set(choice.single),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '« Système » suit le réglage du téléphone.',
+                style: TextStyle(color: Tokens.textSecondary, fontSize: 12.5),
+              ),
+            ],
+          ),
         ),
       ),
     );

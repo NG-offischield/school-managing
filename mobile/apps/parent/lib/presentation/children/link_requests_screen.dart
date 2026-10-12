@@ -108,7 +108,7 @@ class _LinkRequestsScreenState extends State<LinkRequestsScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
             children: [
-              const Text(
+              Text(
                 'Pour voir la scolarité d\'un enfant, votre lien doit être vérifié : l\'école contrôle votre pièce '
                 'd\'identité (ou un parent déjà vérifié vous parraine avec un code), l\'élève confirme, puis '
                 'l\'établissement valide.',
@@ -116,7 +116,7 @@ class _LinkRequestsScreenState extends State<LinkRequestsScreen> {
               ),
               const SectionTitle('Mes demandes'),
               if (rows.isEmpty)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.all(8),
                   child: Text('Aucune demande.', style: TextStyle(color: Tokens.textSecondary)),
                 ),
@@ -164,7 +164,7 @@ class _LinkRequestsScreenState extends State<LinkRequestsScreen> {
                 ),
               if (children.isNotEmpty) ...[
                 const SectionTitle('Parrainer un second parent'),
-                const Text(
+                Text(
                   'Vous êtes parent vérifié : générez un code à usage unique (valable 10 minutes) et remettez-le en '
                   'main propre à l\'autre parent. L\'école validera son rattachement ; il n\'aura jamais plus de '
                   'droits financiers que vous.',

@@ -17,12 +17,12 @@ from PySide6.QtWidgets import QDialog, QTabWidget
 from ...models import LINK_REQUEST_STATUSES, REGISTRATION_STATUSES
 from ..dialogs.parent_dialogs import IdentityCheckDialog, LinkApprovalDialog, LinkRequestDialog, StudentApprovalDialog
 from ..dialogs.teacher_dialogs import ReasonDialog
-from ..theme import TOKENS
+from ..theme import TOKENS, TokenColours
 from ..widgets import Page, button
 from .catalog_base import STATUS_COLUMN_TITLE, PagedCatalogPage
 from .finance_page import coloured
 
-COLOURS = {"PENDING": TOKENS.warning, "APPROVED": TOKENS.success, "REJECTED": TOKENS.danger}
+COLOURS = TokenColours(PENDING="warning", APPROVED="success", REJECTED="danger")
 
 
 def _when(moment):

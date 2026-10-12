@@ -1,15 +1,17 @@
-"""The ONE visual theme of the admin desktop (light, professional).
+"""The visual theme of the admin desktop: light (default) or dark, chosen in
+« Mon compte » (Système / Clair / Sombre; desktop.json) — see the end of this module.
 
 Why it exists: on Windows with dark mode, Qt's native style hands dialogs a
 dark system palette while the old style sheet painted text dark — dark text
 on a near-black dialog. The theme now owns everything:
 - Fusion style (identical rendering on every OS, ignores the system dark mode);
-- an explicit light QPalette (dialogs, menus, combo popups, message boxes,
-  tooltips inherit it);
+- an explicit QPalette from the active tokens (dialogs, menus, combo popups,
+  message boxes, tooltips inherit it);
 - one style sheet generated from the tokens below.
 
 Every colour and font size used by the UI comes from TOKENS / TYPE; pages
-and dialogs never define their own. Text / background pairs are checked
+and dialogs never define their own. TOKENS always reads the ACTIVE palette
+(LIGHT or DARK), so a colour looked up when painting follows a theme change. Text / background pairs are checked
 against WCAG 2.1 contrast (tests/test_theme.py): 4.5:1 for text, 3:1 for
 field borders, focus ring and other UI boundaries.
 """
@@ -17,8 +19,8 @@ field borders, focus ring and other UI boundaries.
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtCore import QDate, QLocale, Qt
-from PySide6.QtGui import QBrush, QColor, QFont, QPalette, QTextCharFormat
+from PySide6.QtCore import QDate, QLocale, QObject, Qt, Signal
+from PySide6.QtGui import QBrush, QColor, QFont, QGuiApplication, QPalette, QTextCharFormat
 from PySide6.QtWidgets import QApplication, QCalendarWidget, QStyleFactory
 
 ASSETS = Path(__file__).resolve().parent / "assets"
@@ -26,6 +28,7 @@ ASSETS = Path(__file__).resolve().parent / "assets"
 
 @dataclass(frozen=True)
 class Tokens:
+    name: str = "light"
     # Surfaces
     background: str = "#F3F5F8"  # application background
     panel: str = "#FFFFFF"  # header, dialogs, toolbars
@@ -80,9 +83,117 @@ class Tokens:
     # tile, white text). (A background on today is not painted: the style sheet owns cell fills.)
     calendar_weekend: str = "#B91C1C"
     calendar_today_text: str = "#1E3A8A"
+    # Former literals of the style sheet
+    error_border: str = "#FECACA"
+    warning_border: str = "#FDE68A"
+    success_border: str = "#BBF7D0"
+    danger_pressed_bg: str = "#FEE2E2"
+    row_line: str = "#EDF1F6"
+    header_section: str = "#EEF2F7"
+    tooltip_text: str = "#FFFFFF"
+    scroll_handle: str = "#C3CCD7"
+    # Icons: "" = dark strokes (assets/x.svg), "-dark" = variants drawn for the dark theme.
+    icon_suffix: str = ""
 
 
-TOKENS = Tokens()
+LIGHT = Tokens()
+
+# Dark: same roles, light text on slate surfaces; every text / UI pair keeps the
+# WCAG ratios of the light theme (tests/test_theme_modes.py). The primary blue is
+# lighter (readable as text on a dark panel) and carries DARK text when filled.
+DARK = Tokens(
+    name="dark",
+    background="#111827",
+    panel="#1F2937",
+    card="#1F2937",
+    field="#111827",
+    field_disabled="#273244",
+    row_alt="#243041",
+    primary="#60A5FA",
+    primary_hover="#93C5FD",
+    primary_pressed="#BFDBFE",
+    primary_soft="#1E3A5F",
+    on_primary="#0B1220",
+    danger="#F87171",
+    danger_hover="#FCA5A5",
+    danger_pressed="#FECACA",
+    secondary_hover="#2B3A4F",
+    secondary_pressed="#334155",
+    disabled_fill="#273244",
+    text="#E5E7EB",
+    text_secondary="#AAB4C3",
+    placeholder="#94A3B8",
+    text_disabled="#8F9BAE",
+    border="#334155",
+    field_border="#6B7A90",
+    focus="#60A5FA",
+    error="#FCA5A5",
+    error_bg="#3B1418",
+    success="#86EFAC",
+    success_bg="#12301F",
+    warning="#FCD34D",
+    warning_bg="#3A2A0B",
+    info="#93C5FD",
+    info_bg="#172B4A",
+    sidebar="#0B1A33",
+    sidebar_text="#E5ECF6",
+    sidebar_muted="#A9B8CC",
+    sidebar_hover="#1A3A66",
+    sidebar_selected="#1D4ED8",
+    chart_1="#60A5FA",
+    chart_2="#2DD4BF",
+    chart_3="#FBBF24",
+    chart_soft="#1E3A5F",
+    chart_grid="#334155",
+    calendar_weekend="#FCA5A5",
+    calendar_today_text="#93C5FD",
+    error_border="#7F1D1D",
+    warning_border="#78350F",
+    success_border="#14532D",
+    danger_pressed_bg="#4C1D1D",
+    row_line="#2B3646",
+    header_section="#273244",
+    tooltip_text="#111827",
+    scroll_handle="#4B5563",
+    icon_suffix="-dark",
+)
+
+
+class _ActiveTokens:
+    """TOKENS: the active palette. Attributes are read at use time, so code
+    that looks a colour up when painting / filling a cell follows a switch."""
+
+    def __init__(self, tokens):
+        object.__setattr__(self, "_tokens", tokens)
+
+    def __getattr__(self, name):
+        return getattr(self._tokens, name)
+
+    def __setattr__(self, name, value):
+        raise AttributeError("TOKENS is read only: use set_active_tokens()")
+
+    @property
+    def current(self):
+        return self._tokens
+
+
+TOKENS = _ActiveTokens(LIGHT)
+
+
+def set_active_tokens(tokens):
+    object.__setattr__(TOKENS, "_tokens", tokens)
+
+
+class TokenColours:
+    """status -> token NAME, resolved when used: a module-level table of
+    status colours that still follows a theme switch."""
+
+    def __init__(self, **names):
+        self.names = names
+
+    def get(self, key, default=None):
+        name = self.names.get(key)
+        return getattr(TOKENS, name) if name else default
 
 
 @dataclass(frozen=True)
@@ -157,8 +268,11 @@ def build_palette(t=TOKENS):
     return palette
 
 
-def _asset(name):
-    return (ASSETS / name).as_posix()
+def _asset(name, t=TOKENS):
+    """Icon for the theme `t` (x.svg, or its x-dark.svg variant for the dark theme)."""
+    stem, dot, ext = name.rpartition(".")
+    themed = ASSETS / f"{stem}{t.icon_suffix}{dot}{ext}"
+    return (themed if themed.exists() else ASSETS / name).as_posix()
 
 
 def build_stylesheet(t=TOKENS, s=TYPE):
@@ -236,9 +350,9 @@ QTabBar::tab:focus {{ outline: none; }}
 
 /* ---------- banners ---------- */
 #banner {{ border-radius: 8px; padding: 10px 14px; border: 1px solid transparent; }}
-#banner[kind="error"] {{ background: {t.error_bg}; color: {t.error}; border-color: #FECACA; }}
-#banner[kind="warning"] {{ background: {t.warning_bg}; color: {t.warning}; border-color: #FDE68A; }}
-#banner[kind="success"] {{ background: {t.success_bg}; color: {t.success}; border-color: #BBF7D0; }}
+#banner[kind="error"] {{ background: {t.error_bg}; color: {t.error}; border-color: {t.error_border}; }}
+#banner[kind="warning"] {{ background: {t.warning_bg}; color: {t.warning}; border-color: {t.warning_border}; }}
+#banner[kind="success"] {{ background: {t.success_bg}; color: {t.success}; border-color: {t.success_border}; }}
 #banner[kind="info"] {{ background: {t.info_bg}; color: {t.info}; border-color: {t.primary_soft}; }}
 
 /* ---------- buttons: primary / secondary / danger ---------- */
@@ -256,7 +370,7 @@ QPushButton[variant="primary"]:disabled {{ background: {t.disabled_fill}; color:
     border: 1px dashed {t.field_border}; }}
 QPushButton[variant="danger"] {{ background: {t.panel}; color: {t.danger}; border: 1px solid {t.danger}; }}
 QPushButton[variant="danger"]:hover {{ background: {t.error_bg}; }}
-QPushButton[variant="danger"]:pressed {{ background: #FEE2E2; }}
+QPushButton[variant="danger"]:pressed {{ background: {t.danger_pressed_bg}; }}
 QPushButton[variant="danger"]:focus {{ border: 2px solid {t.danger}; }}
 QPushButton[variant="danger-solid"] {{ background: {t.danger}; color: {t.on_primary}; border: 1px solid {t.danger}; }}
 QPushButton[variant="danger-solid"]:hover {{ background: {t.danger_hover}; }}
@@ -282,7 +396,7 @@ QLineEdit[invalid="true"], QComboBox[invalid="true"] {{ border: 2px solid {t.err
 QComboBox, QDateEdit {{ padding-right: 30px; }}
 QDateEdit::drop-down {{ subcontrol-origin: padding; subcontrol-position: center right; width: 28px;
     border: none; border-left: 1px solid {t.border}; }}
-QDateEdit::down-arrow {{ image: url("{_asset("chevron-down.svg")}"); width: 12px; height: 12px; }}
+QDateEdit::down-arrow {{ image: url("{_asset("chevron-down.svg", t)}"); width: 12px; height: 12px; }}
 QCalendarWidget QWidget {{ alternate-background-color: {t.row_alt}; }}
 /* Fusion paints the navigation bar with QPalette::Highlight (primary blue): own it, light,
    so the month / year buttons (dark text) stay readable. */
@@ -293,8 +407,8 @@ QCalendarWidget QToolButton {{ color: {t.text}; background: transparent; font-we
 QCalendarWidget QToolButton:hover {{ background: {t.secondary_hover}; }}
 QCalendarWidget QToolButton:pressed {{ background: {t.secondary_pressed}; }}
 QCalendarWidget QToolButton:focus {{ border: 2px solid {t.focus}; }}
-QCalendarWidget QToolButton#qt_calendar_prevmonth {{ qproperty-icon: url("{_asset("chevron-left.svg")}"); }}
-QCalendarWidget QToolButton#qt_calendar_nextmonth {{ qproperty-icon: url("{_asset("chevron-right.svg")}"); }}
+QCalendarWidget QToolButton#qt_calendar_prevmonth {{ qproperty-icon: url("{_asset("chevron-left.svg", t)}"); }}
+QCalendarWidget QToolButton#qt_calendar_nextmonth {{ qproperty-icon: url("{_asset("chevron-right.svg", t)}"); }}
 QCalendarWidget QToolButton::menu-indicator {{ image: none; width: 0; }}
 QCalendarWidget QMenu {{ background: {t.panel}; color: {t.text}; border: 1px solid {t.field_border}; }}
 QCalendarWidget QMenu::item:selected {{ background: {t.primary_soft}; color: {t.text}; }}
@@ -310,7 +424,7 @@ QCalendarWidget QTableView::item {{ padding: 0; border: none; }}
 QCalendarWidget QTableView::item:selected {{ background: {t.primary}; color: {t.on_primary}; }}
 QComboBox::drop-down {{ subcontrol-origin: padding; subcontrol-position: center right; width: 28px;
     border: none; border-left: 1px solid {t.border}; }}
-QComboBox::down-arrow {{ image: url("{_asset("chevron-down.svg")}"); width: 12px; height: 12px; }}
+QComboBox::down-arrow {{ image: url("{_asset("chevron-down.svg", t)}"); width: 12px; height: 12px; }}
 QComboBox QAbstractItemView {{ background: {t.panel}; color: {t.text}; border: 1px solid {t.field_border};
     outline: none; padding: 4px; selection-background-color: {t.primary_soft}; selection-color: {t.text}; }}
 QComboBox QAbstractItemView::item {{ min-height: 30px; padding: 4px 8px; }}
@@ -320,22 +434,22 @@ QCheckBox::indicator {{ width: 18px; height: 18px; border: 1px solid {t.field_bo
 QCheckBox::indicator:hover {{ border-color: {t.focus}; }}
 QCheckBox::indicator:focus {{ border: 2px solid {t.focus}; }}
 QCheckBox::indicator:checked {{ background: {t.primary}; border-color: {t.primary};
-    image: url("{_asset("check.svg")}"); }}
+    image: url("{_asset("check.svg", t)}"); }}
 
 /* ---------- tables ---------- */
 QTableView {{ background: {t.card}; alternate-background-color: {t.row_alt}; color: {t.text};
     border: 1px solid {t.border}; border-radius: 8px; gridline-color: transparent;
     selection-background-color: {t.primary_soft}; selection-color: {t.text}; }}
-QTableView::item {{ padding: 0 10px; border-bottom: 1px solid #EDF1F6; }}
+QTableView::item {{ padding: 0 10px; border-bottom: 1px solid {t.row_line}; }}
 QTableView::item:selected {{ background: {t.primary_soft}; color: {t.text}; }}
 QTableView:focus {{ border: 1px solid {t.focus}; }}
-QHeaderView::section {{ background: #EEF2F7; color: {t.text}; padding: 8px 10px; border: none;
+QHeaderView::section {{ background: {t.header_section}; color: {t.text}; padding: 8px 10px; border: none;
     border-bottom: 1px solid {t.border}; font-weight: 600; }}
 
 /* ---------- misc ---------- */
-QToolTip {{ background: {t.text}; color: #FFFFFF; border: none; padding: 6px 8px; }}
+QToolTip {{ background: {t.text}; color: {t.tooltip_text}; border: none; padding: 6px 8px; }}
 QScrollBar:vertical {{ background: transparent; width: 10px; margin: 2px; }}
-QScrollBar::handle:vertical {{ background: #C3CCD7; border-radius: 4px; min-height: 30px; }}
+QScrollBar::handle:vertical {{ background: {t.scroll_handle}; border-radius: 4px; min-height: 30px; }}
 QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
 QScrollArea#pageScroll {{ background: transparent; border: none; }}
 """
@@ -376,18 +490,71 @@ def style_calendar(calendar: QCalendarWidget, t=TOKENS, today=None):
     return calendar
 
 
-def apply_theme(app):
-    """Install style, palette, font and style sheet on the QApplication."""
+# --- modes: Système / Clair / Sombre ----------------------------------------------------
+
+
+class _ThemeEvents(QObject):
+    changed = Signal(str)  # "light" | "dark", after the palette is installed
+
+
+_EVENTS = None
+
+
+def theme_events():
+    global _EVENTS
+    if _EVENTS is None:
+        _EVENTS = _ThemeEvents()
+    return _EVENTS
+
+
+THEME_MODES = {"system": "Système", "light": "Clair", "dark": "Sombre"}
+
+
+def system_prefers_dark(app=None):
+    """Windows (Qt 6.5+ colour scheme) asks for dark; unknown = light."""
+    hints = (app or QGuiApplication.instance()).styleHints()
+    return hints.colorScheme() == Qt.ColorScheme.Dark
+
+
+def resolve_mode(mode, app=None):
+    """ "system" | "light" | "dark" -> the palette to use."""
+    if mode == "dark" or (mode == "system" and system_prefers_dark(app)):
+        return DARK
+    return LIGHT
+
+
+def apply_theme(app, mode="light"):
+    """Install style, palette, font and style sheet on the QApplication, for
+    `mode` ("system", "light" or "dark"). Can be called again at any time:
+    open windows are re-polished, calendars restyled; pages that coloured
+    table cells reload them (MainWindow.refresh_theme)."""
+    set_active_tokens(resolve_mode(mode, app))
     style = QStyleFactory.create("Fusion")
     app.setStyle(style)
     # Once a style sheet is set, Qt wraps the style (QStyleSheetStyle):
     # remember the base style for diagnostics and tests.
     app.setProperty("theme_base_style", style.metaObject().className())
-    app.setPalette(build_palette())
+    app.setProperty("theme_mode", mode if mode in THEME_MODES else "light")
+    app.setProperty("theme_name", TOKENS.name)
+    app.setPalette(build_palette(TOKENS.current))
     font = QFont(TYPE.family)
     font.setPointSizeF(TYPE.base)
     app.setFont(font)
-    app.setStyleSheet(build_stylesheet())
+    app.setStyleSheet(build_stylesheet(TOKENS.current))
+    for widget in app.allWidgets():
+        if isinstance(widget, QCalendarWidget):
+            style_calendar(widget, TOKENS.current)
+    theme_events().changed.emit(TOKENS.name)
+
+
+def follow_system_scheme(app):
+    """In « Système » mode, a Windows light/dark switch is applied at once."""
+
+    def changed(_scheme):
+        if app.property("theme_mode") == "system":
+            apply_theme(app, "system")
+
+    app.styleHints().colorSchemeChanged.connect(changed)
 
 
 def ensure_app():

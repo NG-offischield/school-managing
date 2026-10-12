@@ -122,7 +122,7 @@ class SectionTitle extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Tokens.text),
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Tokens.text),
             ),
           ),
           ?trailing,
@@ -148,7 +148,7 @@ class InfoRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: Text(label, style: const TextStyle(color: Tokens.textSecondary)),
+            child: Text(label, style: TextStyle(color: Tokens.textSecondary)),
           ),
           const SizedBox(width: 12),
           Flexible(
