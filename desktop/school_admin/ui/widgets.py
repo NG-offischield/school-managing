@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from .feedback import describe
+from .theme import style_calendar
 
 ICONS = {"success": "✓", "error": "✕", "warning": "!", "info": "i"}
 
@@ -129,9 +130,11 @@ def time_field(value=None):
 
 
 def date_field():
-    """Date input with a calendar popup, French format."""
+    """Date input with a calendar popup, French format; the popup is styled
+    from the theme tokens (readable navigation bar, weekends, today)."""
     widget = DateField(calendarPopup=True)
     widget.setDisplayFormat("dd/MM/yyyy")
+    style_calendar(widget.calendarWidget())
     return widget
 
 

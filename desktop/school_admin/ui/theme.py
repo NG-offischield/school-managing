@@ -17,8 +17,9 @@ field borders, focus ring and other UI boundaries.
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtGui import QColor, QFont, QPalette
-from PySide6.QtWidgets import QApplication, QStyleFactory
+from PySide6.QtCore import QDate, QLocale, Qt
+from PySide6.QtGui import QBrush, QColor, QFont, QPalette, QTextCharFormat
+from PySide6.QtWidgets import QApplication, QCalendarWidget, QStyleFactory
 
 ASSETS = Path(__file__).resolve().parent / "assets"
 
@@ -74,6 +75,11 @@ class Tokens:
     chart_3: str = "#B45309"  # third series / attention (amber)
     chart_soft: str = "#BFDBFE"  # bar under the cursor, area under a line
     chart_grid: str = "#E5E9F0"  # gridlines (decorative)
+    # Date picker: weekends keep the usual red, but readable (Qt's default #FF0000 is ~4:1);
+    # today = dark blue, bold, underlined text — distinct from the selected day (solid primary
+    # tile, white text). (A background on today is not painted: the style sheet owns cell fills.)
+    calendar_weekend: str = "#B91C1C"
+    calendar_today_text: str = "#1E3A8A"
 
 
 TOKENS = Tokens()
@@ -278,8 +284,30 @@ QDateEdit::drop-down {{ subcontrol-origin: padding; subcontrol-position: center 
     border: none; border-left: 1px solid {t.border}; }}
 QDateEdit::down-arrow {{ image: url("{_asset("chevron-down.svg")}"); width: 12px; height: 12px; }}
 QCalendarWidget QWidget {{ alternate-background-color: {t.row_alt}; }}
-QCalendarWidget QToolButton {{ color: {t.text}; background: transparent; font-weight: 600; padding: 4px 8px; }}
-QCalendarWidget QAbstractItemView {{ selection-background-color: {t.primary}; selection-color: {t.on_primary}; }}
+/* Fusion paints the navigation bar with QPalette::Highlight (primary blue): own it, light,
+   so the month / year buttons (dark text) stay readable. */
+QCalendarWidget QWidget#qt_calendar_navigationbar {{ background: {t.panel};
+    border-bottom: 1px solid {t.border}; }}
+QCalendarWidget QToolButton {{ color: {t.text}; background: transparent; font-weight: 600; padding: 4px 8px;
+    border: none; border-radius: 6px; }}
+QCalendarWidget QToolButton:hover {{ background: {t.secondary_hover}; }}
+QCalendarWidget QToolButton:pressed {{ background: {t.secondary_pressed}; }}
+QCalendarWidget QToolButton:focus {{ border: 2px solid {t.focus}; }}
+QCalendarWidget QToolButton#qt_calendar_prevmonth {{ qproperty-icon: url("{_asset("chevron-left.svg")}"); }}
+QCalendarWidget QToolButton#qt_calendar_nextmonth {{ qproperty-icon: url("{_asset("chevron-right.svg")}"); }}
+QCalendarWidget QToolButton::menu-indicator {{ image: none; width: 0; }}
+QCalendarWidget QMenu {{ background: {t.panel}; color: {t.text}; border: 1px solid {t.field_border}; }}
+QCalendarWidget QMenu::item:selected {{ background: {t.primary_soft}; color: {t.text}; }}
+QCalendarWidget QSpinBox {{ background: {t.field}; color: {t.text}; border: 1px solid {t.field_border};
+    border-radius: 4px; selection-background-color: {t.primary}; selection-color: {t.on_primary}; }}
+QCalendarWidget QAbstractItemView:enabled {{ background: {t.field}; color: {t.text}; outline: none;
+    selection-background-color: {t.primary}; selection-color: {t.on_primary}; }}
+QCalendarWidget QAbstractItemView:disabled {{ color: {t.text_disabled}; }}
+/* The data-table rule below (QTableView::item padding 0 10px + bottom border) must not reach the
+   calendar's own table: it elided the day numbers to "…" and hid the weekday header. */
+QCalendarWidget QTableView {{ border: none; border-radius: 0; }}
+QCalendarWidget QTableView::item {{ padding: 0; border: none; }}
+QCalendarWidget QTableView::item:selected {{ background: {t.primary}; color: {t.on_primary}; }}
 QComboBox::drop-down {{ subcontrol-origin: padding; subcontrol-position: center right; width: 28px;
     border: none; border-left: 1px solid {t.border}; }}
 QComboBox::down-arrow {{ image: url("{_asset("chevron-down.svg")}"); width: 12px; height: 12px; }}
@@ -311,6 +339,41 @@ QScrollBar::handle:vertical {{ background: #C3CCD7; border-radius: 4px; min-heig
 QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
 QScrollArea#pageScroll {{ background: transparent; border: none; }}
 """
+
+
+def _char_format(foreground, background=None, *, bold=False, underline=False):
+    fmt = QTextCharFormat()
+    fmt.setForeground(QBrush(QColor(foreground)))
+    if background:
+        fmt.setBackground(QBrush(QColor(background)))
+    if bold:
+        fmt.setFontWeight(QFont.Bold)
+    fmt.setFontUnderline(underline)
+    return fmt
+
+
+def style_calendar(calendar: QCalendarWidget, t=TOKENS, today=None):
+    """What the style sheet cannot say about a date picker, from the same
+    tokens: French locale with Monday first, readable weekday headers,
+    weekends in `calendar_weekend`, and TODAY marked (dark blue, bold,
+    underlined) so it never looks like the SELECTED day (solid primary tile).
+    Display only: the selected date and its format are untouched."""
+    calendar.setLocale(QLocale(QLocale.French, QLocale.France))
+    calendar.setFirstDayOfWeek(Qt.Monday)
+    calendar.setGridVisible(False)
+    calendar.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)
+    calendar.setHorizontalHeaderFormat(QCalendarWidget.ShortDayNames)
+    calendar.setHeaderTextFormat(_char_format(t.text_secondary, bold=True))
+    for day in (Qt.Saturday, Qt.Sunday):
+        calendar.setWeekdayTextFormat(day, _char_format(t.calendar_weekend))
+    for day in (Qt.Monday, Qt.Tuesday, Qt.Wednesday, Qt.Thursday, Qt.Friday):
+        calendar.setWeekdayTextFormat(day, _char_format(t.text))
+    calendar.setDateTextFormat(QDate(), QTextCharFormat())  # forget a previous "today"
+    calendar.setDateTextFormat(
+        today or QDate.currentDate(),
+        _char_format(t.calendar_today_text, bold=True, underline=True),
+    )
+    return calendar
 
 
 def apply_theme(app):
