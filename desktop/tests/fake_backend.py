@@ -12,6 +12,7 @@ import uuid
 import httpx
 
 from .fake_accounts import AccountsFake
+from .fake_attendance import AttendanceFake
 from .fake_comm import CommunicationFake
 from .fake_finance import FinanceFake
 from .fake_me import MeFake
@@ -32,7 +33,7 @@ def fail(status, code, message, details=None):
     return httpx.Response(status, json={"success": False, "error": error})
 
 
-class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake, PlansFake, MeFake):
+class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake, PlansFake, MeFake, AttendanceFake):
     def __init__(self, *, roles=("SUPER_ADMIN",)):
         self.roles = list(roles)
         self.init_finance()
@@ -41,6 +42,7 @@ class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake, Pla
         self.init_parents()
         self.init_plans()
         self.init_me()
+        self.init_attendance()  # after init_accounts: guardians have accounts
         self.sessions = {}  # access token -> refresh token
         self.refresh_tokens = set()
         self.revoked = set()
@@ -1645,6 +1647,8 @@ class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake, Pla
         if path.startswith(("admin/registrations/", "admin/link-requests/")):
             return self._parents(request, path, body, admin)
         comm = ("notifications/", "conversations/", "messages/", "forum/", "complaints/", "attachments/")
+        if path.startswith(("admin/attendance/daily/", "admin/scans/", "admin/guardians/")):
+            return self._attendance(request, path, body, admin) or fail(404, "NOT_FOUND", "Introuvable.")
         if path.startswith("admin/plans/"):
             return self._plans(request, path, body, admin)
         admin_comm = ("admin/communication/", "admin/forum/", "admin/complaints/")

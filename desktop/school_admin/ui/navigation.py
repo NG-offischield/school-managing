@@ -25,7 +25,7 @@ NAVIGATION = [
     NavEntry("courses", "Cours", "Gestion académique"),
     NavEntry("parents", "Parents", "Gestion académique"),
     NavEntry("planning", "Planning", "Vie scolaire"),
-    NavEntry("attendance", "Présences", "Vie scolaire", False, "Présences, retards, convocations, QR."),
+    NavEntry("attendance", "Présences", "Vie scolaire", True, "Présences du jour, passages au portail, gardiens."),
     NavEntry("finance", "Finance", "Gestion"),
     NavEntry("payroll", "Paie", "Gestion"),
     NavEntry("communication", "Communication", "Gestion"),

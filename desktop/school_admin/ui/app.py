@@ -11,6 +11,7 @@ from ..auth.token_store import KeyringTokenStore
 from ..config import load_config, save_preference
 from ..realtime import RealtimeClient, socket_url
 from ..services.accounts import AccountService
+from ..services.attendance import AttendanceService
 from ..services.catalog import CategoryService, SubjectService
 from ..services.classes import ClassService, ReferenceService
 from ..services.communication import CommunicationService
@@ -30,6 +31,7 @@ from .branding import SOFTWARE_NAME, software_icon
 from .dialogs.account_dialog import AccountDialog
 from .login_window import LoginWindow
 from .main_window import MainWindow
+from .pages.attendance_page import AttendancePage
 from .pages.catalog_pages import CategoriesPage, SubjectsPage
 from .pages.classes_page import ClassesPage
 from .pages.communication_page import CommunicationPage
@@ -74,6 +76,7 @@ class AppController:
         self.documents = DocumentService(api)
         self.plans = PlanService(api)
         self.me = MeService(api)
+        self.attendance = AttendanceService(api)
         self.login_window = LoginWindow(auth, runner, config)
         self.login_window.logged_in.connect(self.show_shell)
         self.main_window = None
@@ -111,6 +114,9 @@ class AppController:
                 self.courses,
                 self.runner,
                 **options.get("planning", {}),
+            ),
+            "attendance": lambda: AttendancePage(
+                self.attendance, self.references, self.accounts, self.runner, **options.get("attendance", {})
             ),
             "finance": lambda: FinancePage(self.finance, self.runner, **options.get("finance", {})),
             "payroll": lambda: PayrollPage(

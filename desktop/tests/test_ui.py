@@ -63,8 +63,8 @@ def test_shell_header_and_dashboard(controller):
     values = {card.value.text() for card in dashboard.cards}
     assert {"2025-2026", "4", "3", "0", "Indisponible"} <= values
     assert all(card.label.text() for card in dashboard.cards)
-    # Future modules are reserved, not faked.
-    assert type(shell.pages["attendance"]).__name__ == "PlaceholderPage"
+    # Présences is a real module now (attendance, gate passages, guardians), no placeholder left.
+    assert type(shell.pages["attendance"]).__name__ == "AttendancePage"
 
 
 def test_sidebar_navigation_and_coming_soon_entries(controller):
@@ -73,7 +73,8 @@ def test_sidebar_navigation_and_coming_soon_entries(controller):
         shell.open(key)
         assert shell.current_key == key and shell.current_page is shell.pages[key]
     labels = [shell.nav.item(i).text() for i in range(shell.nav.count())]
-    assert "GESTION ACADÉMIQUE" in labels and "Présences   ·  Bientôt" in labels and "Communication" in labels
+    assert "GESTION ACADÉMIQUE" in labels and "Présences" in labels and "Communication" in labels
+    assert not any("Bientôt" in label for label in labels)  # every module of the sidebar is available
     headers = [shell.nav.item(i) for i in range(shell.nav.count()) if shell.nav.item(i).text().isupper()]
     assert headers and all(item.flags() == Qt.NoItemFlags for item in headers)  # not selectable
     page = shell.open("attendance")
