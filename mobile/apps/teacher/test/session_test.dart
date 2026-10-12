@@ -16,13 +16,16 @@ void main() {
       throw http.ClientException('No route to host'); // the PC moved to another network
     });
     final tokens = MemoryTokenStore()..refreshToken = 'ref-old-school';
+    final plans = MemoryPlanFiles();
     final session = teacherSession(
       AppConfig.server('http://192.168.1.10:8000', release: false),
       client: client,
       tokens: tokens,
+      planFiles: plans,
     );
     await session.leave();
     expect(tokens.refreshToken, isNull);
+    expect(plans.cleared, 1); // school plans handed to the PDF viewer leave with the old school
     expect(asked, isEmpty); // no access token: nothing to revoke remotely, nothing sent
   });
 

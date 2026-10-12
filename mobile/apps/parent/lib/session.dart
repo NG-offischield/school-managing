@@ -14,6 +14,7 @@ ServerSession parentSession(
   TokenStore? tokens,
   ChannelFactory? channels,
   PdfStore pdfStore = const DevicePdfStore(),
+  PlanFiles planFiles = const DevicePlanFiles(),
 }) {
   final api = ApiClient(baseUrl: config.apiUrl, client: client);
   final auth = AuthService(
@@ -27,11 +28,18 @@ ServerSession parentSession(
       ? RealtimeClient(api, config.socket, refresh: auth.refreshSession)
       : RealtimeClient(api, config.socket, refresh: auth.refreshSession, channelFactory: channels);
   return ServerSession(
-    app: ParentApp(auth: auth, repository: ParentRepository(api), pdfStore: pdfStore, realtime: live),
+    app: ParentApp(
+      auth: auth,
+      repository: ParentRepository(api),
+      pdfStore: pdfStore,
+      planFiles: planFiles,
+      realtime: live,
+    ),
     onReady: auth.restore, // no request before Android 17 lets the app reach the LAN
     leave: () async {
       await auth.leaveServer(); // server logout if it still answers; local session dropped anyway
       await pdfStore.clear(); // receipts / report cards of the old school
+      await planFiles.clear(); // its school plans handed to the PDF viewer
     },
   );
 }

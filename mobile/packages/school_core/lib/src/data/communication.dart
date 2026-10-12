@@ -8,12 +8,15 @@
 ///   POST /conversations/ {conversation_type, participants, student, title, body, client_id}
 ///   GET  /complaints/    POST /complaints/ {category, subject, description, student, submit}
 ///   forum: GET /forum/spaces/  GET/POST /forum/threads/  GET/POST /forum/threads/{id}/posts/  (forum.dart)
+///   plans: GET /plans/  GET /plans/{id}/  GET /plans/{id}/file/  (school_plans.dart)
 library;
 
 import 'dart:math';
+import 'dart:typed_data';
 
 import '../api/api_client.dart';
 import 'forum.dart';
+import 'school_plans.dart';
 
 /// Server datetimes carry the school's offset ("2026-10-05T08:00:00+01:00"):
 /// the wall-clock part is shown as is — the school's time, whatever the
@@ -66,6 +69,7 @@ const notificationTypes = {
   'ANNOUNCEMENT': 'Annonce',
   'COMPLAINT': 'Réclamation',
   'FORUM': 'Forum',
+  'PLAN': 'Plan de l\'établissement',
 };
 
 const complaintCategories = {
@@ -113,10 +117,21 @@ class AppNotification {
   /// The forum thread this notification opens (announcement, forum activity).
   String? get threadId => payload['thread'] as String?;
 
+  /// The school plan this notification opens (a published plan version).
+  String? get planId => type == 'PLAN' ? payload['plan'] as String? : null;
+
   String get typeLabel => notificationTypes[type] ?? type;
 
-  AppNotification markedRead() =>
-      AppNotification(id: id, type: type, severity: severity, title: title, message: message, read: true, at: at);
+  AppNotification markedRead() => AppNotification(
+    id: id,
+    type: type,
+    severity: severity,
+    title: title,
+    message: message,
+    read: true,
+    at: at,
+    payload: payload, // still opens its thread / plan once read
+  );
 }
 
 class Conversation {
@@ -339,4 +354,16 @@ class CommunicationRepository {
   Future<ForumPost> deleteForumPost(String postId) async => ForumPost.fromJson(
     ((await api.request('DELETE', 'forum/posts/$postId/', body: const {})).data as Map).cast<String, dynamic>(),
   );
+
+  // --- school plans: the server re-checks the audience at every request (404 otherwise) ----------
+
+  Future<List<SchoolPlan>> plans() async => ((await api.get('plans/') as List?) ?? const [])
+      .map((r) => SchoolPlan.fromJson((r as Map).cast<String, dynamic>()))
+      .toList();
+
+  Future<SchoolPlan> plan(String id) async =>
+      SchoolPlan.fromJson((await api.get('plans/$id/') as Map).cast<String, dynamic>());
+
+  /// Bytes of the plan's published version (never an older or draft one).
+  Future<Uint8List> planFile(String id) => api.download('plans/$id/file/');
 }

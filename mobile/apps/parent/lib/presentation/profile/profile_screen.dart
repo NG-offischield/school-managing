@@ -5,7 +5,7 @@ import 'package:school_core/school_core.dart';
 import '../children/link_requests_screen.dart';
 import '../common.dart';
 
-/// Identity, school, link requests, logout, about the software.
+/// Identity, school, link requests, school plan, logout, about the software.
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -60,6 +60,14 @@ class ProfileScreen extends StatelessWidget {
                   title: const Text('Rattachements et parrainage'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => openScreen<void>(context, const LinkRequestsScreen()),
+                ),
+                ListTile(
+                  key: const Key('profile.plans'),
+                  leading: const Icon(Icons.map_outlined),
+                  title: const Text("Plan de l'établissement"),
+                  subtitle: const Text('Bâtiments, salles et accès'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PlansScreen())),
                 ),
               ],
             ),

@@ -10,6 +10,7 @@ import 'composers.dart';
 import 'conversation_screen.dart';
 import 'forum_screen.dart';
 import 'live_state.dart';
+import 'plans_screen.dart';
 
 /// Notifications, messages and complaints of the parent (existing
 /// communication API; new notifications arrive live through the WebSocket).
@@ -160,6 +161,18 @@ class _NotificationsTabState extends State<NotificationsTab> {
                 },
                 icon: const Icon(Icons.forum_outlined),
                 label: const Text('Ouvrir la discussion'),
+              ),
+            ],
+            if (notification.planId != null) ...[
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                key: const Key('notification.plan'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  openAbove<void>(context, PlanViewerScreen(planId: notification.planId!));
+                },
+                icon: const Icon(Icons.map_outlined),
+                label: const Text('Ouvrir le plan'),
               ),
             ],
           ],

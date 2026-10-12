@@ -1,6 +1,7 @@
 package cm.schoolmanaging.school_core
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -29,6 +30,7 @@ import io.flutter.plugin.common.PluginRegistry
  *   openSettings -> opens the app's settings (permission denied for good)
  *   openDocument -> {path, mimeType}: shows a downloaded official PDF (receipt, report card)
  *                   with the device's viewer; false when none is installed (DocumentOpener)
+ *   clearSharedDocuments -> deletes cache/shared/ (copies handed to viewers): server switch
  */
 class SchoolCorePlugin :
     FlutterPlugin,
@@ -36,17 +38,20 @@ class SchoolCorePlugin :
     MethodChannel.MethodCallHandler,
     PluginRegistry.RequestPermissionsResultListener {
     private var channel: MethodChannel? = null
+    private var context: Context? = null
     private var binding: ActivityPluginBinding? = null
     private var pending: MethodChannel.Result? = null
     private var askedThisRun = false
 
     override fun onAttachedToEngine(flutter: FlutterPlugin.FlutterPluginBinding) {
+        context = flutter.applicationContext
         channel = MethodChannel(flutter.binaryMessenger, CHANNEL).also { it.setMethodCallHandler(this) }
     }
 
     override fun onDetachedFromEngine(flutter: FlutterPlugin.FlutterPluginBinding) {
         channel?.setMethodCallHandler(null)
         channel = null
+        context = null
     }
 
     override fun onAttachedToActivity(activity: ActivityPluginBinding) {
@@ -79,6 +84,7 @@ class SchoolCorePlugin :
                 val mime = call.argument<String>("mimeType") ?: "application/pdf"
                 result.success(activity != null && path != null && DocumentOpener.open(activity, path, mime))
             }
+            "clearSharedDocuments" -> result.success(context?.let { DocumentOpener.clear(it) } ?: false)
             else -> result.notImplemented()
         }
     }

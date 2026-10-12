@@ -125,6 +125,32 @@ class FakeApi {
   String activationCode = 'K7Q2-M9XA-4TZP-QH3W-B8NC';
   bool activationUsed = false;
   bool offline = false;
+
+  /// Teachers the plan is published for (e.g. a MANUAL audience: Jean's classes only).
+  final planReaders = <String>{'ta'};
+  final schoolPlan = <String, dynamic>{
+    'id': 'p1',
+    'title': 'Plan général',
+    'description': '',
+    'building': 'Bâtiment A',
+    'floor': 'RDC',
+    'display_order': 0,
+    'published_at': '2026-10-05T08:00:00+01:00',
+    'school_name': 'École Test',
+    'version': {
+      'number': 1,
+      'mime_type': 'image/png',
+      'size_bytes': 70,
+      'width': 1,
+      'height': 1,
+      'page_count': null,
+      'published_at': '2026-10-05T08:00:00+01:00',
+    },
+    'file_url': '/api/v1/plans/p1/file/',
+  };
+  final planPng = base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+  );
   int issued = 0;
 
   List<FakeTeacher> get people => [a, b, parent];
@@ -367,6 +393,13 @@ class FakeApi {
       return ok(rows, meta: {'count': 1, 'next': null});
     }
     if (path == 'conversations/cv1/read/' && who.key == 'ta') return ok({'read': true});
+    // School plans (documents/plans_api.py): the SERVER decides who sees which plan (404 otherwise).
+    final plans = planReaders.contains(who.key) ? [schoolPlan] : const <Map<String, dynamic>>[];
+    if (path == 'plans/') return ok(plans);
+    if (path == 'plans/p1/' && plans.isNotEmpty) return ok(schoolPlan);
+    if (path == 'plans/p1/file/' && plans.isNotEmpty) {
+      return http.Response.bytes(planPng, 200, headers: {'content-type': 'image/png'});
+    }
     if (path == 'complaints/') return ok(<Map>[], meta: {'count': 0, 'next': null});
     // Forum (EXISTING API): the server decides the spaces of the member.
     if (path == 'forum/spaces/') {

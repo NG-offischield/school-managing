@@ -126,6 +126,7 @@ Pour les quatre applications mobiles, **E2E réseau** veut dire : le chemin rés
 | Planning | PASS | PASS (en direct et hors ligne) | PASS (aucune notification de planning de classe, par conception) | PASS | N/A (fermetures seulement) |
 | Finance | PASS (paiement et facture PAYÉE vus ; **notifiée** d'un paiement de parent confirmé, une fois, en direct et par `GET` : backend + réseau + poste) | PASS (paiement, notification) | N/A (sa paie : PASS le 05/10) | N/A (sa paie) | N/A (statut sans montant) |
 | Documents | PARTIAL (desktop ; non joué par le réseau dans cette phase) | PASS (reçu PDF, 05/10) | PARTIAL | PARTIAL | N/A |
+| Plans de l'établissement | PASS (desktop : import, aperçu, versions, publication, retrait, diffusion ; réseau : `e2e/school_plans.mjs` 28/28, le 12/10) | PASS (widget + réseau : liste, téléchargement, notification `PLAN` en direct, accès fermé au retrait ou hors public) | N/A (jamais destinataire, vérifié par le réseau) | PASS (widget + réseau ; perd l'accès aussitôt hors public) | N/A (jamais destinataire, vérifié par le réseau) |
 
 ## 7. Scénarios E2E (réseau, le 09/10)
 

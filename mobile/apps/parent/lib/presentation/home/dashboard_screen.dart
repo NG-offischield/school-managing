@@ -162,6 +162,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   label: 'Bulletins et documents',
                   onTap: () => _push(const DocumentsScreen()),
                 ),
+                _Shortcut(
+                  key: const Key('home.plans'),
+                  icon: Icons.map_outlined,
+                  label: "Plan de l'établissement",
+                  onTap: () => _push(const PlansScreen()),
+                ),
                 _Shortcut(icon: Icons.fact_check_outlined, label: 'Présences', onTap: () => widget.onOpenTab(1)),
                 _Shortcut(
                   icon: Icons.calendar_month_outlined,

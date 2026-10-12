@@ -12,11 +12,21 @@ import 'presentation/home/home_shell.dart';
 /// Root: the session state decides the screen
 /// (splash -> login / create account -> pending approval -> home).
 class ParentApp extends StatelessWidget {
-  const ParentApp({super.key, required this.auth, required this.repository, required this.pdfStore, this.realtime});
+  const ParentApp({
+    super.key,
+    required this.auth,
+    required this.repository,
+    required this.pdfStore,
+    this.planFiles = const DevicePlanFiles(),
+    this.realtime,
+  });
 
   final AuthService auth;
   final ParentRepository repository;
   final PdfStore pdfStore;
+
+  /// Where a PDF school plan goes to be shown by the phone's viewer (school_core).
+  final PlanFiles planFiles;
 
   /// Live connection (existing ws/v1/realtime/); null = refresh by hand (tests).
   final RealtimeClient Function()? realtime;
@@ -29,6 +39,7 @@ class ParentApp extends StatelessWidget {
         Provider<ParentRepository>.value(value: repository),
         Provider<CommunicationRepository>.value(value: repository),
         Provider<PdfStore>.value(value: pdfStore),
+        Provider<PlanFiles>.value(value: planFiles),
       ],
       child: MaterialApp(
         title: 'School Managing — Parent',

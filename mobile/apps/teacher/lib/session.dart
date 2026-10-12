@@ -7,7 +7,13 @@ import 'data/teacher_repository.dart';
 /// The whole client graph of the app for ONE server (school_core ServerHost):
 /// a server switch leaves this session and builds a new one — nothing of the
 /// old school (token, identity, data, live connection) is reused.
-ServerSession teacherSession(AppConfig config, {http.Client? client, TokenStore? tokens, ChannelFactory? channels}) {
+ServerSession teacherSession(
+  AppConfig config, {
+  http.Client? client,
+  TokenStore? tokens,
+  ChannelFactory? channels,
+  PlanFiles planFiles = const DevicePlanFiles(),
+}) {
   final api = ApiClient(baseUrl: config.apiUrl, client: client);
   final auth = AuthService(
     api,
@@ -19,10 +25,11 @@ ServerSession teacherSession(AppConfig config, {http.Client? client, TokenStore?
       ? RealtimeClient(api, config.socket, refresh: auth.refreshSession)
       : RealtimeClient(api, config.socket, refresh: auth.refreshSession, channelFactory: channels);
   return ServerSession(
-    app: TeacherApp(auth: auth, repository: TeacherRepository(api), realtime: live),
+    app: TeacherApp(auth: auth, repository: TeacherRepository(api), planFiles: planFiles, realtime: live),
     onReady: auth.restore, // no request before Android 17 lets the app reach the LAN
     leave: () async {
       await auth.leaveServer(); // server logout if it still answers; local session dropped anyway
+      await planFiles.clear(); // school plans of the old school handed to the PDF viewer
     },
   );
 }

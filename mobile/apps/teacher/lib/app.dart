@@ -8,10 +8,19 @@ import 'presentation/home/home_shell.dart';
 
 /// Root: session state decides the screen (splash -> login -> home).
 class TeacherApp extends StatelessWidget {
-  const TeacherApp({super.key, required this.auth, required this.repository, this.realtime});
+  const TeacherApp({
+    super.key,
+    required this.auth,
+    required this.repository,
+    this.planFiles = const DevicePlanFiles(),
+    this.realtime,
+  });
 
   final AuthService auth;
   final TeacherRepository repository;
+
+  /// Where a PDF school plan goes to be shown by the phone's viewer (school_core).
+  final PlanFiles planFiles;
 
   /// Live connection (existing ws/v1/realtime/); null = refresh by hand (tests).
   final RealtimeClient Function()? realtime;
@@ -23,6 +32,7 @@ class TeacherApp extends StatelessWidget {
         ChangeNotifierProvider<AuthService>.value(value: auth),
         Provider<TeacherRepository>.value(value: repository),
         Provider<CommunicationRepository>.value(value: repository),
+        Provider<PlanFiles>.value(value: planFiles),
       ],
       child: MaterialApp(
         title: 'School Managing — Enseignant',

@@ -281,3 +281,13 @@ Future<bool> openDocument(String path, {String mimeType = 'application/pdf'}) as
     return false;
   }
 }
+
+/// Server switch: deletes the copies of documents handed to the phone's
+/// viewers (cache/shared/). False without an Android side (nothing to delete).
+Future<bool> clearSharedDocuments() async {
+  try {
+    return await const MethodChannel('school_core/local_network').invokeMethod<bool>('clearSharedDocuments') ?? false;
+  } on MissingPluginException {
+    return false;
+  }
+}

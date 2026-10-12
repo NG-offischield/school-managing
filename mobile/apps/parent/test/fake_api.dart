@@ -83,6 +83,32 @@ class FakeApi {
   final suspended = <String>{};
   String? issuedSponsorCode;
   bool offline = false;
+
+  /// Parents the plan is published for (e.g. a MANUAL audience: Awa's children's classes only).
+  final planReaders = <String>{'pa'};
+  final schoolPlan = <String, dynamic>{
+    'id': 'p1',
+    'title': 'Plan général',
+    'description': '',
+    'building': 'Bâtiment A',
+    'floor': 'RDC',
+    'display_order': 0,
+    'published_at': '2026-10-05T08:00:00+01:00',
+    'school_name': 'École Test',
+    'version': {
+      'number': 1,
+      'mime_type': 'image/png',
+      'size_bytes': 70,
+      'width': 1,
+      'height': 1,
+      'page_count': null,
+      'published_at': '2026-10-05T08:00:00+01:00',
+    },
+    'file_url': '/api/v1/plans/p1/file/',
+  };
+  final planPng = base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+  );
   int issued = 0;
 
   List<FakePerson> get people => [a, b, teacher, ...registered];
@@ -458,6 +484,13 @@ class FakeApi {
       ]);
     }
     if (path.startsWith('conversations/') && path.endsWith('/read/')) return ok({'read': true});
+    // School plans (documents/plans_api.py): the SERVER decides who sees which plan (404 otherwise).
+    final plans = planReaders.contains(who.key) ? [schoolPlan] : const <Map<String, dynamic>>[];
+    if (path == 'plans/') return ok(plans);
+    if (path == 'plans/p1/' && plans.isNotEmpty) return ok(schoolPlan);
+    if (path == 'plans/p1/file/' && plans.isNotEmpty) {
+      return http.Response.bytes(planPng, 200, headers: {'content-type': 'image/png'});
+    }
     if (path == 'complaints/') {
       if (request.method == 'POST') {
         final row = {

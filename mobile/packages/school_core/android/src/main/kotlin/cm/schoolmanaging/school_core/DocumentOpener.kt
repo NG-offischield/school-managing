@@ -2,6 +2,7 @@ package cm.schoolmanaging.school_core
 
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
 import java.io.File
@@ -37,7 +38,10 @@ object DocumentOpener {
             false // no PDF viewer: the file stays saved in the app
         }
     }
-}
 
-/** Own subclass: never clashes with another library's androidx FileProvider when manifests merge. */
-class SchoolCoreFileProvider : FileProvider()
+    /** Server switch: the copies handed to viewers (old school's documents) leave the phone. */
+    fun clear(context: Context): Boolean {
+        val folder = File(context.cacheDir, FOLDER)
+        return !folder.exists() || folder.deleteRecursively()
+    }
+}

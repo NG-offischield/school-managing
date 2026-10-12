@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:school_core/school_core.dart';
 
-/// Identity, school, logout, about the software.
+/// Identity, school, school plan, logout, about the software.
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -50,6 +50,14 @@ class ProfileScreen extends StatelessWidget {
                   leading: const Icon(Icons.badge_outlined),
                   title: const Text('Rôle'),
                   subtitle: Text((membership?.roles.contains('TEACHER') ?? false) ? 'Enseignant' : '—'),
+                ),
+                ListTile(
+                  key: const Key('profile.plans'),
+                  leading: const Icon(Icons.map_outlined),
+                  title: const Text("Plan de l'établissement"),
+                  subtitle: const Text('Bâtiments, salles et accès'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PlansScreen())),
                 ),
               ],
             ),

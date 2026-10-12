@@ -20,15 +20,20 @@ void main() {
     final tokens = MemoryTokenStore()..refreshToken = 'ref-old-school';
     final pdfs = MemoryPdfStore();
     await pdfs.save('recu.pdf', Uint8List.fromList(utf8.encode('%PDF old school')));
+    final plans = MemoryPlanFiles();
+    await plans.openPdf('plan.pdf', Uint8List.fromList(utf8.encode('%PDF old plan')));
     final session = parentSession(
       AppConfig.server('http://192.168.1.10:8000', release: false),
       client: client,
       tokens: tokens,
       pdfStore: pdfs,
+      planFiles: plans,
     );
     await session.leave();
     expect(tokens.refreshToken, isNull);
     expect(pdfs.files, isEmpty);
+    expect(plans.opened, isEmpty); // the old school's plans too
+    expect(plans.cleared, 1);
     expect(asked, isEmpty); // no access token: nothing to revoke remotely, nothing sent
   });
 
