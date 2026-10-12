@@ -388,7 +388,7 @@ def test_year_level_class_dashboard_path(controller, backend):
     offered = {}
 
     def create(references, school_class=None):
-        year_list, level_list, _rooms = references
+        year_list, level_list, _rooms, _regimes = references
         offered["years"] = [y.name for y in year_list]
         offered["levels"] = [lv.code for lv in level_list]
         new_year = next(y for y in year_list if y.name == "2026-2027")

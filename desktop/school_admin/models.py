@@ -223,6 +223,8 @@ class SchoolClass:
     main_room_label: str
     public_visible: bool
     active: bool
+    regime_id: str | None = None
+    regime_label: str = ""
 
     # The list screens name a row by `code`; a class is identified by its name.
     @property
@@ -243,6 +245,36 @@ class SchoolClass:
             row.get("main_room_name") or "",
             bool(row.get("public_visible")),
             bool(row["active"]),
+            row.get("regime"),
+            row.get("regime_name") or "",
+        )
+
+
+@dataclass
+class TimetableRegime:
+    """Explicit time window of a school year (backend academics.TimetableRegime):
+    lets a day class and an evening class share one default room."""
+
+    id: str
+    year_id: str
+    name: str
+    start: str  # "HH:MM"
+    end: str
+    active: bool
+
+    @property
+    def label(self):
+        return f"{self.name} ({self.start}–{self.end})"
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            row["id"],
+            row["academic_year"],
+            row["name"],
+            (row.get("start_time") or "")[:5],
+            (row.get("end_time") or "")[:5],
+            bool(row.get("active", True)),
         )
 
 

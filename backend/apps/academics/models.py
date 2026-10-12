@@ -443,6 +443,49 @@ class Room(TenantModel):
 
 
 # =============================================================================
+# Timetable regimes
+# =============================================================================
+
+
+class TimetableRegime(TenantModel):
+    """An explicit time window of one school year — "Cours du jour 07:00–14:00",
+    "Cours du soir 17:00–21:30" — that a class can belong to (optional).
+
+    Why it exists: a room is normally the DEFAULT room (SchoolClass.main_room)
+    of one class per year. Two classes may share it only when each belongs to
+    an explicit regime and the two windows do not overlap (a day class and an
+    evening class); the classes' slots and sessions then stay inside their
+    regime. Never deduced from a class name. Schools without regimes ignore
+    this entirely.
+
+    First version: a window lies within one day (end after start) — an
+    evening running past midnight is refused, not guessed.
+    """
+
+    academic_year = models.ForeignKey(AcademicYear, on_delete=models.PROTECT, related_name="timetable_regimes")
+    name = models.CharField(max_length=80)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["start_time", "name"]
+        constraints = [
+            models.UniqueConstraint(fields=["school", "academic_year", "name"], name="regime_school_year_name_unique"),
+            models.CheckConstraint(condition=Q(end_time__gt=F("start_time")), name="regime_times_ordered"),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.start_time:%H:%M}–{self.end_time:%H:%M})"
+
+    def overlaps(self, other):
+        return self.start_time < other.end_time and other.start_time < self.end_time
+
+    def contains(self, start_time, end_time):
+        return self.start_time <= start_time and end_time <= self.end_time
+
+
+# =============================================================================
 # Classes
 # =============================================================================
 
@@ -464,6 +507,8 @@ class SchoolClass(TenantModel):
     academic_year = models.ForeignKey(AcademicYear, on_delete=models.PROTECT, related_name="classes")
     capacity = models.PositiveIntegerField(blank=True, null=True)
     main_room = models.ForeignKey(Room, on_delete=models.SET_NULL, blank=True, null=True, related_name="main_of")
+    # Optional explicit time window of the class (same school and year, enforced by PostgreSQL).
+    regime = models.ForeignKey(TimetableRegime, on_delete=models.PROTECT, blank=True, null=True, related_name="classes")
     active = models.BooleanField(default=True)
     public_visible = models.BooleanField(default=False)
 
@@ -474,6 +519,15 @@ class SchoolClass(TenantModel):
             models.UniqueConstraint(fields=["school", "name", "academic_year"], name="class_school_name_year_unique"),
             models.CheckConstraint(
                 condition=Q(capacity__isnull=True) | Q(capacity__gt=0), name="class_capacity_positive"
+            ),
+            # A default room is held by ONE class per year and regime: two classes without
+            # regime (NULL = NULL here) or with the same regime can never share it. Sharing
+            # across DIFFERENT regimes is checked by the service (windows must not overlap).
+            models.UniqueConstraint(
+                fields=["academic_year", "main_room", "regime"],
+                condition=Q(main_room__isnull=False),
+                nulls_distinct=False,
+                name="class_default_room_per_regime_unique",
             ),
         ]
 

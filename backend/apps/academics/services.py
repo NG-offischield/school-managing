@@ -27,6 +27,7 @@ from .models import (
     SchoolClass,
     Subject,
     SubjectType,
+    TimetableRegime,
 )
 
 # Initial pedagogical categories of a new school (configurable afterwards:
@@ -316,7 +317,7 @@ def set_subject_active(subject, active, *, actor):
 # break them. The main room is delegated to the planning service, which
 # owns the room rules (same school, active, capacity vs enrolled pupils).
 
-CLASS_FIELDS = ["name", "level", "academic_year", "capacity", "main_room", "active", "public_visible"]
+CLASS_FIELDS = ["name", "level", "academic_year", "capacity", "main_room", "regime", "active", "public_visible"]
 OPEN_YEAR_STATUSES = (AcademicYearStatus.PLANNED, AcademicYearStatus.ACTIVE)
 
 
@@ -361,15 +362,19 @@ def _unique_class_name(school, year, name, exclude=None):
         )
 
 
-def _set_main_room(school_class, room, actor):
-    # Lazy import: scheduling depends on academics, not the other way round.
-    from apps.scheduling.services import set_class_main_room
+def _set_room_and_regime(school_class, actor, **values):
+    # Lazy import: scheduling depends on academics, not the other way round. The
+    # planning service owns the room rules (school, active, capacity, exclusivity
+    # per regime) and checks room + regime TOGETHER under the room's lock.
+    from apps.scheduling.services import set_class_room_and_regime
 
-    return set_class_main_room(school_class, room, actor=actor)
+    return set_class_room_and_regime(school_class, actor=actor, **values)
 
 
 @transaction.atomic
-def create_class(school, *, actor, name, level, academic_year, capacity=None, main_room=None, public_visible=False):
+def create_class(
+    school, *, actor, name, level, academic_year, capacity=None, main_room=None, regime=None, public_visible=False
+):
     require_role(actor, ADMIN_ROLES, school=school)
     name = _class_name(name)
     _check_level(school, level)
@@ -384,16 +389,17 @@ def create_class(school, *, actor, name, level, academic_year, capacity=None, ma
         capacity=capacity,
         public_visible=public_visible,
     )
-    if main_room is not None:
-        school_class = _set_main_room(school_class, main_room, actor)
+    if main_room is not None or regime is not None:
+        school_class = _set_room_and_regime(school_class, actor, room=main_room, regime=regime)
     _audit("CLASS_CREATED", actor, school_class, new=snapshot(school_class, CLASS_FIELDS))
     return school_class
 
 
 @transaction.atomic
 def update_class(school_class, *, actor, **changes):
-    """Editable: name, level, capacity, main_room, public_visible. The academic
-    year is fixed at creation (409 class_year_immutable)."""
+    """Editable: name, level, capacity, main_room, regime, public_visible. The
+    academic year is fixed at creation (409 class_year_immutable). Changing the
+    default room never moves existing slots or sessions."""
     require_role(actor, ADMIN_ROLES, school=school_class.school)
     school_class = SchoolClass.objects.select_for_update().get(pk=school_class.pk)
     school = school_class.school
@@ -415,8 +421,13 @@ def update_class(school_class, *, actor, **changes):
     if "public_visible" in changes:
         school_class.public_visible = bool(changes["public_visible"])
     school_class.save()
+    placement = {}
     if "main_room" in changes and changes["main_room"] != school_class.main_room:
-        school_class = _set_main_room(school_class, changes["main_room"], actor)
+        placement["room"] = changes["main_room"]
+    if "regime" in changes and changes["regime"] != school_class.regime:
+        placement["regime"] = changes["regime"]
+    if placement:
+        school_class = _set_room_and_regime(school_class, actor, **placement)
     _audit("CLASS_UPDATED", actor, school_class, old=old, new=snapshot(school_class, CLASS_FIELDS))
     return school_class
 
@@ -661,3 +672,74 @@ def set_level_active(level, active, *, actor):
         action = "LEVEL_ACTIVATED" if active else "LEVEL_DEACTIVATED"
         _audit(action, actor, level, old=old, new=snapshot(level, LEVEL_FIELDS))
     return level
+
+
+# =============================================================================
+# Timetable regimes (optional: day / evening classes sharing a default room)
+# =============================================================================
+
+REGIME_FIELDS = ["name", "start_time", "end_time", "active"]
+
+
+def _regime_times(start_time, end_time):
+    if start_time is None or end_time is None:
+        raise ValidationError("A regime needs a start and an end time.", code="regime_times_required")
+    if end_time <= start_time:
+        # First version: a window lies within one day (no evening past midnight).
+        raise ValidationError("The regime must end after it starts, the same day.", code="invalid_times")
+
+
+def _unique_regime_name(school, year, name, exclude=None):
+    duplicates = TimetableRegime.objects.filter(school=school, academic_year=year, name__iexact=name)
+    if exclude is not None:
+        duplicates = duplicates.exclude(pk=exclude.pk)
+    if duplicates.exists():
+        raise ValidationError(f"A regime named {name} already exists for this year.", code="duplicate_regime_name")
+
+
+@transaction.atomic
+def create_regime(school, *, actor, academic_year, name, start_time, end_time):
+    require_role(actor, ADMIN_ROLES, school=school)
+    _check_year(school, academic_year)
+    name = (name or "").strip()
+    if not name:
+        raise ValidationError("A regime name is required.", code="name_required")
+    _regime_times(start_time, end_time)
+    _unique_regime_name(school, academic_year, name)
+    regime = TimetableRegime.objects.create(
+        school=school, academic_year=academic_year, name=name, start_time=start_time, end_time=end_time
+    )
+    _audit("TIMETABLE_REGIME_CREATED", actor, regime, new=snapshot(regime, REGIME_FIELDS))
+    return regime
+
+
+@transaction.atomic
+def update_regime(regime, *, actor, **changes):
+    """Name, hours, active. New hours are re-checked against the regime's
+    classes: their published slots must still fit, and a default room they share
+    with another regime must still not overlap. Deactivating a regime that
+    classes still use is refused (remove it from those classes first)."""
+    require_role(actor, ADMIN_ROLES, school=regime.school)
+    regime = TimetableRegime.objects.select_for_update().get(pk=regime.pk)
+    if regime.academic_year.status not in OPEN_YEAR_STATUSES:
+        raise ValidationError("This academic year is closed.", code="year_closed")
+    old = snapshot(regime, REGIME_FIELDS)
+    if "name" in changes:
+        name = (changes["name"] or "").strip()
+        if not name:
+            raise ValidationError("A regime name is required.", code="name_required")
+        _unique_regime_name(regime.school, regime.academic_year, name, exclude=regime)
+        regime.name = name
+    start, end = changes.get("start_time", regime.start_time), changes.get("end_time", regime.end_time)
+    _regime_times(start, end)
+    regime.start_time, regime.end_time = start, end
+    if "active" in changes and not changes["active"] and regime.classes.exists():
+        raise ValidationError("Classes still follow this regime.", code="regime_in_use")
+    if "active" in changes:
+        regime.active = bool(changes["active"])
+    regime.save()
+    from apps.scheduling.services import recheck_regime
+
+    recheck_regime(regime)
+    _audit("TIMETABLE_REGIME_UPDATED", actor, regime, old=old, new=snapshot(regime, REGIME_FIELDS))
+    return regime

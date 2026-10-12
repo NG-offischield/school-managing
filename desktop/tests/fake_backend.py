@@ -87,6 +87,7 @@ class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake):
             "rx": {"id": "rx", "code": "OLD", "name": "Salle fermée", "capacity": 20, "active": False},
         }
         self.classes = {}
+        self.regimes = {}  # timetable regimes (optional day / evening windows)
         self.classes_in_use = set()
         for name, level in (("6e A", "l6"), ("6e B", "l6"), ("5e A", "l5"), ("5e B", "l5")):
             self.add_class(name, level)
@@ -1406,10 +1407,55 @@ class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake):
             "academic_year": year,
             "capacity": None,
             "main_room": room,
+            "regime": None,
             "public_visible": False,
             "active": active,
         }
         return cid
+
+    def _regime_label(self, regime_id):
+        r = self.regimes.get(regime_id)
+        return f"{r['name']} ({r['start_time'][:5]}–{r['end_time'][:5]})" if r else None
+
+    def _default_room_refusal(self, merged, current):
+        """Server rule (scheduling.set_class_room_and_regime): one class per year holds a
+        default room, unless both follow explicit regimes whose windows do not overlap."""
+        room, regime = merged.get("main_room"), merged.get("regime")
+        if not room:
+            return None
+        for other in self.classes.values():
+            if other is current or other["academic_year"] != merged["academic_year"] or other["main_room"] != room:
+                continue
+            if not regime or not other.get("regime"):
+                return "room_default_taken"
+            mine, theirs = self.regimes[regime], self.regimes[other["regime"]]
+            if mine["start_time"] < theirs["end_time"] and theirs["start_time"] < mine["end_time"]:
+                return "room_default_regimes_overlap"
+        return None
+
+    def _regimes_route(self, request, path, body, admin):
+        method = request.method
+        if method == "GET":
+            rows = list(self.regimes.values())
+            year = request.url.params.get("academic_year")
+            if year:
+                rows = [r for r in rows if r["academic_year"] == year]
+            if request.url.params.get("active") == "true":
+                rows = [r for r in rows if r["active"]]
+            return self._page(sorted(rows, key=lambda r: r["start_time"]), request)
+        if not admin:
+            return fail(403, "PERMISSION_DENIED", "Permission refusée.")
+        parts = path.split("/")
+        current = self.regimes.get(parts[1]) if len(parts) > 2 and parts[1] else None
+        merged = {**(current or {}), **body}
+        if merged["end_time"] <= merged["start_time"]:
+            return fail(400, "BUSINESS_RULE_VIOLATION", "Heures.", {"rule": "invalid_times"})
+        if current is None:
+            rid = str(uuid.uuid4())
+            self.regimes[rid] = {"id": rid, "active": True, **merged}
+            return ok(self.regimes[rid], status=201)
+        current.update(body)
+        return ok(current)
 
     def _class_out(self, row):
         level, year = self.levels[row["level"]], next(y for y in self.years if y["id"] == row["academic_year"])
@@ -1420,6 +1466,7 @@ class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake):
             "level_name": level["name"],
             "academic_year_name": year["name"],
             "main_room_name": f"{room['code']} — {room['name']}" if room else None,
+            "regime_name": self._regime_label(row.get("regime")),
         }
 
     def _classes(self, request, path, body, admin):
@@ -1459,6 +1506,9 @@ class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake):
             return fail(404, "NOT_FOUND", "Salle introuvable.")
         if current is not None and body.get("academic_year", current["academic_year"]) != current["academic_year"]:
             return fail(409, "CONFLICT", "Année non modifiable.", {"rule": "class_year_immutable"})
+        refusal = self._default_room_refusal(merged, current)
+        if refusal:
+            return fail(409, "CONFLICT", "Salle principale déjà prise.", {"rule": refusal})
         year = next(y for y in self.years if y["id"] == merged["academic_year"])
         if year["status"] not in ("PLANNED", "ACTIVE"):
             return fail(400, "BUSINESS_RULE_VIOLATION", "Année clôturée.", {"rule": "year_closed"})
@@ -1473,11 +1523,17 @@ class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake):
             self.log("CLASS_CREATED", merged["name"])
             cid = self.add_class(merged["name"], merged["level"], merged["academic_year"], merged.get("main_room"))
             self.classes[cid].update(
-                capacity=merged.get("capacity"), public_visible=merged.get("public_visible", False)
+                capacity=merged.get("capacity"),
+                public_visible=merged.get("public_visible", False),
+                regime=merged.get("regime"),
             )
             return ok(self._class_out(self.classes[cid]), status=201)
         current.update(
-            {k: v for k, v in body.items() if k in ("name", "level", "capacity", "main_room", "public_visible")}
+            {
+                k: v
+                for k, v in body.items()
+                if k in ("name", "level", "capacity", "main_room", "regime", "public_visible")
+            }
         )
         return ok(self._class_out(current))
 
@@ -1599,6 +1655,8 @@ class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake):
             return self._page(rows, request)
         if path.startswith("classes/"):
             return self._classes(request, path, body, admin)
+        if path.startswith("timetable-regimes/"):
+            return self._regimes_route(request, path, body, admin)
         if path.startswith("academic-years/"):
             return self._years(request, path, body, admin)
         if path.startswith("students/") or path.startswith("enrollments/"):

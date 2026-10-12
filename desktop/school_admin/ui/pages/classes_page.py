@@ -2,11 +2,16 @@
 
 Filters: academic year (the current year by default), level, status and a
 search on the name. Add / edit open ClassDialog fed with lists fresh from the
-API (open years, active levels, active rooms)."""
+API (open years, active levels, active rooms, regimes). « Régimes horaires… »
+creates or edits the optional time windows (day / evening classes sharing a
+default room); the server enforces every rule."""
 
 from PySide6.QtWidgets import QComboBox, QDialog
 
+from ...services.classes import RegimeService
 from ..dialogs.class_dialog import ClassDialog
+from ..dialogs.regime_dialog import RegimeDialog
+from ..widgets import button
 from .catalog_base import STATUS_COLUMN_TITLE, CatalogPage
 
 ALL_YEARS = "Toutes les années"
@@ -20,10 +25,11 @@ class ClassesPage(CatalogPage):
     noun = "classe"
     search_placeholder = "Rechercher par nom ou niveau…"
 
-    def __init__(self, service, references, runner, parent=None, *, dialog=ClassDialog, **kwargs):
+    def __init__(self, service, references, runner, parent=None, *, dialog=ClassDialog, regimes=None, **kwargs):
         self.service = service
         self.references = references
         self.dialog = dialog
+        self.regime_service = regimes or RegimeService(service.api)
         self._filters_ready = False
         super().__init__(runner, parent, **kwargs)
 
@@ -32,6 +38,13 @@ class ClassesPage(CatalogPage):
 
     def is_filtered(self):
         return super().is_filtered() or bool(self.level_filter.currentData())
+
+    def extra_actions(self):
+        self.regimes_button = button(
+            "Régimes horaires…", tooltip="Cours du jour / du soir : fenêtres horaires facultatives des classes"
+        )
+        self.regimes_button.clicked.connect(self.manage_regimes)
+        return [self.regimes_button]
 
     def describe_row(self, row):
         return f"{row.name} — {row.year_name}"
@@ -90,21 +103,59 @@ class ClassesPage(CatalogPage):
 
     def cells(self, row):
         capacity = f"{row.capacity} élèves" if row.capacity else "—"
-        return [row.name, row.level_label, row.year_name, row.main_room_label or "—", capacity, ""]
+        room = row.main_room_label or "—"
+        if row.regime_label:
+            room = f"{room} · {row.regime_label}"
+        return [row.name, row.level_label, row.year_name, room, capacity, ""]
 
     # --- dialogs -------------------------------------------------------------------
     def open_dialog(self, references, school_class=None):
         """Returns the dialog values, or None if cancelled (overridable in tests)."""
-        years, levels, rooms = references
-        dialog = self.dialog(years, levels, rooms, self, school_class)
+        years, levels, rooms, regimes = references
+        dialog = self.dialog(years, levels, rooms, self, school_class, regimes=regimes)
         return dialog.values() if dialog.exec() == QDialog.Accepted else None
 
     def _with_references(self, then):
-        """Lists offered by the form, fresh from the API: open years, active levels, active rooms."""
+        """Lists offered by the form, fresh from the API: open years, active levels, active rooms, regimes."""
         self.call(
-            lambda: (self.references.years(open_only=True), self.references.levels(), self.references.rooms()),
+            lambda: (
+                self.references.years(open_only=True),
+                self.references.levels(),
+                self.references.rooms(),
+                self.references.regimes(),
+            ),
             then,
-            action="Impossible de charger les années, niveaux et salles",
+            action="Impossible de charger les années, niveaux, salles et régimes",
+        )
+
+    # --- timetable regimes ------------------------------------------------------------
+    def open_regimes(self, years, regimes):
+        """Returns the regime form values, or None if cancelled (overridable in tests)."""
+        dialog = RegimeDialog(years, regimes, self)
+        return dialog.values() if dialog.exec() == QDialog.Accepted else None
+
+    def manage_regimes(self):
+        def open_form(references):
+            values = self.open_regimes(*references)
+            if not values:
+                return
+            regime_id = values.pop("regime_id")
+            if regime_id:
+                values.pop("academic_year_id")
+                call = lambda: self.regime_service.update(regime_id, **values)  # noqa: E731
+                done, failed = "modifié", "Impossible de modifier le régime horaire"
+            else:
+                values.pop("active")
+                call = lambda: self.regime_service.create(**values)  # noqa: E731
+                done, failed = "créé", "Impossible de créer le régime horaire"
+            self.call(
+                call, lambda saved: self.success(f"Régime horaire « {saved.name} » {done} avec succès."), action=failed
+            )
+
+        self.call(
+            lambda: (self.references.years(open_only=True), self.regime_service.list()),
+            open_form,
+            action="Impossible de charger les régimes horaires",
         )
 
     def add(self):

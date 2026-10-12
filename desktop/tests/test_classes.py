@@ -108,6 +108,7 @@ def test_dialog_lists_validation_and_values(qapp, refs):
         "academic_year_id": "y1",
         "level_id": "l5",
         "main_room_id": "r2",
+        "regime_id": None,  # no regime in this year: field hidden
         "capacity": 35,
         "public_visible": False,
     }
@@ -231,7 +232,7 @@ def test_create_edit_deactivate_reactivate(controller, backend):
     offered = {}
 
     def create(references, school_class=None):
-        years, levels, rooms = references
+        years, levels, rooms, _regimes = references
         offered["years"] = [y.name for y in years]
         return {
             "name": "4e A",

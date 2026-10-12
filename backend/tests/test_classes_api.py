@@ -45,8 +45,12 @@ def payload(w, **extra):
 
 
 def test_admin_creates_a_class_with_level_year_and_room(w):
+    # R12 is already 3e A's default room: a second class cannot hold it (no regimes here).
+    taken = error(as_(w.admin).post("/api/v1/classes/", payload(w, main_room=str(w.r12.pk)), format="json"), 409)
+    assert taken["details"]["rule"] == "room_default_taken"
+    r14 = planning.create_room(w.school, actor=w.admin, code="R14", name="Salle 14", capacity=40)
     body = data(
-        as_(w.admin).post("/api/v1/classes/", payload(w, capacity=35, main_room=str(w.r12.pk)), format="json"), 201
+        as_(w.admin).post("/api/v1/classes/", payload(w, capacity=35, main_room=str(r14.pk)), format="json"), 201
     )
     assert (body["name"], body["level"], body["academic_year"], body["capacity"]) == (
         "4e A",
@@ -54,7 +58,8 @@ def test_admin_creates_a_class_with_level_year_and_room(w):
         str(w.year.pk),
         35,
     )
-    assert (body["main_room"], body["main_room_name"], body["active"]) == (str(w.r12.pk), "R12 — Salle 12", True)
+    assert (body["main_room"], body["main_room_name"], body["active"]) == (str(r14.pk), "R14 — Salle 14", True)
+    assert (body["regime"], body["regime_name"]) == (None, None)
     assert body["academic_year_name"] == "2025-2026" and body["level_name"] == w.klass.level.name
     created = SchoolClass.objects.get(pk=body["id"])
     assert created.school == w.school

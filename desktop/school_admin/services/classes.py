@@ -7,10 +7,15 @@ Reference lists come from the API, never typed by hand:
     years   GET /academic-years/   (open ones — planned / current — for a new class)
     levels  GET /levels/           (active ones)
     rooms   GET /rooms/?active=true
+    regimes GET /timetable-regimes/   (optional day / evening windows of a year)
+
+Default room: optional; one class per year holds it, unless both classes follow
+explicit, non-overlapping regimes (server rule, 409 room_default_taken /
+room_default_regimes_overlap). Changing it moves no planned slot or session.
 """
 
 from ..api.errors import ValidationFailed
-from ..models import AcademicYear, Level, Room, SchoolClass
+from ..models import AcademicYear, Level, Room, SchoolClass, TimetableRegime
 
 
 def _active_param(active):
@@ -32,6 +37,12 @@ class ReferenceService:
 
     def rooms(self):
         return [Room.from_api(row) for row in self.api.list_all("rooms/", active="true")]
+
+    def regimes(self, *, academic_year_id=None, active_only=True):
+        rows = self.api.list_all(
+            "timetable-regimes/", academic_year=academic_year_id or None, active="true" if active_only else None
+        )
+        return [TimetableRegime.from_api(row) for row in rows]
 
     def classes(self, *, academic_year_id=None):
         """Active classes (all years, or one year): the student forms filter
@@ -68,25 +79,39 @@ class ClassService:
         if errors:
             raise ValidationFailed("Formulaire incomplet.", details=errors)
 
-    def create(self, *, name, level_id, academic_year_id, main_room_id=None, capacity=None, public_visible=False):
+    def create(
+        self,
+        *,
+        name,
+        level_id,
+        academic_year_id,
+        main_room_id=None,
+        regime_id=None,
+        capacity=None,
+        public_visible=False,
+    ):
         self._require(name, level_id, academic_year_id)
         payload = {
             "name": name.strip(),
             "level": level_id,
             "academic_year": academic_year_id,
             "main_room": main_room_id or None,
+            "regime": regime_id or None,
             "capacity": capacity or None,
             "public_visible": bool(public_visible),
         }
         return SchoolClass.from_api(self.api.post(self.PATH, payload))
 
-    def update(self, class_id, *, name, level_id, main_room_id=None, capacity=None, public_visible=False):
+    def update(
+        self, class_id, *, name, level_id, main_room_id=None, regime_id=None, capacity=None, public_visible=False
+    ):
         """The academic year is fixed at creation (server rule): not sent."""
         self._require(name, level_id, creating=False)
         payload = {
             "name": name.strip(),
             "level": level_id,
             "main_room": main_room_id or None,
+            "regime": regime_id or None,
             "capacity": capacity or None,
             "public_visible": bool(public_visible),
         }
@@ -97,3 +122,28 @@ class ClassService:
 
     def reactivate(self, class_id):
         return SchoolClass.from_api(self.api.post(f"{self.PATH}{class_id}/reactivate/"))
+
+
+class RegimeService:
+    """Timetable regimes (backend academics/class_api.py). Thin client: hours,
+    unique name, overlaps with shared rooms and slots are checked by the server."""
+
+    PATH = "timetable-regimes/"
+
+    def __init__(self, api):
+        self.api = api
+
+    def list(self, *, academic_year_id=None):
+        rows = self.api.list_all(self.PATH, academic_year=academic_year_id or None)
+        return [TimetableRegime.from_api(row) for row in rows]
+
+    def create(self, *, academic_year_id, name, start, end):
+        if not (name or "").strip():
+            raise ValidationFailed("Formulaire incomplet.", details={"name": ["Obligatoire."]})
+        payload = {"academic_year": academic_year_id, "name": name.strip(), "start_time": start, "end_time": end}
+        return TimetableRegime.from_api(self.api.post(self.PATH, payload))
+
+    def update(self, regime_id, **changes):
+        mapping = {"name": "name", "start": "start_time", "end": "end_time", "active": "active"}
+        payload = {mapping[k]: v for k, v in changes.items() if k in mapping}
+        return TimetableRegime.from_api(self.api.patch(f"{self.PATH}{regime_id}/", payload))

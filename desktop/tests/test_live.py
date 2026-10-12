@@ -185,7 +185,7 @@ def test_full_vertical_against_the_real_backend(live, tmp_path):
     assert classes.year_filter.currentData() == new_year.id  # the new current year by default
 
     def fill_class(references, school_class=None):
-        years, levels, rooms = references
+        years, levels, rooms, _regimes = references
         dialog = ClassDialog(years, levels, rooms, school_class=school_class)
         if school_class is None:
             assert dialog.academic_year.currentData() == new_year.id  # current year preselected

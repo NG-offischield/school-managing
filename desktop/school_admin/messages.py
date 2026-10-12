@@ -19,6 +19,18 @@ RULE_MESSAGES = {
     "level_required": "Choisissez un niveau.",
     "room_inactive": "Cette salle est inactive : choisissez une salle active.",
     "room_capacity_exceeded": "La salle est trop petite pour les élèves inscrits dans la classe.",
+    "room_default_taken": "Cette salle est déjà la salle principale d'une autre classe de l'année. Pour la partager "
+    "(cours du jour et cours du soir), chaque classe doit suivre un régime horaire distinct qui ne se chevauche pas.",
+    "room_default_regimes_overlap": "Cette salle est déjà la salle principale d'une classe dont le régime horaire "
+    "chevauche celui-ci : choisissez une autre salle ou des régimes sans chevauchement.",
+    "slots_outside_regime": "Des créneaux publiés de la classe sont en dehors de ce régime horaire : "
+    "déplacez-les d'abord, ou choisissez un autre régime.",
+    "outside_regime": "Cette classe suit un régime horaire : le créneau ou la séance doit rester dans ses heures.",
+    "regime_inactive": "Ce régime horaire est inactif : choisissez un régime actif.",
+    "regime_other_year": "Ce régime horaire appartient à une autre année scolaire.",
+    "regime_in_use": "Des classes suivent encore ce régime horaire : retirez-le de ces classes avant de le désactiver.",
+    "duplicate_regime_name": "Un régime horaire porte déjà ce nom pour cette année scolaire.",
+    "regime_times_required": "Indiquez l'heure de début et l'heure de fin du régime.",
     "name_required": "Le nom est obligatoire.",
     "academic_year_required": "Choisissez une année scolaire.",
     "duplicate_year_name": "Une année scolaire porte déjà ce nom : choisissez-en un autre.",

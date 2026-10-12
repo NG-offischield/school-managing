@@ -25,7 +25,7 @@ from django.db import IntegrityError, connection, transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from apps.academics.models import AcademicPeriod, AcademicYearStatus, Room, RoomType
+from apps.academics.models import AcademicPeriod, AcademicYearStatus, Room, RoomType, SchoolClass, TimetableRegime
 from apps.audit.models import AuditLayer
 from apps.audit.services import record_audit, snapshot
 from apps.people.compatibility import evaluate
@@ -273,20 +273,135 @@ def set_room_active(room, active, *, actor):
 @transaction.atomic
 def set_class_main_room(school_class, room, *, actor):
     """The default room of the class's theoretical courses (None to clear)."""
-    require_role(actor, ADMIN_ROLES, school=school_class.school)
-    _check_room(room, school_class.school, school_class)
-    old = {"main_room": str(school_class.main_room_id) if school_class.main_room_id else None}
-    school_class.main_room = room
-    school_class.save(update_fields=["main_room", "updated_at"])
-    record_audit(
-        "CLASS_MAIN_ROOM_SET",
-        actor=actor,
-        entity=school_class,
-        old=old,
-        new={"main_room": str(room.pk) if room else None},
-        layer=AuditLayer.ADMINISTRATIVE,
+    return set_class_room_and_regime(school_class, actor=actor, room=room)
+
+
+_UNSET = object()
+
+
+def _check_regime(regime, school_class):
+    if regime is None:
+        return None
+    regime = TimetableRegime.objects.get(pk=regime.pk)  # fresh: hours / status may have changed
+    if regime.school_id != school_class.school_id or regime.academic_year_id != school_class.academic_year_id:
+        raise ValidationError("The regime belongs to another school year.", code="regime_other_year")
+    if not regime.active:
+        raise ValidationError("This timetable regime is inactive.", code="regime_inactive")
+    return regime
+
+
+def _check_default_room_sharing(school_class, room, regime):
+    """A default room belongs to ONE class per year — unless every class sharing
+    it has an explicit regime and the windows do not overlap. The caller holds
+    the room's row lock: two concurrent assignments of the same room are
+    serialised and the second one sees the first."""
+    if room is None:
+        return
+    others = (
+        SchoolClass.objects.filter(academic_year_id=school_class.academic_year_id, main_room=room)
+        .exclude(pk=school_class.pk)
+        .select_related("regime")
     )
+    for other in others:
+        params = {"room": str(room.pk), "class": other.name}
+        if regime is None or other.regime is None:
+            raise ValidationError(
+                f"This room is already the default room of {other.name}.", code="room_default_taken", params=params
+            )
+        if other.regime_id == regime.pk or regime.overlaps(other.regime):
+            raise ValidationError(
+                f"{other.name} uses this room in an overlapping timetable regime ({other.regime}).",
+                code="room_default_regimes_overlap",
+                params={**params, "regime": other.regime.name},
+            )
+
+
+def _check_slots_in_regime(school_class, regime):
+    """A class put in a regime must already plan its published slots inside it."""
+    if regime is None:
+        return
+    outside = [
+        slot
+        for slot in ScheduleSlot.objects.filter(school_class=school_class, status=SlotStatus.PUBLISHED)
+        if not regime.contains(slot.start_time, slot.end_time)
+    ]
+    if outside:
+        raise ValidationError(
+            f"{len(outside)} published slot(s) of the class lie outside {regime}.",
+            code="slots_outside_regime",
+            params={"slots": [str(s.pk) for s in outside]},
+        )
+
+
+@transaction.atomic
+def set_class_room_and_regime(school_class, *, actor, room=_UNSET, regime=_UNSET):
+    """Default room and/or timetable regime of a class, checked TOGETHER.
+
+    The default room only pre-fills NEW slots: existing slots and sessions keep
+    the room they were planned with (changing them is an explicit planning
+    operation: reschedule a slot, change a session's room)."""
+    require_role(actor, ADMIN_ROLES, school=school_class.school)
+    school_class = SchoolClass.objects.select_for_update().get(pk=school_class.pk)
+    new_room = school_class.main_room if room is _UNSET else room
+    new_regime = school_class.regime if regime is _UNSET else regime
+    if new_room is not None:
+        Room.objects.select_for_update().get(pk=new_room.pk)  # serialise the room's assignments
+    _check_room(new_room, school_class.school, school_class)
+    new_regime = _check_regime(new_regime, school_class)
+    if regime is not _UNSET:
+        _check_slots_in_regime(school_class, new_regime)
+    _check_default_room_sharing(school_class, new_room, new_regime)
+    old = {
+        "main_room": str(school_class.main_room_id) if school_class.main_room_id else None,
+        "regime": str(school_class.regime_id) if school_class.regime_id else None,
+    }
+    school_class.main_room, school_class.regime = new_room, new_regime
+    school_class.save(update_fields=["main_room", "regime", "updated_at"])
+    new = {
+        "main_room": str(new_room.pk) if new_room else None,
+        "regime": str(new_regime.pk) if new_regime else None,
+    }
+    if new != old:
+        record_audit(
+            "CLASS_MAIN_ROOM_SET", actor=actor, entity=school_class, old=old, new=new, layer=AuditLayer.ADMINISTRATIVE
+        )
     return school_class
+
+
+def recheck_regime(regime):
+    """After a regime's hours changed: its classes' slots must still fit, and the
+    rooms they share with other regimes must still not overlap."""
+    for school_class in regime.classes.select_related("main_room"):
+        _check_slots_in_regime(school_class, regime)
+        if school_class.main_room_id:
+            Room.objects.select_for_update().get(pk=school_class.main_room_id)
+            _check_default_room_sharing(school_class, school_class.main_room, regime)
+
+
+def _check_session_in_regime(school_class, start, end):
+    """A session of a class in a regime: same local day, inside the window."""
+    if school_class.regime_id is None:
+        return
+    tz = _tz(school_class.school)
+    local_start, local_end = start.astimezone(tz), end.astimezone(tz)
+    if local_start.date() != local_end.date():  # a regime window never crosses midnight
+        regime = school_class.regime
+        raise ValidationError(
+            f"{school_class.name} follows the regime {regime}: a session cannot run past midnight.",
+            code="outside_regime",
+            params={"regime": regime.name, "start": f"{regime.start_time:%H:%M}", "end": f"{regime.end_time:%H:%M}"},
+        )
+    _check_in_regime(school_class, local_start.time(), local_end.time())
+
+
+def _check_in_regime(school_class, start_time, end_time):
+    regime = school_class.regime
+    if regime is not None and not regime.contains(start_time, end_time):
+        raise ValidationError(
+            f"{school_class.name} follows the regime {regime}: plan inside it.",
+            code="outside_regime",
+            params={"regime": regime.name, "start": f"{regime.start_time:%H:%M}", "end": f"{regime.end_time:%H:%M}"},
+        )
 
 
 # =============================================================================
@@ -374,6 +489,7 @@ def _slot_plan(course, weekday, start_time, end_time, room, effective_from, effe
         raise ValidationError("Weekday must be between 1 (Monday) and 7 (Sunday).", code="invalid_weekday")
     if end_time <= start_time:
         raise ValidationError("The slot must end after it starts.", code="invalid_times")
+    _check_in_regime(course.school_class, start_time, end_time)
     if effective_from < year.start_date or effective_to > year.end_date or effective_to < effective_from:
         raise ValidationError("The slot must lie within the academic year.", code="outside_year")
     if room is None:
@@ -678,6 +794,7 @@ def create_exceptional_session(course, *, actor, start, end, room=None, reason):
     year = course.academic_year
     if not (year.start_date <= day <= year.end_date):
         raise ValidationError("The session must lie within the academic year.", code="outside_year")
+    _check_session_in_regime(course.school_class, start, end)
     room = room if room is not None else course.school_class.main_room
     _check_room(room, course.school, course.school_class)
     conflicts = find_session_conflicts(
@@ -747,6 +864,7 @@ def move_session(session, *, actor, new_start, new_end, reason):
     year = session.academic_year
     if not (year.start_date <= day <= year.end_date):
         raise ValidationError("The session must lie within the academic year.", code="outside_year")
+    _check_session_in_regime(session.school_class, new_start, new_end)
     if _approved_unavailability(session.teacher, new_start, new_end):
         raise ValidationError("The teacher is unavailable at this time.", code="teacher_unavailable")
     conflicts = find_session_conflicts(
@@ -931,6 +1049,7 @@ def swap_sessions(first, second, *, actor, reason):
     targets = {a.pk: (b.scheduled_start, b.scheduled_end), b.pk: (a.scheduled_start, a.scheduled_end)}
     for session in (a, b):
         start, end = targets[session.pk]
+        _check_session_in_regime(session.school_class, start, end)
         if _approved_unavailability(session.teacher, start, end):
             raise ValidationError("A teacher is unavailable at the new time.", code="teacher_unavailable")
         conflicts = find_session_conflicts(

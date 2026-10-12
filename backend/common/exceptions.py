@@ -63,6 +63,13 @@ CONFLICT_RULES = {
     "planning_conflict",
     "room_in_use",
     "room_capacity_exceeded",
+    # default rooms and timetable regimes
+    "room_default_taken",
+    "room_default_regimes_overlap",
+    "slots_outside_regime",
+    "outside_regime",
+    "duplicate_regime_name",
+    "regime_in_use",
     "course_scheduled",
     # finance (ADR 0013)
     "idempotency_conflict",
