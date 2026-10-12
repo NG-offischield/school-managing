@@ -37,6 +37,7 @@ def initials(full_name):
 
 class MainWindow(QMainWindow):
     logout_requested = Signal()
+    account_requested = Signal()
     session_expired = Signal()
 
     def __init__(self, identity, page_factories, runner, parent=None):
@@ -89,10 +90,15 @@ class MainWindow(QMainWindow):
         self.role_label = QLabel(f"{identity.role_label} · {identity.username}", objectName="userRole")
         who.addWidget(self.user_label)
         who.addWidget(self.role_label)
+        self.account_button = button(
+            "Mon compte", "secondary", tooltip="Coordonnées, photo, mot de passe, appareils connectés"
+        )
+        self.account_button.clicked.connect(self.account_requested.emit)
         self.logout_button = button("Se déconnecter", tooltip="Fermer la session sur ce poste")
         top.addWidget(avatar)
         top.addLayout(who)
         top.addSpacing(8)
+        top.addWidget(self.account_button)
         top.addWidget(self.logout_button)
         self.logout_button.clicked.connect(self.logout_requested.emit)
 

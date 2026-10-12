@@ -14,6 +14,7 @@ import httpx
 from .fake_accounts import AccountsFake
 from .fake_comm import CommunicationFake
 from .fake_finance import FinanceFake
+from .fake_me import MeFake
 from .fake_parents import ParentsFake
 from .fake_plans import PlansFake
 
@@ -31,7 +32,7 @@ def fail(status, code, message, details=None):
     return httpx.Response(status, json={"success": False, "error": error})
 
 
-class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake, PlansFake):
+class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake, PlansFake, MeFake):
     def __init__(self, *, roles=("SUPER_ADMIN",)):
         self.roles = list(roles)
         self.init_finance()
@@ -39,6 +40,7 @@ class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake, Pla
         self.init_accounts()
         self.init_parents()
         self.init_plans()
+        self.init_me()
         self.sessions = {}  # access token -> refresh token
         self.refresh_tokens = set()
         self.revoked = set()
@@ -1605,6 +1607,8 @@ class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake, Pla
                     ],
                 }
             )
+        if path.startswith(("auth/me/profile/", "auth/me/photo/", "auth/password/", "auth/sessions/")):
+            return self._me(request, path, body) or fail(404, "NOT_FOUND", "Introuvable.")
         admin = bool({"SUPER_ADMIN", "ADMIN"} & set(self.roles))
         return self._catalogue(request, path, body, admin) or fail(404, "NOT_FOUND", "Introuvable.")
 

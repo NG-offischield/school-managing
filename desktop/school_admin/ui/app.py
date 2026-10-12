@@ -18,6 +18,7 @@ from ..services.courses import CourseService
 from ..services.dashboard import DashboardService
 from ..services.documents import DocumentService
 from ..services.finance import FinanceService
+from ..services.me import MeService
 from ..services.parents import ParentAdminService
 from ..services.payroll import PayrollService
 from ..services.planning import PlanningService
@@ -26,6 +27,7 @@ from ..services.structure import LevelService, YearService
 from ..services.students import StudentService
 from ..services.teachers import TeacherService
 from .branding import SOFTWARE_NAME, software_icon
+from .dialogs.account_dialog import AccountDialog
 from .login_window import LoginWindow
 from .main_window import MainWindow
 from .pages.catalog_pages import CategoriesPage, SubjectsPage
@@ -70,6 +72,7 @@ class AppController:
         self.parents = ParentAdminService(api)
         self.documents = DocumentService(api)
         self.plans = PlanService(api)
+        self.me = MeService(api)
         self.login_window = LoginWindow(auth, runner, config)
         self.login_window.logged_in.connect(self.show_shell)
         self.main_window = None
@@ -167,8 +170,18 @@ class AppController:
             self.realtime.start()
         self.main_window = MainWindow(identity, self.page_factories(), self.runner)
         self.main_window.logout_requested.connect(self.logout)
+        self.main_window.account_requested.connect(self.open_account)
         self.main_window.session_expired.connect(lambda: self.show_login("Votre session a expiré : reconnectez-vous."))
         self.main_window.show()
+
+    def account_dialog(self):
+        dialog = AccountDialog(self.me, self.runner, self.main_window)
+        dialog.signed_out.connect(self.logout)  # every device disconnected: this one too
+        dialog.session_expired.connect(lambda: self.show_login("Votre session a expiré : reconnectez-vous."))
+        return dialog
+
+    def open_account(self):
+        self.account_dialog().exec()
 
     def logout(self):
         self.runner.run(
