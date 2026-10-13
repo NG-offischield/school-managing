@@ -9,6 +9,7 @@ import 'package:school_core/school_core.dart';
 import 'package:school_parent/app.dart';
 import 'package:school_parent/data/parent_repository.dart';
 import 'package:school_parent/data/pdf_store.dart';
+import 'package:school_parent/presentation/common.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'fake_api.dart';
@@ -163,7 +164,11 @@ void main() {
     await h.start(tester);
     await h.login(tester, h.fake.a);
     await h.tab(tester, 'Présences');
-    expect(find.text('4.00 h'), findsOneWidget);
+    // The summary line (the history may also list a 4.00 h day, depending on what is built).
+    expect(
+      find.byWidgetPredicate((w) => w is InfoRow && w.label == 'Absences non justifiées' && w.value == '4.00 h'),
+      findsOneWidget,
+    );
     expect(find.text('Alerte jaune'), findsOneWidget);
     expect(find.text('Entrée enregistrée'), findsOneWidget);
     expect(find.text('En retard'), findsOneWidget);
