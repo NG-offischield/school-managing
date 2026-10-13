@@ -244,3 +244,44 @@ def test_list_messages_are_grammatical_in_english(controller, backend, tmp_path)
     page.reload()
     assert page.empty.text() == "No category matches these criteria."
     assert page.a == "a" and page.the == "the " and page.plural == "categories"
+
+
+def test_realtime_connection_announces_the_language(qapp):
+    """The server renders system notifications in the connection's language."""
+    from school_admin.realtime import RealtimeClient
+
+    from .test_communication_documents import FakeSocket, StubApi
+
+    class LanguageSocket(FakeSocket):
+        def open(self, request):
+            super().open(request)
+            self.headers[b"Accept-Language"] = bytes(request.rawHeader("Accept-Language"))
+
+    sockets = []
+    rt = RealtimeClient(
+        StubApi(), "ws://h/ws/v1/realtime/", socket_factory=lambda: sockets.append(LanguageSocket()) or sockets[-1]
+    )
+    rt.start()
+    i18n.set_language("en")
+    rt.start()
+    assert [s.headers[b"Accept-Language"] for s in sockets] == [b"fr", b"en"]
+    rt.stop()
+
+
+def test_switch_reconnects_a_live_connection_only(controller, tmp_path):  # noqa: F811
+    controller.config_directory = tmp_path
+    starts = []
+
+    class Live:
+        state = "online"
+
+        def start(self):
+            starts.append(i18n.language())
+
+    controller.realtime = Live()
+    controller.set_language("en")
+    assert starts == ["en"]  # reconnected, announcing English
+    controller.realtime.state = "stopped"  # logged out: stays closed
+    controller.set_language("fr")
+    assert starts == ["en"]
+    controller.realtime = None

@@ -48,6 +48,7 @@ from ..dialogs.planning_dialogs import (
     SessionDialog,
     SlotDialog,
     SubstituteDialog,
+    action_allowed,
 )
 from ..dialogs.teacher_dialogs import ask_reason
 from ..theme import TOKENS
@@ -300,7 +301,7 @@ class WeekPage(Page):
         )
         if session is not None:
             for action, (name, _text) in zip(self.session_button.menu().actions(), SessionDialog.ACTIONS, strict=False):
-                action.setEnabled(session.status == "SCHEDULED" and (name != "restore" or session.is_substituted))
+                action.setEnabled(action_allowed(name, session))
 
     def set_busy(self, busy):
         super().set_busy(busy)
@@ -327,6 +328,24 @@ class WeekPage(Page):
                 f"{context['session'].code} · {context['session'].date:%d/%m/%Y} {context['session'].hours}",
                 save_text=tr("Annuler la séance") if kind == "cancel" else tr("Restaurer"),
                 danger=kind == "cancel",
+            )
+        if kind in ("validate", "reject"):
+            session = context["session"]
+            what = f"{session.code} · {session.date:%d/%m/%Y} {session.hours} · {session.teacher_name}"
+            if kind == "validate":
+                return ask_reason(
+                    self,
+                    tr("Valider la présence de l'enseignant ?"),
+                    tr("{0}. La séance devient réalisée et payable (une seule fois).", what),
+                    save_text=tr("Valider"),
+                    optional=True,
+                )
+            return ask_reason(
+                self,
+                tr("Séance non assurée ?"),
+                tr("{0}. Elle ne sera pas payée ; une séance déjà payée est déduite de la prochaine paie.", what),
+                save_text=tr("Confirmer"),
+                danger=True,
             )
         dialog = factories[kind]()
         if dialog.exec() != QDialog.Accepted:
@@ -374,6 +393,17 @@ class WeekPage(Page):
                 lambda: self.planning.restore_teacher(session.id, values["reason"]),
                 tr("Enseignant prévu restauré."),
                 tr("Impossible de restaurer l'enseignant"),
+            ),
+            # the server answers with the verification: the week is reloaded around the session
+            "validate": (
+                lambda: (self.planning.validate_presence(session.id, values["reason"]), session)[1],
+                tr("Présence validée : la séance est réalisée et payable."),
+                tr("Impossible de valider la présence"),
+            ),
+            "reject": (
+                lambda: (self.planning.reject_presence(session.id, values["reason"]), session)[1],
+                tr("Séance marquée non assurée : elle ne sera pas payée."),
+                tr("Impossible de marquer la séance non assurée"),
             ),
         }
         fn, message, action = calls[name]

@@ -44,6 +44,7 @@ class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake, Pla
         self.init_me()
         self.init_attendance()  # after init_accounts: guardians have accounts
         self.sessions = {}  # access token -> refresh token
+        self.verifications = []  # (validate | reject, session id, reason) received
         self.refresh_tokens = set()
         self.revoked = set()
         self.categories = {}
@@ -982,6 +983,38 @@ class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake, Pla
             "room": self._room_ref(slot["room"]),
         }
 
+    def _verify_session(self, row, action, body):
+        """payroll.services.validate_session / reject_session (the rules the screen relies on)."""
+        from datetime import datetime
+
+        verified = row.setdefault("_verified", "PENDING")
+        if action == "validate":
+            if row["status"] == "CANCELLED":
+                return fail(400, "BUSINESS_RULE_VIOLATION", "Annulée.", {"rule": "session_cancelled"})
+            if datetime.fromisoformat(row["scheduled_end"]) > datetime.now().astimezone():
+                return fail(400, "BUSINESS_RULE_VIOLATION", "Pas terminée.", {"rule": "session_not_finished"})
+            if verified == "VALIDATED":
+                return fail(400, "BUSINESS_RULE_VIOLATION", "Déjà validée.", {"rule": "session_already_validated"})
+            row["_verified"], row["status"] = "VALIDATED", "COMPLETED"
+        else:
+            if not (body.get("reason") or "").strip():
+                return fail(400, "BUSINESS_RULE_VIOLATION", "Motif.", {"rule": "reason_required"})
+            if verified == "REJECTED":
+                return fail(400, "BUSINESS_RULE_VIOLATION", "Déjà rejetée.", {"rule": "session_already_rejected"})
+            row["_verified"] = "REJECTED"
+            if row["status"] == "COMPLETED":
+                row["status"] = "SCHEDULED"
+        self.verifications.append((action, row["id"], body.get("reason")))
+        return ok(
+            {
+                "id": f"chk-{row['id']}",
+                "teaching_session": row["id"],
+                "teacher": row["teacher"],
+                "verified_status": row["_verified"],
+                "verification_reason": body.get("reason") or None,
+            }
+        )
+
     def _session_out(self, row):
         subject, klass = self.subjects[row["_subject"]], self.classes[row["_class"]]
         return {
@@ -1148,6 +1181,8 @@ class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake, Pla
             row = self.teaching_sessions.get(parts[2])
             if row is None:
                 return fail(404, "NOT_FOUND", "Séance introuvable.")
+            if parts[3] in ("validate", "reject"):
+                return self._verify_session(row, parts[3], body)
             if not (body.get("reason") or "").strip():
                 return fail(400, "BUSINESS_RULE_VIOLATION", "Motif.", {"rule": "reason_required"})
             if row["status"] != "SCHEDULED":
@@ -1647,7 +1682,9 @@ class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake, Pla
         if path.startswith(("admin/registrations/", "admin/link-requests/")):
             return self._parents(request, path, body, admin)
         comm = ("notifications/", "conversations/", "messages/", "forum/", "complaints/", "attachments/")
-        if path.startswith(("admin/attendance/daily/", "admin/scans/", "admin/guardians/")):
+        if path.startswith(("admin/attendance/daily/", "admin/scans/", "admin/guardians/", "admin/qr-codes/")) or (
+            path.startswith("admin/attendance/") and path.endswith("/correct/")
+        ):
             return self._attendance(request, path, body, admin) or fail(404, "NOT_FOUND", "Introuvable.")
         if path.startswith("admin/plans/"):
             return self._plans(request, path, body, admin)

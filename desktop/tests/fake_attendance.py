@@ -1,8 +1,9 @@
 """Fake of the attendance / guardian administration endpoints (backend
 attendance/api.py: admin/attendance/daily/, admin/scans/; people/
-guardian_admin_api.py) for the desktop tests: the CONTRACT — read-only
-attendance computed by the server, scans filtered by guardian, guardians
-created without password (activation and suspension: admin/accounts/)."""
+guardian_admin_api.py) for the desktop tests: the CONTRACT — attendance
+computed by the server and corrected with a reason (/correct/), scans
+filtered by guardian, annual QR codes (issue, issue-class, reissue, revoke),
+guardians created without password (activation and suspension: admin/accounts/)."""
 
 import uuid
 
@@ -54,6 +55,8 @@ class AttendanceFake:
         ]
         self.scan_rows = []
         self.attendance_queries = []
+        self.qr_codes = {}  # id -> QRSerializer row
+        self.corrections = []  # bodies received by /correct/
         gid = self.add_guardian("Moussa", "Bello", "G-01", activated=True)
         self.scan_rows += [
             {
@@ -73,6 +76,98 @@ class AttendanceFake:
                 "guardian": gid,
             },
         ]
+
+    # --- attendance.services.correct_attendance / QR codes (the rules the screens rely on) ---
+    def _correct(self, record_id, body):
+        record = next((r for r in self.daily_rows if r["id"] == record_id), None)
+        if record is None:
+            return self._at_fail(404, "NOT_FOUND")
+        if not (body.get("reason") or "").strip():
+            return self._at_fail(400, "BUSINESS_RULE_VIOLATION", "reason_required")
+        status = body.get("status")
+        if status not in ("PRESENT", "LATE", "ABSENT", "EXCUSED"):
+            return self._at_fail(400, "VALIDATION_ERROR", details={"status": ["Invalid choice."]})
+        self.corrections.append(dict(body))
+        if status in ("PRESENT", "LATE"):
+            arrival = body.get("arrival_time") or record["arrival_time"]
+            if not arrival:
+                return self._at_fail(400, "BUSINESS_RULE_VIOLATION", "arrival_required")
+            hour, minute = int(arrival[11:13]), int(arrival[14:16])
+            late = max(0, hour * 60 + minute - (7 * 60 + 30))  # policy: late after 07:30
+            record.update(status="LATE" if late else "PRESENT", arrival_time=arrival, late_minutes=late)
+        else:
+            record.update(status=status, arrival_time=None, late_minutes=0)
+        record["note"] = body["reason"].strip()
+        return self._at_ok(record)
+
+    def _enrolled(self, student_id):
+        return (
+            any(e["student"] == student_id and e["status"] == "ACTIVE" for e in self.student_enrollments.values())
+            and self.students.get(student_id, {}).get("status") == "ACTIVE"
+        )
+
+    def _issue_qr(self, student_id):
+        active = next(
+            (q for q in self.qr_codes.values() if q["student"] == student_id and q["status"] == "ACTIVE"), None
+        )
+        if active:
+            return active  # idempotent
+        version = 1 + max((q["version"] for q in self.qr_codes.values() if q["student"] == student_id), default=0)
+        qid = str(uuid.uuid4())
+        self.qr_codes[qid] = {
+            "id": qid,
+            "student": student_id,
+            "academic_year": "y1",
+            "token": uuid.uuid4().hex + "abcdefghijk",  # 43 characters, like the server's
+            "version": version,
+            "status": "ACTIVE",
+            "issued_at": f"{TODAY}T08:00:00+01:00",
+            "revoked_at": None,
+            "revocation_reason": None,
+        }
+        return self.qr_codes[qid]
+
+    def _revoke_qr(self, qr, reason):
+        qr.update(status="REVOKED", revoked_at=f"{TODAY}T09:00:00+01:00", revocation_reason=reason.strip())
+
+    def _qr(self, request, parts, body):
+        if request.method == "GET" and len(parts) == 2:
+            params = request.url.params
+            rows = list(self.qr_codes.values())
+            if params.get("student"):
+                rows = [q for q in rows if q["student"] == params["student"]]
+            if params.get("status"):
+                rows = [q for q in rows if q["status"] == params["status"]]
+            return self._page(rows, request)
+        action = parts[2]
+        if action in ("issue", "reissue"):
+            student = body.get("student")
+            if student not in self.students:
+                return self._at_fail(404, "NOT_FOUND")
+            if not self._enrolled(student):
+                return self._at_fail(400, "BUSINESS_RULE_VIOLATION", "student_not_enrolled")
+            if action == "reissue":
+                if not (body.get("reason") or "").strip():
+                    return self._at_fail(400, "BUSINESS_RULE_VIOLATION", "reason_required")
+                for qr in [q for q in self.qr_codes.values() if q["student"] == student and q["status"] == "ACTIVE"]:
+                    self._revoke_qr(qr, body["reason"])
+            return self._at_ok(self._issue_qr(student), 201)
+        if action == "issue-class":
+            enrolled = [
+                e["student"]
+                for e in self.student_enrollments.values()
+                if e["school_class"] == body.get("school_class") and e["status"] != "WITHDRAWN"
+            ]
+            return self._at_ok([self._issue_qr(s) for s in enrolled if self._enrolled(s)], 201)
+        qr = self.qr_codes.get(action)
+        if qr is None or len(parts) < 4 or parts[3] != "revoke":
+            return self._at_fail(404, "NOT_FOUND")
+        if not (body.get("reason") or "").strip():
+            return self._at_fail(400, "BUSINESS_RULE_VIOLATION", "reason_required")
+        if qr["status"] == "REVOKED":
+            return self._at_fail(400, "BUSINESS_RULE_VIOLATION", "qr_already_revoked")
+        self._revoke_qr(qr, body["reason"])
+        return self._at_ok(qr)
 
     def add_guardian(self, first, last, number, *, activated=False, status="ACTIVE"):
         gid = str(uuid.uuid4())
@@ -134,6 +229,11 @@ class AttendanceFake:
             if params.get("school_class"):
                 rows = [r for r in rows if r["school_class"] == params["school_class"]]
             return self._page(rows, request)
+        parts = path.strip("/").split("/")
+        if parts[:2] == ["admin", "attendance"] and parts[-1] == "correct":
+            return self._correct(parts[2], body)
+        if parts[:2] == ["admin", "qr-codes"]:
+            return self._qr(request, parts, body)
         if path == "admin/scans/":
             rows = [r for r in self.scan_rows if not params.get("date") or r["scanned_at"].startswith(params["date"])]
             if params.get("guardian"):

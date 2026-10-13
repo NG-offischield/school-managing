@@ -1,18 +1,20 @@
-"""Vie scolaire → Présences: the day's attendance and the gate passages (read
-only: the server computes them from the QR scans and the policies), and the
-gate guardians (creation, activation code, suspension — the existing account
-services). Tabs: « Présences du jour », « Passages au portail », « Gardiens ».
+"""Vie scolaire → Présences: the day's attendance (computed by the server
+from the QR scans and the policies; an administrator corrects a record with
+a reason, audited), the gate passages (read only), the pupils' annual QR
+codes (issue, reissue, revoke) and the gate guardians (creation, activation
+code, suspension — the existing account services). Tabs: « Présences du
+jour », « Passages au portail », « Codes QR », « Gardiens ».
 Every call off the UI thread; every rule is the server's.
 """
 
-from PySide6.QtCore import QDate, Qt
-from PySide6.QtWidgets import QComboBox, QDialog, QLineEdit, QTabWidget
+from PySide6.QtCore import QDate, Qt, QTime
+from PySide6.QtWidgets import QComboBox, QDialog, QLineEdit, QPlainTextEdit, QTabWidget
 
 from ...i18n import Lazy, Texts, Tr, tr
-from ...services.attendance import DAILY_STATUSES, SCAN_RESULTS
+from ...services.attendance import CORRECTIONS, DAILY_STATUSES, SCAN_RESULTS
 from ..dialogs.teacher_dialogs import ActivationCodeDialog, ask_reason
 from ..theme import TOKENS, TokenColours
-from ..widgets import FormDialog, Page, button, date_field
+from ..widgets import FormDialog, Page, button, date_field, time_field
 from .catalog_base import STATUS_COLUMN_TITLE, CatalogPage
 from .finance_page import coloured
 
@@ -44,9 +46,61 @@ class _ReadOnly(CatalogPage):
         pass
 
 
+def _values(dialog):
+    return dialog.values() if dialog.exec() == QDialog.Accepted else None
+
+
+class CorrectionDialog(FormDialog):
+    """Correct one pupil's day: the reason is kept in the history (audit);
+    present or late is decided by the server from the arrival time."""
+
+    def __init__(self, record, parent=None):
+        super().__init__(
+            tr("Corriger la présence — {0}", record.student_name),
+            tr("Statut actuel : {0}. Le motif est conservé dans l'historique.", record.status_label),
+            parent,
+            save_text=tr("Enregistrer la correction"),
+            width=540,
+        )
+        self.target = QComboBox()
+        for code, label in CORRECTIONS.items():
+            self.target.addItem(label, code)
+        current = "PRESENT" if record.status in ("PRESENT", "LATE") else record.status
+        self.target.setCurrentIndex(max(0, self.target.findData(current)))
+        self.add_field("status", tr("Nouveau statut"), self.target, required=True)
+        arrival = QTime(record.arrival.hour, record.arrival.minute) if record.arrival else QTime(7, 30)
+        self.arrival = self.add_field("arrival_time", tr("Heure d'arrivée"), time_field(arrival), width="short")
+        reason = QPlainTextEdit(placeholderText=tr("Ex. certificat médical présenté, oubli de carte…"))
+        reason.setFixedHeight(72)
+        reason.setTabChangesFocus(True)
+        self.reason = self.add_field("reason", tr("Motif"), reason, required=True)
+        self.target.currentIndexChanged.connect(self._status_changed)
+        self.reason.textChanged.connect(self.refresh_state)
+        self.arrival.setEnabled(self.target.currentData() == "PRESENT")
+        self.finish()
+
+    def _status_changed(self, _index=None):
+        self.arrival.setEnabled(self.target.currentData() == "PRESENT")
+        self.refresh_state()
+
+    def missing_fields(self):
+        return [] if self.reason.toPlainText().strip() else [tr("Motif")]
+
+    def values(self):
+        present = self.target.currentData() == "PRESENT"
+        return {
+            "status": self.target.currentData(),
+            "reason": self.reason.toPlainText().strip(),
+            "arrival": self.arrival.time().toPython() if present else None,
+        }
+
+
 class DailyAttendancePage(_ReadOnly):
     title = Tr("Présences du jour")
-    description = Tr("Calculées par le serveur à partir des passages au portail (QR) et de l'horaire du jour.")
+    description = Tr(
+        "Calculées par le serveur à partir des passages au portail (QR) et de l'horaire du jour. "
+        "Une correction exige un motif et reste dans l'historique."
+    )
     columns = Tr(["Élève", "Matricule", "Classe", "Arrivée", "Retard", STATUS_COLUMN_TITLE])
     noun = "élève"
     feminine = False
@@ -56,10 +110,40 @@ class DailyAttendancePage(_ReadOnly):
 
     def __init__(self, service, references, runner, parent=None, **kwargs):
         self.references = references
+        self.open_correction = lambda record: _values(CorrectionDialog(record, self))  # overridable in tests
         super().__init__(service, runner, parent, **kwargs)
 
     def stretch_columns(self):
         return {0}
+
+    def extra_actions(self):
+        self.correct_button = button(
+            tr("Corriger…"), tooltip=tr("Corriger la présence sélectionnée (motif obligatoire)")
+        )
+        self.correct_button.clicked.connect(self.correct)
+        return [self.correct_button]
+
+    def update_extra_actions(self, row):
+        if hasattr(self, "correct_button"):
+            self.correct_button.setEnabled(row is not None)
+
+    def open_row(self):
+        self.correct()
+
+    def correct(self):
+        row = self.selected()
+        if row is None:
+            return
+        values = self.open_correction(row)
+        if not values:
+            return
+        self.call(
+            lambda: self.service.correct(
+                row.id, status=values["status"], reason=values["reason"], day=row.day, arrival=values["arrival"]
+            ),
+            lambda _saved: (self.success(tr("Correction de {0} enregistrée.", row.student_name)), self.reload()),
+            action=tr("Impossible d'enregistrer la correction"),
+        )
 
     def add_filters(self, layout):
         _date_filter(self, layout)
@@ -151,6 +235,169 @@ class ScansPage(_ReadOnly):
     def cells(self, row):
         when = (f"{row.scanned_at:%H:%M:%S}", row.scanned_at.timestamp()) if row.scanned_at else ("—", 0)
         return [when, row.student_name, row.scanned_by, ""]
+
+
+QR_COLOURS = TokenColours(ACTIVE="success", REVOKED="danger")
+
+
+class CodesPage(_ReadOnly):
+    """The annual QR code of each pupil of a class (the one the student card
+    prints). Issuing is idempotent server side; a reissue revokes the active
+    code and creates version n+1 (lost or stolen card)."""
+
+    title = Tr("Codes QR")
+    description = Tr(
+        "Code QR annuel de chaque élève (imprimé sur la carte d'élève, module Documents). "
+        "Réémettre révoque l'ancien code : l'ancienne carte ne passe plus au portail."
+    )
+    columns = Tr(["Élève", "Matricule", "Version", "Émis le", STATUS_COLUMN_TITLE])
+    noun = "élève"
+    feminine = False
+    search_placeholder = Tr("Rechercher un élève…")
+    status_filters = Lazy(
+        lambda: list(ALL) + [(tr("Actif"), "ACTIVE"), (tr("Révoqué"), "REVOKED"), (tr("Aucun code"), "NONE")]
+    )
+    narrow_hidden = (1, 3)
+
+    def __init__(self, service, references, runner, parent=None, **kwargs):
+        self.references = references
+        self.ask = ask_reason  # overridable in tests
+        super().__init__(service, runner, parent, **kwargs)
+
+    def stretch_columns(self):
+        return {0}
+
+    def add_filters(self, layout):
+        self.class_filter = QComboBox()
+        self.class_filter.setAccessibleName(tr("Filtrer par classe"))
+        self.class_filter.addItem(tr("Choisir une classe…"), None)
+        self.class_filter.setMinimumWidth(170)
+        self.class_filter.currentIndexChanged.connect(lambda _: self.reload())
+        layout.addWidget(self.class_filter)
+
+    def extra_actions(self):
+        self.class_button = button(
+            tr("Toute la classe"),
+            tooltip=tr("Un code pour chaque élève actif de la classe qui n'en a pas"),
+        )
+        self.issue_button = button(tr("Émettre"), tooltip=tr("Émettre le code de l'élève sélectionné"))
+        self.reissue_button = button(
+            tr("Réémettre…"), tooltip=tr("Carte perdue ou volée : nouveau code, l'ancien est révoqué")
+        )
+        self.revoke_button = button(tr("Révoquer…"), "danger")
+        self.class_button.clicked.connect(self.issue_class)
+        self.issue_button.clicked.connect(self.issue)
+        self.reissue_button.clicked.connect(self.reissue)
+        self.revoke_button.clicked.connect(self.revoke)
+        return [self.class_button, self.issue_button, self.reissue_button, self.revoke_button]
+
+    def update_extra_actions(self, row):
+        if not hasattr(self, "class_button"):
+            return
+        self.class_button.setEnabled(self.class_filter.currentData() is not None)
+        self.issue_button.setEnabled(row is not None and not row.active)
+        self.reissue_button.setEnabled(row is not None and row.active)
+        self.revoke_button.setEnabled(row is not None and row.active)
+
+    def fetch(self):
+        if self.class_filter.count() == 1:
+            classes = self.references.classes()
+            self.class_filter.blockSignals(True)
+            for klass in classes:
+                self.class_filter.addItem(klass.name, klass.id)
+            self.class_filter.blockSignals(False)
+        class_id = self.class_filter.currentData()
+        if class_id is None:
+            return []
+        rows = self.service.class_codes(class_id)
+        wanted, search = self.status.currentData(), self.search.text().strip().lower()
+        return [
+            r
+            for r in rows
+            if (not wanted or (r.qr_status or "NONE") == wanted)
+            and (not search or search in f"{r.student_name} {r.student_number}".lower())
+        ]
+
+    def describe_row(self, row):
+        return row.student_name
+
+    def status_cell(self, row):
+        return coloured(row.status_label, QR_COLOURS.get(row.qr_status, TOKENS.text_secondary))
+
+    def cells(self, row):
+        version = (f"V{row.version}", row.version) if row.version else ("—", 0)
+        issued = (f"{row.issued_at:%d/%m/%Y}", row.issued_at.timestamp()) if row.issued_at else ("—", 0)
+        return [row.student_name, row.student_number, version, issued, ""]
+
+    def _done(self, message):
+        self.success(message)
+        self.reload()
+
+    def issue_class(self):
+        class_id, name = self.class_filter.currentData(), self.class_filter.currentText()
+        if class_id is not None:
+            self.call(
+                lambda: self.service.issue_class_codes(class_id),
+                lambda codes: self._done(tr("{0} code(s) actif(s) pour la classe {1}.", len(codes), name)),
+                action=tr("Impossible d'émettre les codes de la classe"),
+            )
+
+    def open_row(self):
+        """Double-click / Entrée on a pupil without an active code: issue it."""
+        row = self.selected()
+        if row is not None and not row.active:
+            self.issue()
+
+    def issue(self):
+        row = self.selected()
+        if row is not None and not row.active:
+            self.call(
+                lambda: self.service.issue_code(row.student_id),
+                lambda _qr: self._done(tr("Code QR émis pour {0}.", row.student_name)),
+                action=tr("Impossible d'émettre le code QR"),
+            )
+
+    def reissue(self):
+        row = self.selected()
+        if row is None:
+            return
+        answer = self.ask(
+            self,
+            tr("Réémettre le code de {0} ?", row.student_name),
+            tr(
+                "L'ancien code (V{0}) est révoqué : l'ancienne carte ne passe plus au portail. "
+                "Imprimez ensuite la nouvelle carte (module Documents).",
+                row.version,
+            ),
+            save_text=tr("Réémettre"),
+        )
+        if answer:
+            self.call(
+                lambda: self.service.reissue_code(row.student_id, answer["reason"]),
+                lambda qr: self._done(tr("Nouveau code (V{0}) pour {1}.", qr.get("version"), row.student_name)),
+                action=tr("Impossible de réémettre le code QR"),
+            )
+
+    def revoke(self):
+        row = self.selected()
+        if row is None:
+            return
+        answer = self.ask(
+            self,
+            tr("Révoquer le code de {0} ?", row.student_name),
+            tr(
+                "Le code ne passera plus au portail. Il reste dans l'historique ; "
+                "un nouveau code peut être émis ensuite."
+            ),
+            save_text=tr("Révoquer"),
+            danger=True,
+        )
+        if answer:
+            self.call(
+                lambda: self.service.revoke_code(row.qr_id, answer["reason"]),
+                lambda _qr: self._done(tr("Code de {0} révoqué.", row.student_name)),
+                action=tr("Impossible de révoquer le code QR"),
+            )
 
 
 class GuardianDialog(FormDialog):
@@ -326,11 +573,13 @@ class AttendancePage(Page):
         self.tabs.setDocumentMode(True)
         self.daily = DailyAttendancePage(service, references, runner, **kwargs)
         self.scans = ScansPage(service, runner, **kwargs)
+        self.codes = CodesPage(service, references, runner, **kwargs)
         self.guardians = GuardiansPage(service, accounts, runner, show_scans=self._scans_of, **kwargs)
-        self.pages = {"daily": self.daily, "scans": self.scans, "guardians": self.guardians}
+        self.pages = {"daily": self.daily, "scans": self.scans, "codes": self.codes, "guardians": self.guardians}
         for page, label in (
             (self.daily, tr("Présences du jour")),
             (self.scans, tr("Passages au portail")),
+            (self.codes, tr("Codes QR")),
             (self.guardians, tr("Gardiens")),
         ):
             self.tabs.addTab(page, label)

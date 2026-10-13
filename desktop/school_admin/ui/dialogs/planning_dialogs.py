@@ -433,6 +433,19 @@ class SubstituteDialog(FormDialog):
         return {"teacher_id": self.teacher.currentData(), "reason": self.reason.toPlainText().strip()}
 
 
+def action_allowed(name, session, now=None):
+    """What can be done with a session (the server re-checks every rule):
+    planning changes while it is SCHEDULED; the teacher's presence once it is
+    over — validated (payable) while not yet validated, or marked not taught
+    (also after a validation, as a correction)."""
+    if name in ("validate", "reject"):
+        if session.end is None or session.status == "CANCELLED":
+            return False
+        over = session.end <= (now or datetime.now(session.end.tzinfo))
+        return over and (session.status == "SCHEDULED" if name == "validate" else True)
+    return session.status == "SCHEDULED" and (name != "restore" or session.is_substituted)
+
+
 class SessionDialog(FormDialog):
     """Record of a session; buttons close it with `action` set."""
 
@@ -443,6 +456,8 @@ class SessionDialog(FormDialog):
             ("substitute", "Remplacer l'enseignant…"),
             ("restore", "Restaurer l'enseignant prévu…"),
             ("cancel", "Annuler la séance…"),
+            ("validate", "Valider la présence de l'enseignant…"),
+            ("reject", "Séance non assurée…"),
         )
     )
 
@@ -473,15 +488,18 @@ class SessionDialog(FormDialog):
         self.buttons = {}
         scheduled = session.status == "SCHEDULED"
         for index, (name, text) in enumerate(self.ACTIONS):
-            widget = button(text, "danger" if name == "cancel" else "secondary")
-            enabled = scheduled and (name != "restore" or session.is_substituted)
-            widget.setEnabled(enabled)
+            widget = button(text, "danger" if name in ("cancel", "reject") else "secondary")
+            widget.setEnabled(action_allowed(name, session))
             widget.clicked.connect(lambda _=False, n=name: self._start(n))
             grid.addWidget(widget, index // 2, index % 2)
             self.buttons[name] = widget
         self.body.addWidget(holder)
         if not scheduled:
             self.body.addWidget(QLabel(tr("Séance annulée ou réalisée : plus modifiable."), objectName="help"))
+        elif not action_allowed("validate", session):
+            self.body.addWidget(
+                QLabel(tr("La présence de l'enseignant se valide une fois la séance terminée."), objectName="help")
+            )
         self.finish(required_note=False)
         self.save_button.setFocus()
 

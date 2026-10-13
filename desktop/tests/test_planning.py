@@ -9,7 +9,7 @@ import pytest
 from PySide6.QtCore import QPointF, QSize, Qt
 from PySide6.QtTest import QTest
 
-from school_admin.api.errors import Conflict, Forbidden, NotFound, ValidationFailed
+from school_admin.api.errors import ApiError, Conflict, Forbidden, NotFound, ValidationFailed
 from school_admin.config import AppConfig
 from school_admin.messages import explain_conflicts
 from school_admin.services.planning import PlanningService, monday_of
@@ -456,3 +456,59 @@ def test_week_view_point_hit(qapp, planning):
     view.grab()  # paints and lays the blocks out
     rect, session = view.blocks[0]
     assert view.session_at(rect.center()) is session and view.session_at(QPointF(5, 5)) is None
+
+
+# =============================================================================
+# Teacher presence (payroll API: self-reported on mobile, verified here)
+# =============================================================================
+
+
+def test_presence_actions_follow_the_session_state(qapp, planning):
+    from dataclasses import replace
+
+    from school_admin.ui.dialogs.planning_dialogs import action_allowed
+
+    session = planning.week(MONDAY)[0]  # 02/03/2026: over
+    assert action_allowed("validate", session) and action_allowed("reject", session)
+    before = session.start.replace(hour=7)  # the session has not ended yet
+    assert not action_allowed("validate", session, now=before) and not action_allowed("reject", session, now=before)
+    done = replace(session, status="COMPLETED")
+    assert not action_allowed("validate", done) and action_allowed("reject", done)  # correction still possible
+    cancelled = replace(session, status="CANCELLED")
+    assert not action_allowed("validate", cancelled) and not action_allowed("reject", cancelled)
+    dialog = SessionDialog(session)
+    assert dialog.buttons["validate"].isEnabled() and dialog.buttons["reject"].isEnabled()
+
+
+def test_presence_service_relays_the_server(planning, backend):
+    session = planning.week(MONDAY)[0]
+    with pytest.raises(ValidationFailed):
+        planning.reject_presence(session.id, "  ")  # a reason is required, before any call
+    assert backend.verifications == []
+    planning.validate_presence(session.id)
+    assert backend.verifications == [("validate", session.id, None)]  # no empty comment sent
+    with pytest.raises(ApiError, match="Déjà validée"):
+        planning.validate_presence(session.id)  # the server refuses a second validation
+
+
+def test_teacher_presence_validated_then_corrected_from_the_week(controller, backend):
+    shell, page = open_planning(controller)
+    week = page.week
+    session = next(s for s in week.sessions if s.subject_code == "MATH")
+    week.select(session.id)
+    answers = {"validate": {"reason": ""}}
+    week.ask = lambda kind, **context: answers.get(kind)
+    week.session_action("validate")
+    assert week.banner.plain_text() == "Présence validée : la séance est réalisée et payable."
+    assert week.current().status == "COMPLETED"
+    names = [name for name, _ in SessionDialog.ACTIONS]
+    menu = dict(zip(names, week.session_button.menu().actions(), strict=True))
+    assert not menu["validate"].isEnabled() and menu["reject"].isEnabled() and not menu["move"].isEnabled()
+    answers["reject"] = {"reason": "Enseignant absent, non remplacé"}
+    week.session_action("reject")
+    assert week.banner.plain_text() == "Séance marquée non assurée : elle ne sera pas payée."
+    assert week.current().status == "SCHEDULED"
+    assert backend.verifications == [
+        ("validate", session.id, None),
+        ("reject", session.id, "Enseignant absent, non remplacé"),
+    ]

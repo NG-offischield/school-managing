@@ -283,13 +283,20 @@ class TeacherDialog(FormDialog):
 
 
 class ReasonDialog(FormDialog):
-    def __init__(self, title, instruction, parent=None, *, save_text=None, with_expiry=False, danger=False):
+    def __init__(
+        self, title, instruction, parent=None, *, save_text=None, with_expiry=False, danger=False, optional=False
+    ):
         save_text = tr("Confirmer") if save_text is None else save_text  # read now: follows the language
         super().__init__(title, instruction, parent, save_text=save_text, width=520)
-        reason = QPlainTextEdit(placeholderText=tr("Motif (obligatoire)"))
+        self.optional = optional  # a comment rather than a mandatory reason
+        reason = QPlainTextEdit(
+            placeholderText=tr("Commentaire (facultatif)") if optional else tr("Motif (obligatoire)")
+        )
         reason.setFixedHeight(72)
         reason.setTabChangesFocus(True)
-        self.reason = self.add_field("reason", tr("Motif"), reason, required=True)
+        self.reason = self.add_field(
+            "reason", tr("Commentaire") if optional else tr("Motif"), reason, required=not optional
+        )
         self.expires = self.expiry = None
         if with_expiry:
             self.expires = self.add_field("expires", tr("Durée"), QCheckBox(tr("Limiter la dérogation dans le temps")))
@@ -305,7 +312,7 @@ class ReasonDialog(FormDialog):
         self.reason.setFocus()
 
     def missing_fields(self):
-        return [] if self.reason.toPlainText().strip() else [tr("Motif")]
+        return [] if self.optional or self.reason.toPlainText().strip() else [tr("Motif")]
 
     def values(self):
         expires_at = None

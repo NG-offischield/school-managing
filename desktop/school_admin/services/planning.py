@@ -176,6 +176,19 @@ class PlanningService:
     def restore_teacher(self, session_id, reason):
         return self._action(session_id, "restore-teacher", {"reason": reason})
 
+    # --- teacher presence (backend payroll/api.py: spec §15, self-reported then verified) ---
+    def validate_presence(self, session_id, reason=""):
+        """The session was really taught: COMPLETED and payable (the server
+        refuses a cancelled, unfinished, already validated or paid session)."""
+        comment = (reason or "").strip()
+        return self.api.post(f"admin/sessions/{session_id}/validate/", {"reason": comment} if comment else {})
+
+    def reject_presence(self, session_id, reason):
+        """Not taught: never payable (a paid session gets a negative adjustment, server side)."""
+        if not (reason or "").strip():
+            raise ValidationFailed("Formulaire incomplet.", details={"reason": [tr("Indiquez le motif.")]})
+        return self.api.post(f"admin/sessions/{session_id}/reject/", {"reason": reason.strip()})
+
     def changes(self, *, since: date):
         return self.api.list_all("planning/changes/", date_from=since.isoformat())
 
