@@ -64,6 +64,10 @@ class Notification(TenantModel):
       UNIQUE(recipient, event_key) makes production idempotent (replays,
       retries, two triggers for the same fact never notify twice);
     - `source_type` / `source_id`: the business row that caused it.
+    - `text`: for a SYSTEM notification, the language-neutral description of
+      its title / message (texts.py: key + parameters), rendered in the
+      reader's language; `title` / `message` keep the French rendering. Empty
+      for rows created before it: they are shown as stored.
     Only `is_read` / `read_at` may change, once (trigger).
     """
 
@@ -75,6 +79,7 @@ class Notification(TenantModel):
     is_read = models.BooleanField(default=False, db_index=True)
     read_at = models.DateTimeField(blank=True, null=True)
     payload = models.JSONField(default=dict)
+    text = models.JSONField(default=dict, blank=True)  # {"title": spec, "message": spec} (texts.py)
     event_key = models.CharField(max_length=200)
     source_type = models.CharField(max_length=80, blank=True, null=True)
     source_id = models.UUIDField(blank=True, null=True)

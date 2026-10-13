@@ -45,6 +45,7 @@ from .models import (
     ThreadType,
 )
 from .notifications import notify_many
+from .texts import text
 
 MAX_POST = 10000
 
@@ -165,8 +166,8 @@ def create_thread(space, *, actor, title, body, thread_type=ThreadType.GENERAL):
             school=space.school,
             notification_type=NotificationType.FORUM,
             severity=Severity.INFO,
-            title=f"Nouveau sujet : {thread.title}"[:200],
-            message=f"{actor.user.full_name} : {body.strip()}"[:200],
+            title=text("forum.thread.title", title=thread.title),
+            message=text("forum.excerpt", author=actor.user.full_name, body=body.strip()[:200]),
             event_key=f"forum.thread:{thread.pk}",
             payload={"thread": str(thread.pk), "space": str(space.pk)},
             source=thread,
@@ -202,8 +203,8 @@ def add_post(thread, *, actor, body):
             school=thread.school,
             notification_type=NotificationType.FORUM,
             severity=Severity.INFO,
-            title=f"Réponse : {thread.title}"[:200],
-            message=f"{actor.user.full_name} : {post.body}"[:200],
+            title=text("forum.reply.title", title=thread.title),
+            message=text("forum.excerpt", author=actor.user.full_name, body=post.body[:200]),
             event_key=f"forum.post:{post.pk}",
             payload={"thread": str(thread.pk), "space": str(thread.space_id), "post": str(post.pk)},
             source=post,

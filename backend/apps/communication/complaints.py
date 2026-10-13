@@ -48,6 +48,7 @@ from .models import (
     Severity,
 )
 from .notifications import administrators, notify_many
+from .texts import label, text
 
 S = ComplaintStatus
 
@@ -214,7 +215,7 @@ def submit_complaint(complaint, *, actor):
     complaint.conversation = conversation
     complaint.save()
     _history(complaint, S.DRAFT, S.OPEN, actor)
-    _notify(complaint, actor, f"Nouvelle réclamation : {complaint.subject}", complaint.description[:200])
+    _notify(complaint, actor, text("complaint.new.title", subject=complaint.subject), complaint.description[:200])
     return complaint
 
 
@@ -269,7 +270,12 @@ def change_status(complaint, *, actor, status, reason=None):
         complaint.resolved_at = None
     complaint.save()
     _history(complaint, old, status, actor, comment)
-    _notify(complaint, actor, f"Réclamation : {complaint.get_status_display().lower()}", comment or complaint.subject)
+    _notify(
+        complaint,
+        actor,
+        text("complaint.status.title", status=label("complaint_status", complaint.status, lower=True)),
+        comment or complaint.subject,
+    )
     return complaint
 
 
@@ -291,7 +297,7 @@ def cancel_complaint(complaint, *, actor, reason=None):
     complaint.save()
     _history(complaint, old, S.CANCELLED, actor, comment)
     if old != S.DRAFT:
-        _notify(complaint, actor, "Réclamation annulée", comment)
+        _notify(complaint, actor, text("complaint.cancelled.title"), comment)
     return complaint
 
 
@@ -315,7 +321,7 @@ def assign(complaint, *, actor, assignee, reason=None):
         actor,
         f"Assignée à {assignee.user.full_name}" + (f" — {reason.strip()}" if reason and reason.strip() else ""),
     )
-    _notify(complaint, actor, "Réclamation assignée", complaint.subject)
+    _notify(complaint, actor, text("complaint.assigned.title"), complaint.subject)
     return complaint
 
 

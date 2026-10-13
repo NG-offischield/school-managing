@@ -46,6 +46,7 @@ from common.permissions import membership_has_role
 
 from .models import NotificationType, Severity
 from .notifications import administrators, notify_many, parents_to_inform
+from .texts import label, text
 
 logger = logging.getLogger(__name__)
 
@@ -65,11 +66,16 @@ def project_attendance(record):
         school=record.school,
         notification_type=NotificationType.ATTENDANCE_LATE if late else NotificationType.ATTENDANCE_ABSENT,
         severity=Severity.WARNING,
-        title=f"{'Retard' if late else 'Absence'} — {student.full_name}",
+        title=text("attendance.late.title" if late else "attendance.absent.title", student=student.full_name),
         message=(
-            f"{student.full_name} est arrivé(e) avec {record.late_minutes} min de retard le {record.date:%d/%m/%Y}."
+            text(
+                "attendance.late.message",
+                student=student.full_name,
+                minutes=record.late_minutes,
+                date=f"{record.date:%d/%m/%Y}",
+            )
             if late
-            else f"{student.full_name} est absent(e) le {record.date:%d/%m/%Y}."
+            else text("attendance.absent.message", student=student.full_name, date=f"{record.date:%d/%m/%Y}")
         ),
         event_key=f"attendance:{record.pk}:{record.status}",
         payload={
@@ -84,20 +90,21 @@ def project_attendance(record):
 
 def project_convocation(convocation):
     scheduled = convocation.status == "SCHEDULED"
+    start = timezone.localtime(convocation.scheduled_start)
     return notify_many(
         [convocation.parent.membership],
         school=convocation.school,
         notification_type=NotificationType.CONVOCATION,
         severity=Severity.CRITICAL if scheduled else Severity.INFO,
         title=(
-            f"Convocation — {convocation.student.full_name}"
+            text("convocation.scheduled.title", student=convocation.student.full_name)
             if scheduled
-            else f"Convocation : {convocation.get_status_display().lower()}"
+            else text("convocation.status.title", status=label("convocation_status", convocation.status, lower=True))
         ),
         message=(
-            f"Vous êtes convoqué(e) le {timezone.localtime(convocation.scheduled_start):%d/%m/%Y à %H:%M}."
+            text("convocation.scheduled.message", date=f"{start:%d/%m/%Y}", time=f"{start:%H:%M}")
             if scheduled
-            else "Le statut de votre convocation a changé."
+            else text("convocation.status.message")
         ),
         event_key=f"convocation:{convocation.pk}:{convocation.status}",
         payload={
@@ -131,8 +138,12 @@ def project_schedule_change(change):
         "date": session.date.isoformat() if session else None,
         "school_class": str(change.school_class_id) if change.school_class_id else None,
     }
-    label = change.get_change_type_display()
-    when = f" du {session.date:%d/%m/%Y}" if session else ""
+    change_label = label("change_type", change.change_type)
+    message = (
+        text("schedule.message.dated", change=change_label, date=f"{session.date:%d/%m/%Y}")
+        if session
+        else text("schedule.message", change=change_label)
+    )
     common = {
         "school": change.school,
         "notification_type": kind,
@@ -147,8 +158,8 @@ def project_schedule_change(change):
     ]
     created = notify_many(
         teachers,
-        title=f"Planning : {label}",
-        message=f"{label}{when}.",
+        title=text("schedule.teacher.title", change=change_label),
+        message=message,
         payload={**facts, "reason": change.reason},
         **common,
     )
@@ -158,7 +169,11 @@ def project_schedule_change(change):
         )
         parents = [p for s in students for p in parents_to_inform(s)]
         created += notify_many(
-            parents, title=f"Emploi du temps : {label}", message=f"{label}{when}.", payload=facts, **common
+            parents,
+            title=text("schedule.parent.title", change=change_label),
+            message=message,
+            payload=facts,
+            **common,
         )
     ScheduleChange.objects.filter(pk=change.pk).update(
         notification_status=NotificationStatus.SENT, notified_at=timezone.now()
@@ -201,20 +216,24 @@ def _notify_finance_admins(payment):
     )
     numbers = [number for number, _ in invoices]
     if numbers:
-        about = f"facture{'s' if len(numbers) > 1 else ''} {', '.join(numbers)}"
+        about = text("payment.admin.invoices", n=len(numbers), numbers=", ".join(numbers))
     else:
-        about = payment.fee_type.name if payment.fee_type_id else "paiement libre"
+        # a fee type's name is the school's data: shown as it is
+        about = payment.fee_type.name if payment.fee_type_id else text("payment.admin.free")
     amount = _amount_label(payment.amount, payment.currency)
     when = timezone.localtime(payment.completed_at or payment.initiated_at)
     return notify_many(
         administrators(payment.school),
         school=payment.school,
         notification_type=NotificationType.PAYMENT,
-        title=f"Paiement confirmé — {about} — {amount}"[:200],
-        message=(
-            f"{payment.student.full_name} : paiement {payment.payment_reference} par portefeuille mobile, "
-            f"confirmé le {when:%d/%m/%Y à %H:%M}."
-        )[:500],
+        title=text("payment.admin.title", about=about, amount=amount),
+        message=text(
+            "payment.admin.message",
+            student=payment.student.full_name,
+            reference=payment.payment_reference,
+            date=f"{when:%d/%m/%Y}",
+            time=f"{when:%H:%M}",
+        ),
         event_key=f"payment.admin:{payment.pk}",
         payload={
             "payment": str(payment.pk),
@@ -235,9 +254,14 @@ def _notify_payer(payment, ok):
         school=payment.school,
         notification_type=NotificationType.PAYMENT,
         severity=Severity.INFO if ok else Severity.WARNING,
-        title="Paiement confirmé" if ok else "Paiement non abouti",
-        message=f"Paiement {payment.payment_reference} de {payment.amount} {payment.currency} : "
-        f"{payment.get_status_display().lower()}.",
+        title=text("payment.confirmed.title" if ok else "payment.failed.title"),
+        message=text(
+            "payment.payer.message",
+            reference=payment.payment_reference,
+            amount=payment.amount,
+            currency=payment.currency,
+            status=label("payment_status", payment.status, lower=True),
+        ),
         event_key=f"payment:{payment.pk}:{payment.status}",
         payload={
             "payment": str(payment.pk),
@@ -256,8 +280,10 @@ def project_refund(refund):
         [payment.payer],
         school=refund.school,
         notification_type=NotificationType.REFUND,
-        title="Remboursement effectué",
-        message=f"{refund.amount} {payment.currency} remboursés sur le paiement {payment.payment_reference}.",
+        title=text("refund.title"),
+        message=text(
+            "refund.message", amount=refund.amount, currency=payment.currency, reference=payment.payment_reference
+        ),
         event_key=f"refund:{refund.pk}",
         payload={"refund": str(refund.pk), "payment": str(payment.pk), "amount": str(refund.amount)},
         source=refund,
@@ -273,9 +299,13 @@ def project_payroll(payroll):
         [employee.membership],
         school=payroll.school,
         notification_type=NotificationType.PAYROLL,
-        title="Paie versée" if paid else "Paie validée",
-        message=f"{payroll.payroll_period.name} : {payroll.approved_amount} {payroll.currency} "
-        f"{'versés' if paid else 'validés par l’administration'}.",
+        title=text("payroll.paid.title" if paid else "payroll.approved.title"),
+        message=text(
+            "payroll.paid.message" if paid else "payroll.approved.message",
+            period=payroll.payroll_period.name,
+            amount=payroll.approved_amount,
+            currency=payroll.currency,
+        ),
         event_key=f"payroll:{payroll.pk}:{payroll.status}",
         payload={
             "payroll": str(payroll.pk),
@@ -294,8 +324,8 @@ def project_report_card(card):
         parents_to_inform(card.student),
         school=card.school,
         notification_type=NotificationType.REPORT_CARD,
-        title=f"Bulletin disponible — {card.student.full_name}",
-        message=f"Le bulletin de {card.academic_period.name} est disponible.",
+        title=text("report_card.title", student=card.student.full_name),
+        message=text("report_card.message", period=card.academic_period.name),
         event_key=f"report_card:{card.pk}",
         payload={"report_card": str(card.pk), "student": str(card.student_id), "period": str(card.academic_period_id)},
         source=card,

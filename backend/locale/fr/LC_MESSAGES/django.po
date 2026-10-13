@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-02 15:09+0100\n"
+"POT-Creation-Date: 2026-10-13 09:51+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,74 +17,411 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 
-#: common/errors.py:55
+#: apps/communication/texts.py:28
+#, python-format
+msgid "Late arrival — %(student)s"
+msgstr "Retard — %(student)s"
+
+#: apps/communication/texts.py:29
+#, python-format
+msgid "Absence — %(student)s"
+msgstr "Absence — %(student)s"
+
+#: apps/communication/texts.py:30
+#, python-format
+msgid "%(student)s arrived %(minutes)s min late on %(date)s."
+msgstr "%(student)s est arrivé(e) avec %(minutes)s min de retard le %(date)s."
+
+#: apps/communication/texts.py:31
+#, python-format
+msgid "%(student)s is absent on %(date)s."
+msgstr "%(student)s est absent(e) le %(date)s."
+
+#: apps/communication/texts.py:33
+#, python-format
+msgid "Meeting notice — %(student)s"
+msgstr "Convocation — %(student)s"
+
+#: apps/communication/texts.py:34
+#, python-format
+msgid "Meeting notice: %(status)s"
+msgstr "Convocation : %(status)s"
+
+#: apps/communication/texts.py:35
+#, python-format
+msgid "You are asked to attend on %(date)s at %(time)s."
+msgstr "Vous êtes convoqué(e) le %(date)s à %(time)s."
+
+#: apps/communication/texts.py:36
+msgid "The status of your meeting notice has changed."
+msgstr "Le statut de votre convocation a changé."
+
+#: apps/communication/texts.py:38
+#, python-format
+msgid "Schedule: %(change)s"
+msgstr "Planning : %(change)s"
+
+#: apps/communication/texts.py:39
+#, python-format
+msgid "Timetable: %(change)s"
+msgstr "Emploi du temps : %(change)s"
+
+#: apps/communication/texts.py:40
+#, python-format
+msgid "%(change)s on %(date)s."
+msgstr "%(change)s du %(date)s."
+
+#: apps/communication/texts.py:41
+#, python-format
+msgid "%(change)s."
+msgstr "%(change)s."
+
+#: apps/communication/texts.py:43
+msgid "Payment confirmed"
+msgstr "Paiement confirmé"
+
+#: apps/communication/texts.py:44
+msgid "Payment not completed"
+msgstr "Paiement non abouti"
+
+#: apps/communication/texts.py:45
+#, python-format
+msgid "Payment %(reference)s of %(amount)s %(currency)s: %(status)s."
+msgstr "Paiement %(reference)s de %(amount)s %(currency)s : %(status)s."
+
+#: apps/communication/texts.py:46
+#, python-format
+msgid "Payment confirmed — %(about)s — %(amount)s"
+msgstr "Paiement confirmé — %(about)s — %(amount)s"
+
+#: apps/communication/texts.py:47
+#, python-format
+msgid "invoice %(numbers)s"
+msgid_plural "invoices %(numbers)s"
+msgstr[0] "facture %(numbers)s"
+msgstr[1] "factures %(numbers)s"
+
+#: apps/communication/texts.py:48
+msgid "free payment"
+msgstr "paiement libre"
+
+#: apps/communication/texts.py:50
+#, python-format
+msgid ""
+"%(student)s: payment %(reference)s by mobile wallet, confirmed on %(date)s "
+"at %(time)s."
+msgstr ""
+"%(student)s : paiement %(reference)s par portefeuille mobile, confirmé le "
+"%(date)s à %(time)s."
+
+#: apps/communication/texts.py:52
+msgid "Refund completed"
+msgstr "Remboursement effectué"
+
+#: apps/communication/texts.py:53
+#, python-format
+msgid "%(amount)s %(currency)s refunded on payment %(reference)s."
+msgstr "%(amount)s %(currency)s remboursés sur le paiement %(reference)s."
+
+#: apps/communication/texts.py:55
+msgid "Pay paid out"
+msgstr "Paie versée"
+
+#: apps/communication/texts.py:56
+msgid "Pay approved"
+msgstr "Paie validée"
+
+#: apps/communication/texts.py:57
+#, python-format
+msgid "%(period)s: %(amount)s %(currency)s paid out."
+msgstr "%(period)s : %(amount)s %(currency)s versés."
+
+#: apps/communication/texts.py:58
+#, python-format
+msgid "%(period)s: %(amount)s %(currency)s approved by the administration."
+msgstr "%(period)s : %(amount)s %(currency)s validés par l’administration."
+
+#: apps/communication/texts.py:60
+#, python-format
+msgid "Report card available — %(student)s"
+msgstr "Bulletin disponible — %(student)s"
+
+#: apps/communication/texts.py:61
+#, python-format
+msgid "The report card for %(period)s is available."
+msgstr "Le bulletin de %(period)s est disponible."
+
+#: apps/communication/texts.py:63
+#, python-format
+msgid "New complaint: %(subject)s"
+msgstr "Nouvelle réclamation : %(subject)s"
+
+#: apps/communication/texts.py:64
+#, python-format
+msgid "Complaint: %(status)s"
+msgstr "Réclamation : %(status)s"
+
+#: apps/communication/texts.py:65
+msgid "Complaint cancelled"
+msgstr "Réclamation annulée"
+
+#: apps/communication/texts.py:66
+msgid "Complaint assigned"
+msgstr "Réclamation assignée"
+
+#: apps/communication/texts.py:68
+#, python-format
+msgid "New topic: %(title)s"
+msgstr "Nouveau sujet : %(title)s"
+
+#: apps/communication/texts.py:69
+#, python-format
+msgid "Reply: %(title)s"
+msgstr "Réponse : %(title)s"
+
+#: apps/communication/texts.py:70
+#, python-format
+msgid "%(author)s: %(body)s"
+msgstr "%(author)s : %(body)s"
+
+#: apps/communication/texts.py:71
+#, python-format
+msgid "Message from %(sender)s"
+msgstr "Message de %(sender)s"
+
+#: apps/communication/texts.py:73
+#, python-format
+msgid "Map published: %(title)s"
+msgstr "Plan publié : %(title)s"
+
+#: apps/communication/texts.py:74
+#, python-format
+msgid "Map updated: %(title)s"
+msgstr "Plan mis à jour : %(title)s"
+
+#: apps/communication/texts.py:75
+#, python-format
+msgid "%(where)s — version %(number)s."
+msgstr "%(where)s — version %(number)s."
+
+#: apps/communication/texts.py:76
+#, python-format
+msgid "Version %(number)s."
+msgstr "Version %(number)s."
+
+#: apps/communication/texts.py:83
+msgctxt "convocation_status"
+msgid "Scheduled"
+msgstr "Programmée"
+
+#: apps/communication/texts.py:84
+msgctxt "convocation_status"
+msgid "Held"
+msgstr "Tenue"
+
+#: apps/communication/texts.py:85
+msgctxt "convocation_status"
+msgid "Parent absent"
+msgstr "Parent absent"
+
+#: apps/communication/texts.py:86
+msgctxt "convocation_status"
+msgid "Cancelled"
+msgstr "Annulée"
+
+#: apps/communication/texts.py:89
+msgctxt "change_type"
+msgid "New weekly slot"
+msgstr "Nouveau créneau hebdomadaire"
+
+#: apps/communication/texts.py:90
+msgctxt "change_type"
+msgid "Weekly slot ended"
+msgstr "Fin d'un créneau hebdomadaire"
+
+#: apps/communication/texts.py:91
+msgctxt "change_type"
+msgid "Weekly slot withdrawn"
+msgstr "Créneau hebdomadaire retiré"
+
+#: apps/communication/texts.py:92
+msgctxt "change_type"
+msgid "Exceptional lesson"
+msgstr "Séance exceptionnelle"
+
+#: apps/communication/texts.py:93
+msgctxt "change_type"
+msgid "Lesson cancelled"
+msgstr "Séance annulée"
+
+#: apps/communication/texts.py:94
+msgctxt "change_type"
+msgid "Lesson moved"
+msgstr "Séance déplacée"
+
+#: apps/communication/texts.py:95
+msgctxt "change_type"
+msgid "Room changed"
+msgstr "Changement de salle"
+
+#: apps/communication/texts.py:96
+msgctxt "change_type"
+msgid "Substitute teacher"
+msgstr "Enseignant remplaçant"
+
+#: apps/communication/texts.py:97
+msgctxt "change_type"
+msgid "Usual teacher back"
+msgstr "Retour de l'enseignant habituel"
+
+#: apps/communication/texts.py:98
+msgctxt "change_type"
+msgid "Lessons swapped"
+msgstr "Séances échangées"
+
+#: apps/communication/texts.py:101
+msgctxt "payment_status"
+msgid "Created / pending"
+msgstr "Créé / en attente"
+
+#: apps/communication/texts.py:102
+msgctxt "payment_status"
+msgid "Succeeded"
+msgstr "Réussi"
+
+#: apps/communication/texts.py:103
+msgctxt "payment_status"
+msgid "Declined"
+msgstr "Refusé"
+
+#: apps/communication/texts.py:104
+msgctxt "payment_status"
+msgid "Insufficient funds"
+msgstr "Fonds insuffisants"
+
+#: apps/communication/texts.py:105
+msgctxt "payment_status"
+msgid "Timed out"
+msgstr "Délai dépassé"
+
+#: apps/communication/texts.py:106
+msgctxt "payment_status"
+msgid "Provider error"
+msgstr "Erreur fournisseur"
+
+#: apps/communication/texts.py:107
+msgctxt "payment_status"
+msgid "Cancelled"
+msgstr "Annulé"
+
+#: apps/communication/texts.py:108
+msgctxt "payment_status"
+msgid "Partially refunded"
+msgstr "Partiellement remboursé"
+
+#: apps/communication/texts.py:109
+msgctxt "payment_status"
+msgid "Refunded"
+msgstr "Remboursé"
+
+#: apps/communication/texts.py:112
+msgctxt "complaint_status"
+msgid "Draft"
+msgstr "Brouillon"
+
+#: apps/communication/texts.py:113
+msgctxt "complaint_status"
+msgid "Open"
+msgstr "Ouverte"
+
+#: apps/communication/texts.py:114
+msgctxt "complaint_status"
+msgid "In progress"
+msgstr "En traitement"
+
+#: apps/communication/texts.py:115
+msgctxt "complaint_status"
+msgid "Resolved"
+msgstr "Résolue"
+
+#: apps/communication/texts.py:116
+msgctxt "complaint_status"
+msgid "Cancelled"
+msgstr "Annulée"
+
+#: apps/communication/texts.py:117
+msgctxt "complaint_status"
+msgid "Closed"
+msgstr "Clôturée"
+
+#: common/errors.py:58
 msgid "Some fields are invalid."
 msgstr "Certains champs sont invalides."
 
-#: common/errors.py:56
+#: common/errors.py:59
 msgid "The request body is malformed."
 msgstr "Le corps de la requête est mal formé."
 
-#: common/errors.py:57
+#: common/errors.py:60
 msgid "Resource not found."
 msgstr "Ressource introuvable."
 
-#: common/errors.py:58
+#: common/errors.py:61
 msgid "This method is not allowed on this resource."
 msgstr "Cette méthode n'est pas autorisée sur cette ressource."
 
-#: common/errors.py:59
+#: common/errors.py:62
 msgid "The requested response format is not available."
 msgstr "Le format de réponse demandé n'est pas disponible."
 
-#: common/errors.py:60
+#: common/errors.py:63
 msgid "Unsupported content type."
 msgstr "Type de contenu non pris en charge."
 
-#: common/errors.py:61
+#: common/errors.py:64
 msgid "Too many requests. Please try again later."
 msgstr "Trop de requêtes. Veuillez réessayer plus tard."
 
-#: common/errors.py:62
+#: common/errors.py:65
 msgid "An unexpected error occurred."
 msgstr "Une erreur inattendue s'est produite."
 
-#: common/errors.py:63
+#: common/errors.py:66
 msgid "This operation breaks a business rule."
 msgstr "Cette opération enfreint une règle métier."
 
-#: common/errors.py:64
+#: common/errors.py:67
 msgid "This operation conflicts with existing data."
 msgstr "Cette opération est en conflit avec des données existantes."
 
-#: common/errors.py:65
+#: common/errors.py:68
 msgid "Authentication is required."
 msgstr "Une authentification est requise."
 
-#: common/errors.py:66
+#: common/errors.py:69
 msgid "Authentication failed."
 msgstr "Échec de l'authentification."
 
-#: common/errors.py:67
+#: common/errors.py:70
 msgid "Invalid credentials."
 msgstr "Identifiants incorrects."
 
-#: common/errors.py:68
+#: common/errors.py:71
 msgid "Invalid or expired access token."
 msgstr "Jeton d'accès invalide ou expiré."
 
-#: common/errors.py:69
+#: common/errors.py:72
 msgid "Invalid or expired refresh token."
 msgstr "Jeton de renouvellement invalide ou expiré."
 
-#: common/errors.py:70
+#: common/errors.py:73
+msgid "This activation code is invalid or expired."
+msgstr "Ce code d'activation est invalide ou expiré."
+
+#: common/errors.py:74
 msgid "You do not have permission to perform this action."
 msgstr "Vous n'avez pas la permission d'effectuer cette action."
 
-#: common/errors.py:71
+#: common/errors.py:75
 msgid "No active school membership for this request."
 msgstr "Aucune adhésion active à un établissement pour cette requête."
-
-#: common/errors.py
-msgid "This activation code is invalid or expired."
-msgstr "Ce code d'activation est invalide ou expiré."

@@ -23,6 +23,8 @@ from urllib.parse import urlsplit
 from PySide6.QtCore import QObject, QTimer, QUrl, Signal
 from PySide6.QtNetwork import QNetworkRequest
 
+from .i18n import language
+
 UNAUTHORIZED = 4401
 PING_MS = 25_000
 BACKOFF = (1, 2, 4, 8, 15, 30)
@@ -76,6 +78,8 @@ class RealtimeClient(QObject):
         self.socket.textMessageReceived.connect(self._on_text)
         request = QNetworkRequest(QUrl(self.url))
         request.setRawHeader(b"Authorization", f"Bearer {self.api.access_token}".encode())
+        # the server renders system notifications in the interface language
+        request.setRawHeader(b"Accept-Language", language().encode())
         self._set_state("connecting")
         self.socket.open(request)
 

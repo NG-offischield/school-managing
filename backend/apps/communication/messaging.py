@@ -34,6 +34,7 @@ from .models import (
     NotificationType,
 )
 from .notifications import administrators, notify_many
+from .texts import text
 
 MAX_BODY = 5000
 
@@ -229,7 +230,7 @@ def send_message(conversation, *, actor, body, files=(), client_id=None):
         recipients,
         school=conversation.school,
         notification_type=NotificationType.MESSAGE,
-        title=f"Message de {actor.user.full_name}",
+        title=text("message.title", sender=actor.user.full_name),
         message=body[:200],
         event_key=f"message:{message.pk}",
         payload={"conversation": str(conversation.pk), "message": str(message.pk)},

@@ -337,6 +337,35 @@ void main() {
       expect(expired, [true]);
       await client.dispose();
     });
+
+    test('announces the language; a new language reconnects (system notifications follow it)', () async {
+      final languages = <String?>[];
+      final channels = <FakeChannel>[];
+      api.accessToken = 'acc-1';
+      L10n.use(AppLanguage.fr);
+      final client = RealtimeClient(
+        api,
+        socketUri('http://h:8000/api/v1/'),
+        channelFactory: (uri, headers) {
+          languages.add(headers['Accept-Language']);
+          return channels.add(FakeChannel()) as dynamic ?? channels.last;
+        },
+      );
+      client.start();
+      channels.last.push({'type': 'auth.ok', 'unread_notifications': 0});
+      await pump();
+      L10n.use(AppLanguage.en);
+      await pump();
+      expect(languages, ['fr', 'en']); // reconnected in English
+      L10n.use(AppLanguage.en); // same language again: no reconnection
+      await pump();
+      client.stop();
+      L10n.use(AppLanguage.fr); // stopped (logged out): stays closed
+      await pump();
+      expect(languages, ['fr', 'en']);
+      expect(client.state, RealtimeState.stopped);
+      await client.dispose();
+    });
   });
 }
 

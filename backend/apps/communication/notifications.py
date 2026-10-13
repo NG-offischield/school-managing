@@ -6,17 +6,21 @@
   triggers for the same fact, never notify twice;
 - preferences: a non-mandatory type can be switched off in-app or for push;
 - push queue: a PENDING NotificationDelivery for the future FCM worker;
-- real-time: pushed on the member's WebSocket group after commit.
+- real-time: pushed on the member's WebSocket group after commit;
+- language: a SYSTEM title / message is a texts.text(...) description,
+  rendered in the reader's language (REST: Accept-Language; WebSocket: the
+  connection's language). What people wrote is passed as a plain string and
+  never translated.
 """
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
-from django.utils import timezone
+from django.utils import timezone, translation
 
 from apps.accounts.models import MembershipStatus, SchoolMembership
 from common.permissions import ADMIN_ROLES
 
-from . import realtime
+from . import realtime, texts
 from .models import (
     MANDATORY_TYPES,
     Notification,
@@ -27,13 +31,27 @@ from .models import (
 )
 
 
-def serialize(notification):
+def localized(notification, language=None):
+    """(title, message) in `language` (default: the active one). A row
+    without a text description (user-written, or older) is shown as stored."""
+    language = language or translation.get_language() or texts.DEFAULT_LANGUAGE
+    spec = notification.text or {}
+    try:
+        title = texts.render(spec["title"], language)[:200] if "title" in spec else notification.title
+        message = texts.render(spec["message"], language) if "message" in spec else notification.message
+    except (KeyError, TypeError, ValueError):  # a text removed since: the stored rendering
+        return notification.title, notification.message
+    return title, message
+
+
+def serialize(notification, language=None):
+    title, message = localized(notification, language)
     return {
         "id": str(notification.pk),
         "notification_type": notification.notification_type,
         "severity": notification.severity,
-        "title": notification.title,
-        "message": notification.message,
+        "title": title,
+        "message": message,
         "payload": notification.payload,
         "is_read": notification.is_read,
         "read_at": notification.read_at.isoformat() if notification.read_at else None,
@@ -63,6 +81,8 @@ def notify(
     source=None,
 ):
     """Create (once) the notification of `event_key` for `recipient`.
+    `title` / `message`: a plain string (what a person wrote, shown as is) or
+    a texts.text(...) description (system wording, rendered per reader).
     Returns the new Notification, or None when nothing was created
     (already notified, inactive member, or switched off by preference)."""
     if recipient.school_id != school.pk:
@@ -74,6 +94,11 @@ def notify(
     in_app, push = preference(recipient, notification_type)
     if not in_app:
         return None
+    description = {name: value for name, value in (("title", title), ("message", message)) if texts.is_text(value)}
+    if texts.is_text(title):
+        title = texts.render(title)  # stored French rendering (default language)
+    if texts.is_text(message):
+        message = texts.render(message)
     try:
         with transaction.atomic():
             notification = Notification.objects.create(
@@ -84,6 +109,7 @@ def notify(
                 title=title[:200],
                 message=message,
                 payload=payload or {},
+                text=description,
                 event_key=event_key,
                 source_type=source._meta.label if source is not None else None,
                 source_id=source.pk if source is not None else None,
@@ -92,7 +118,11 @@ def notify(
         return None  # this event was already notified to this member
     if push:
         NotificationDelivery.objects.create(school=school, notification=notification)
-    realtime.to_member(recipient.pk, {"type": "notification", "data": serialize(notification)})
+    # each connection renders it in its own language (consumers.py)
+    realtime.to_member(
+        recipient.pk,
+        {"type": "notification", "data": serialize(notification, texts.DEFAULT_LANGUAGE), "text": description},
+    )
     return notification
 
 

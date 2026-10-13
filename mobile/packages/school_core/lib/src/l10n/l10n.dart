@@ -51,7 +51,14 @@ abstract final class L10n {
   static String get intl => _language.intl;
 
   /// Tests / [LocalizedScreens] only.
-  static void use(AppLanguage language) => _language = language;
+  static void use(AppLanguage language) {
+    _language = language;
+    changes.value = language;
+  }
+
+  /// The language in use, for what lives outside the widget tree (the
+  /// real-time connection announces it to the server).
+  static final ValueNotifier<AppLanguage> changes = ValueNotifier(AppLanguage.fr);
 
   /// An app adds its own English texts (idempotent).
   static final Set<Map<String, String>> _registered = {};

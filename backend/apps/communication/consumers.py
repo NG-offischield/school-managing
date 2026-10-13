@@ -6,7 +6,10 @@ Authentication (same tokens as REST, revocation effective immediately):
 - native clients (Flutter, PySide6): `Authorization: Bearer <access>` header
   at the handshake (+ optional `X-School-Code`);
 - browsers (cannot set headers): first frame {"type": "auth", "token": ...,
-  "school": optional code}. Nothing else is accepted before it.
+  "school": optional code, "language": optional}. Nothing else is accepted before it.
+Language: `Accept-Language` at the handshake (or "language" of the auth
+frame), fr / en, French otherwise. System notification texts are rendered in
+it (notifications.localized); what people wrote is forwarded untouched.
 Failure -> close code 4401. The session and the membership are re-checked
 at least every REVALIDATE_SECONDS while the socket lives.
 
@@ -42,9 +45,9 @@ from apps.accounts.authentication import session_from_access_token
 from apps.accounts.models import MembershipStatus, SchoolMembership, UserSession
 from common.tenancy import resolve_membership
 
-from . import access, messaging, realtime
+from . import access, messaging, realtime, texts
 from .models import Conversation, Message, Notification
-from .notifications import serialize, unread_count
+from .notifications import localized, serialize, unread_count
 
 REVALIDATE_SECONDS = 30
 SYNC_LIMIT = 100
@@ -88,7 +91,31 @@ def _conversation(membership, conversation_id):
     return conversation
 
 
-def _sync(membership_id, since):
+def connection_language(value):
+    """'en-GB,en;q=0.9,fr;q=0.8' -> 'en'; unsupported or missing -> 'fr'."""
+    for part in str(value or "").split(","):
+        code = part.split(";")[0].strip().lower()[:2]
+        if code in ("fr", "en"):
+            return code
+    return texts.DEFAULT_LANGUAGE
+
+
+def localize_frame(frame, language):
+    """A notification frame from notify(): title / message rendered in the
+    connection's language; the internal text description is not forwarded."""
+    if frame.get("type") != "notification":
+        return frame
+    frame = dict(frame)
+    description = frame.pop("text", None) or {}
+    data = dict(frame["data"])
+    if description:
+        holder = Notification(title=data["title"], message=data["message"], text=description)
+        data["title"], data["message"] = localized(holder, language)
+    frame["data"] = data
+    return frame
+
+
+def _sync(membership_id, since, language=texts.DEFAULT_LANGUAGE):
     membership = _member(membership_id)
     notifications = Notification.objects.filter(recipient=membership)
     if since is not None:
@@ -96,7 +123,7 @@ def _sync(membership_id, since):
     latest = list(notifications.order_by("-created_at")[:SYNC_LIMIT])
     return {
         "type": "sync",
-        "notifications": [serialize(n) for n in reversed(latest)],
+        "notifications": [serialize(n, language) for n in reversed(latest)],
         "unread_notifications": unread_count(membership),
     }
 
@@ -169,6 +196,7 @@ class RealtimeConsumer(AsyncJsonWebsocketConsumer):
         self.checked_at = 0.0
         await self.accept()
         headers = dict(self.scope.get("headers", []))
+        self.language = connection_language(headers.get(b"accept-language", b"").decode("latin1"))
         authorization = headers.get(b"authorization", b"").decode("latin1")
         if authorization:
             scheme, _, token = authorization.partition(" ")
@@ -207,6 +235,8 @@ class RealtimeConsumer(AsyncJsonWebsocketConsumer):
     async def receive_json(self, content, **kwargs):
         kind = content.get("type") if isinstance(content, dict) else None
         if self.membership_id is None:
+            if kind == "auth" and content.get("language"):
+                self.language = connection_language(content.get("language"))
             if kind == "auth" and await self._login(str(content.get("token") or ""), content.get("school")):
                 return
             await self.send_json({"type": "error", "code": "NOT_AUTHENTICATED"})
@@ -217,7 +247,9 @@ class RealtimeConsumer(AsyncJsonWebsocketConsumer):
         if kind == "ping":
             await self.send_json({"type": "pong"})
         elif kind == "sync":
-            await self.send_json(await database_sync_to_async(_sync)(self.membership_id, _since(content.get("since"))))
+            await self.send_json(
+                await database_sync_to_async(_sync)(self.membership_id, _since(content.get("since")), self.language)
+            )
         elif kind == "subscribe":
             frame = await database_sync_to_async(_subscribe)(
                 self.membership_id, content.get("conversation"), _since(content.get("since"))
@@ -253,7 +285,7 @@ class RealtimeConsumer(AsyncJsonWebsocketConsumer):
 
     async def member_event(self, event):
         if await self._valid():
-            await self.send_json(event["frame"])
+            await self.send_json(localize_frame(event["frame"], self.language))
 
     async def conversation_event(self, event):
         conversation = uuid.UUID(event["conversation"])

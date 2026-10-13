@@ -32,6 +32,7 @@ from apps.accounts.models import MembershipStatus, SchoolMembership
 from apps.audit.services import record_audit
 from apps.communication.models import NotificationType
 from apps.communication.notifications import notify_many
+from apps.communication.texts import text
 from apps.gradebook.models import Course
 from apps.people.models import EnrollmentStatus, ParentStudent, ProfessionalStatus, StudentEnrollment, TeacherProfile
 from common.permissions import ADMIN_ROLES, membership_has_role, require_role
@@ -279,8 +280,12 @@ def _notify(plan, version):
         readers(plan),
         school=plan.school,
         notification_type=NotificationType.PLAN,
-        title=(f"Plan publié : {plan.title}" if first else f"Plan mis à jour : {plan.title}")[:200],
-        message=(f"{where} — version {version.number}." if where else f"Version {version.number}.")[:500],
+        title=text("plan.published.title" if first else "plan.updated.title", title=plan.title),
+        message=(
+            text("plan.version.located", where=where, number=version.number)
+            if where
+            else text("plan.version", number=version.number)
+        ),
         event_key=f"plan.version:{version.pk}",
         payload={"plan": str(plan.pk), "version": str(version.pk), "number": version.number},
         source=version,

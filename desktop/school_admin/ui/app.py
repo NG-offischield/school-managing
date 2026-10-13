@@ -203,6 +203,8 @@ class AppController:
         set_language(code)
         self.api.set_language(code)
         saved = save_preference("language", code, self.config_directory)
+        if self.realtime is not None and self.realtime.state in ("online", "connecting", "offline"):
+            self.realtime.start()  # live notifications in the new language from now on
         self.rebuild_windows()
         return saved
 

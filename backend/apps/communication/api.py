@@ -114,6 +114,12 @@ class NotificationSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
+    def to_representation(self, instance):
+        """Same fields; a system title / message in the request's language."""
+        data = super().to_representation(instance)
+        data["title"], data["message"] = notifications.localized(instance)
+        return data
+
 
 class NotificationList(SchoolScopedMixin, generics.ListAPIView):
     queryset = Notification.objects.order_by("-created_at")

@@ -17,6 +17,7 @@ import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../api/api_client.dart';
+import '../l10n/l10n.dart';
 
 const unauthorizedClose = 4401;
 const _backoff = [1, 2, 4, 8, 15, 30];
@@ -41,7 +42,9 @@ class RealtimeClient {
     this.pingInterval = const Duration(seconds: 25),
     Future<bool> Function()? refresh,
   }) : _factory = channelFactory,
-       _refresh = refresh ?? (() async => false);
+       _refresh = refresh ?? (() async => false) {
+    L10n.changes.addListener(_languageChanged);
+  }
 
   final ApiClient api;
   final Uri uri;
@@ -80,7 +83,8 @@ class RealtimeClient {
     }
     _drop();
     _set(RealtimeState.connecting);
-    final channel = _factory(uri, {'Authorization': 'Bearer $token'});
+    // the server renders system notifications in this language
+    final channel = _factory(uri, {'Authorization': 'Bearer $token', 'Accept-Language': L10n.language.code});
     _channel = channel;
     _subscription = channel.stream.listen(
       (event) => _onFrame('$event'),
@@ -96,7 +100,17 @@ class RealtimeClient {
     _set(RealtimeState.stopped);
   }
 
+  /// A new language: reconnect, so live notifications come in it.
+  void _languageChanged() {
+    if (state == RealtimeState.online || state == RealtimeState.connecting) {
+      scheduleMicrotask(() {
+        if (state != RealtimeState.stopped) start();
+      });
+    }
+  }
+
   Future<void> dispose() async {
+    L10n.changes.removeListener(_languageChanged);
     stop();
     for (final controller in [_states, _notifications, _unread, _messages, _expired]) {
       await controller.close();

@@ -99,6 +99,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
   Future<List<AppNotification>>? _future;
   List<AppNotification> _rows = [];
   StreamSubscription<Map<String, dynamic>>? _live;
+  AppLanguage? _language;
 
   @override
   void initState() {
@@ -108,6 +109,15 @@ class _NotificationsTabState extends State<NotificationsTab> {
       final pushed = AppNotification.fromJson(data);
       if (_rows.every((n) => n.id != pushed.id)) setState(() => _rows = [pushed, ..._rows]);
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // the server writes system notifications in the language asked: reload
+    final language = languageOf(context);
+    if (_language != null && language != _language) _load();
+    _language = language;
   }
 
   @override
