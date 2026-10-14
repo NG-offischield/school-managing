@@ -6,6 +6,7 @@ isolation are unchanged: the filters only narrow what the caller already sees.""
 import uuid
 
 import pytest
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.finance import services as fin
@@ -67,7 +68,9 @@ def test_payment_and_invoice_filters_search_dates_method(w):
     assert refs(search=by_wallet.payment_reference[-6:].lower()) == {by_wallet.payment_reference}
     assert refs(search=s0.last_name.upper()) == {by_cash.payment_reference, by_wallet.payment_reference}
     assert refs(search="personne-inconnue") == set()
-    today = by_cash.initiated_at.date()
+    # the filter is on the school's local date (TIME_ZONE): not the UTC date, which differs
+    # between 00:00 and 01:00 in Douala
+    today = timezone.localdate(by_cash.initiated_at)
     assert len(refs(date_from=today.isoformat(), date_to=today.isoformat())) == 2
     assert refs(date_to="2000-01-01") == set()
     assert as_(w.admin).get(url, {"date_from": "pas-une-date"}).status_code == 400
