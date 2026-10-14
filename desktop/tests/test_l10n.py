@@ -285,3 +285,70 @@ def test_switch_reconnects_a_live_connection_only(controller, tmp_path):  # noqa
     controller.set_language("fr")
     assert starts == ["en"]
     controller.realtime = None
+
+
+def _convocation_dialogs(ctrl, backend):
+    from school_admin.services.attendance import Convocation
+    from school_admin.ui.pages.attendance_page import ConvocationDialog, OutcomeDialog
+
+    from .test_attendance_page import family
+
+    family(backend)
+    _, page = open_module(ctrl, "attendance")
+    convocations = page.open_tab("convocations")
+    dialog = ConvocationDialog(convocations.search_students, convocations.load_recipients, convocations)
+    dialog.picker.show([(backend.awa, "Ndiaye Awa (MAT-001)")])
+    sample = Convocation("c1", "Awa Ndiaye", "MAT-001", "Mariam Ndiaye", None, None, "Absences", "SCHEDULED")
+    return dialog, OutcomeDialog(sample)
+
+
+def test_convocation_dialogs_in_english(controller, backend, tmp_path):  # noqa: F811
+    controller.config_directory = tmp_path
+    open_module(controller, "dashboard")
+    controller.set_language("en")
+    dialog, outcome = _convocation_dialogs(controller, backend)
+    assert dialog.windowTitle() == "New meeting notice" and dialog.save_button.text() == "Send notice"
+    items = [dialog.recipient.itemText(i) for i in range(dialog.recipient.count())]
+    assert items == ["Mariam Ndiaye — Mother (primary contact)", "Paul Ndiaye — Father"]
+    assert [outcome.outcome.itemText(i) for i in range(outcome.outcome.count())] == [
+        "Held",
+        "Parent absent",
+        "Cancelled",
+    ]
+    for widget in (dialog, outcome):
+        texts, _ = _visible_texts(widget)
+        assert not _untranslated(texts + [widget.windowTitle()], []), _untranslated(texts, [])
+        widget.close()
+    assert not [t for t in i18n.missing if not DATA.fullmatch(t)]
+
+
+@pytest.mark.parametrize("mode", ["light", "dark"])
+def test_convocation_dialogs_readable_in_both_themes(controller, backend, qapp, mode):  # noqa: F811
+    # A theme switch re-polishes EVERY widget of the application: the windows left
+    # open by earlier test files (thousands of widgets) would make it crawl — the
+    # same cleanup as test_theme_modes.py. The application itself has a handful.
+    from PySide6.QtCore import QCoreApplication, QEvent
+    from PySide6.QtGui import QPalette
+
+    from school_admin.ui.theme import apply_theme, contrast_ratio
+
+    from .test_theme_dialogs import color, shown
+
+    own = {controller.login_window, controller.main_window}
+    for widget in [w for w in qapp.topLevelWidgets() if w not in own]:
+        widget.close()
+        widget.deleteLater()
+    QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+    apply_theme(qapp, mode)
+    try:
+        for dialog in _convocation_dialogs(controller, backend):
+            shown(dialog)
+            background = color(dialog, QPalette.Window)
+            for label in [lbl for lbl in dialog.findChildren(QLabel) if lbl.isVisible() and lbl.text().strip()]:
+                ratio = contrast_ratio(color(label, QPalette.WindowText), background)
+                assert ratio >= 4.5, f"{mode} {label.text()[:40]!r}: {ratio:.2f}"
+            for field in dialog.findChildren(QComboBox) + dialog.findChildren(QLineEdit):
+                assert contrast_ratio(color(field, QPalette.Text), color(field, QPalette.Base)) >= 4.5
+            dialog.close()
+    finally:
+        apply_theme(qapp, "light")  # every other test expects the default light theme

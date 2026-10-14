@@ -29,6 +29,7 @@ def test_navigation_entry_is_now_available(controller, backend):  # noqa: F811
         "Présences du jour",
         "Passages au portail",
         "Codes QR",
+        "Convocations",
         "Gardiens",
     ]
 
@@ -108,11 +109,24 @@ def test_duplicate_number_is_explained(controller, backend):  # noqa: F811
 
 
 @pytest.mark.parametrize("size", [QSize(1366, 768), QSize(1280, 720), QSize(1024, 768)])
-@pytest.mark.parametrize("tab", ["daily", "scans", "codes", "guardians"])
+@pytest.mark.parametrize("tab", ["daily", "scans", "codes", "convocations", "guardians"])
 def test_attendance_tabs_fit(controller, backend, size, tab):  # noqa: F811
     shell, _, view = open_attendance(controller, tab)
     if tab == "codes":  # the list exists once a class is chosen (before: the empty state)
         view.class_filter.setCurrentIndex(view.class_filter.findText("6e A"))
+    if tab == "convocations":  # a list with a convocation (empty: the empty state is shown)
+        from datetime import date, time
+
+        mother = family(backend)["mother"]
+        view.open_dialog = lambda: {
+            "student_id": backend.awa,
+            "parent_id": mother,
+            "day": date(2026, 3, 10),
+            "start": time(15, 0),
+            "end": time(16, 0),
+            "reason": "Absences répétées",
+        }
+        view.add()
     shell.resize(size)
     shell.show()
     QTest.qWaitForWindowExposed(shell)
@@ -244,3 +258,149 @@ def test_qr_code_refused_for_a_pupil_not_enrolled(controller, backend):  # noqa:
     with pytest.raises(ApiError):
         service.issue_code(backend.chloe)  # no class this year: the server refuses
     assert backend.qr_codes == {}
+
+
+# =============================================================================
+# Convocations (admin/convocations/, recipients = active, verified links only)
+# =============================================================================
+
+
+def family(backend):
+    """Awa: a verified mother (primary contact), a verified father without notifications,
+    a DECLARED father and a former tutor — only the first two may be convened."""
+    return {
+        "mother": backend.add_parent_link(backend.awa, "Mariam Ndiaye", "MOTHER", primary=True),
+        "father": backend.add_parent_link(backend.awa, "Paul Ndiaye", "FATHER", notified=False),
+        "declared": backend.add_parent_link(backend.awa, "Ibrahim Ndiaye", "FATHER", verified=False),
+        "former": backend.add_parent_link(backend.awa, "Ancien Tuteur", "TUTOR", active=False),
+    }
+
+
+def convocation_dialog(page):
+    from school_admin.ui.pages.attendance_page import ConvocationDialog
+
+    return ConvocationDialog(page.search_students, page.load_recipients, page)
+
+
+def test_convocation_dialog_offers_only_eligible_recipients(controller, backend):  # noqa: F811
+    links = family(backend)
+    _, _, page = open_attendance(controller, "convocations")
+    dialog = convocation_dialog(page)
+    assert not dialog.recipient.isEnabled() and not dialog.save_enabled  # a pupil first
+    dialog.picker.text.setText("Ndiaye")
+    dialog.picker.run()  # server search (students/?search=)
+    assert dialog.picker.results.currentText() == "Ndiaye Awa (MAT-001)"
+    items = [dialog.recipient.itemText(i) for i in range(dialog.recipient.count())]
+    assert items == ["Mariam Ndiaye — Mère (contact principal)", "Paul Ndiaye — Père"]
+    ids = [dialog.recipient.itemData(i) for i in range(dialog.recipient.count())]
+    assert links["declared"] not in ids and links["former"] not in ids  # never offered
+    assert dialog.recipient_help.text() == ""
+    dialog.recipient.setCurrentIndex(1)
+    assert "ne recevra pas la notification" in dialog.recipient_help.text()
+    dialog.recipient.setCurrentIndex(0)
+    assert not dialog.save_enabled  # still no reason
+    dialog.reason.setPlainText("Absences répétées")
+    assert dialog.save_enabled
+    values = dialog.values()
+    assert (values["student_id"], values["parent_id"]) == (backend.awa, links["mother"])
+    dialog.end.setTime(dialog.start.time())
+    assert not dialog.save_enabled and "heure de fin" in dialog.status.text()
+    dialog.close()
+
+
+def test_a_pupil_without_verified_parent_cannot_be_convened(controller, backend):  # noqa: F811
+    backend.add_parent_link(backend.bruno, "Inconnu Ekane", "FATHER", verified=False)
+    _, _, page = open_attendance(controller, "convocations")
+    dialog = convocation_dialog(page)
+    dialog.picker.show([(backend.bruno, "Ekane Bruno (MAT-002)")])
+    assert dialog.recipient.currentText() == "Aucun responsable vérifié" and not dialog.recipient.isEnabled()
+    assert "lien vérifié" in dialog.recipient_help.text()
+    dialog.reason.setPlainText("Comportement")
+    assert not dialog.save_enabled
+    dialog.close()
+
+
+def test_convocation_created_listed_then_closed(controller, backend):  # noqa: F811
+    from datetime import date, time
+
+    links = family(backend)
+    _, _, page = open_attendance(controller, "convocations")
+    assert page.table.rowCount() == 0 and page.add_button.isEnabled()
+    page.open_dialog = lambda: {
+        "student_id": backend.awa,
+        "parent_id": links["mother"],
+        "day": date(2026, 3, 10),
+        "start": time(15, 0),
+        "end": time(16, 0),
+        "reason": "Absences répétées",
+    }
+    page.add()
+    assert backend.convocation_posts == [
+        {
+            "student": backend.awa,
+            "parent": links["mother"],
+            "scheduled_start": "2026-03-10T15:00:00",  # local time of that day, as entered
+            "scheduled_end": "2026-03-10T16:00:00",
+            "reason": "Absences répétées",
+        }
+    ]
+    assert page.banner.plain_text() == "Convocation de Mariam Ndiaye enregistrée : le parent est prévenu."
+    assert column(page.table, 1) == ["Awa Ndiaye"] and column(page.table, 2) == ["Mariam Ndiaye"]
+    assert page.table.item(0, 0).text() == "10/03/2026 15:00" and page.table.item(0, 4).text() == "Programmée"
+    page.table.selectRow(0)
+    assert page.close_button.isEnabled()
+    page.open_outcome = lambda _c: {"status": "HELD", "notes": "Venue avec sa fille"}
+    page.close_convocation()
+    assert page.table.item(0, 4).text() == "Tenue" and page.banner.plain_text() == "Convocation de Awa Ndiaye : Tenue."
+    page.table.selectRow(0)
+    assert not page.close_button.isEnabled()  # closed once
+    page.status.setCurrentIndex(page.status.findData("SCHEDULED"))
+    assert page.table.rowCount() == 0
+
+
+def test_convocation_refusals_and_outage_are_explained(controller, backend):  # noqa: F811
+    from datetime import date, time
+
+    from school_admin.api.errors import NetworkError
+
+    links = family(backend)
+    _, _, page = open_attendance(controller, "convocations")
+    page.open_dialog = lambda: {
+        "student_id": backend.awa,
+        "parent_id": links["declared"],  # not offered by the dialog; the server refuses it anyway
+        "day": date(2026, 3, 10),
+        "start": time(15, 0),
+        "end": time(16, 0),
+        "reason": "Test",
+    }
+    page.add()
+    assert page.banner.kind in ("warning", "error") and page.banner.plain_text()
+    assert backend.convocations == {} and page.table.rowCount() == 0
+    page.find_students = lambda _text: (_ for _ in ()).throw(NetworkError("down"))
+    dialog = convocation_dialog(page)
+    dialog.picker.text.setText("Ndiaye")
+    dialog.picker.run()
+    assert page.banner.plain_text()  # the outage is explained, nothing is chosen
+    assert dialog.picker.student_id is None
+    dialog.close()
+
+
+def test_recipients_server_error_or_offline_keeps_the_form_closed(controller, backend):  # noqa: F811
+    from .fake_backend import fail
+
+    family(backend)
+    _, _, page = open_attendance(controller, "convocations")
+    backend.forced[("GET", "admin/convocations/recipients/")] = fail(500, "SERVER_ERROR", "Erreur interne.")
+    dialog = convocation_dialog(page)
+    dialog.picker.show([(backend.awa, "Ndiaye Awa (MAT-001)")])
+    assert page.banner.kind == "error" and page.banner.plain_text()  # explained, not hidden
+    assert dialog.recipient.currentData() is None and not dialog.recipient.isEnabled()
+    dialog.reason.setPlainText("Absences")
+    assert not dialog.save_enabled  # nobody can be convened without the server's list
+    dialog.close()
+    del backend.forced[("GET", "admin/convocations/recipients/")]
+    backend.offline = True
+    page.reload()
+    assert page.banner.plain_text()  # the list cannot load: said, with no stale rows invented
+    assert page.table.rowCount() == 0
+    backend.offline = False

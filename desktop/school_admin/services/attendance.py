@@ -10,6 +10,10 @@ service and activated / suspended with the EXISTING account endpoints
     GET  admin/qr-codes/?student=&status=                annual QR codes (one active per pupil and year)
     POST admin/qr-codes/issue/ {student}   …/issue-class/ {school_class}   …/reissue/ {student, reason}
     POST admin/qr-codes/{id}/revoke/ {reason}
+    GET  admin/convocations/?status=
+    POST admin/convocations/ {student, parent, scheduled_start, scheduled_end, reason}
+    GET  admin/convocations/recipients/?student=   the parents who may be convened (active, verified links)
+    POST admin/convocations/{id}/status/ {status, notes?}
 
 Every rule is the server's: who may correct, the status a time gives (late
 or present), when a code can be issued (pupil actively enrolled, open year),
@@ -44,6 +48,11 @@ SCAN_RESULTS = Labels(
 )
 ACCOUNT_STATUSES = Labels({"ACTIVE": "Actif", "SUSPENDED": "Suspendu", "PENDING": "En attente", "LEFT": "Parti"})
 QR_STATUSES = Labels({"ACTIVE": "Actif", "REVOKED": "Révoqué", "": "Aucun code"})
+CONVOCATION_STATUSES = Labels(
+    {"SCHEDULED": "Programmée", "HELD": "Tenue", "MISSED": "Parent absent", "CANCELLED": "Annulée"}
+)
+# How a convocation is closed (SCHEDULED is the server's starting state).
+CONVOCATION_OUTCOMES = Labels({"HELD": "Tenue", "MISSED": "Parent absent", "CANCELLED": "Annulée"})
 # What a correction may set (PENDING is the server's own state). Present or late
 # is decided by the server from the arrival time and the day's policy.
 CORRECTIONS = Labels(
@@ -121,6 +130,74 @@ class ScanRecord:
             result=row.get("result") or "",
             student_name=row.get("student_name") or "—",
             scanned_by=row.get("scanned_by_name") or "—",
+        )
+
+
+@dataclass(frozen=True)
+class Recipient:
+    """A parent who may be convened (the server lists only active, verified links)."""
+
+    parent_id: str
+    name: str
+    relationship_type: str
+    is_primary_contact: bool
+    notified: bool  # will also receive the in-app notification
+
+    @property
+    def label(self):
+        from ..models import RELATIONSHIPS
+
+        relation = RELATIONSHIPS.get(self.relationship_type, self.relationship_type)
+        text = f"{self.name} — {relation}"
+        return tr("{0} (contact principal)", text) if self.is_primary_contact else text
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            parent_id=str(row["parent"]),
+            name=row.get("name") or "",
+            relationship_type=row.get("relationship_type") or "",
+            is_primary_contact=bool(row.get("is_primary_contact")),
+            notified=bool(row.get("notified")),
+        )
+
+
+@dataclass(frozen=True)
+class Convocation:
+    id: str
+    student_name: str
+    student_number: str
+    parent_name: str
+    start: datetime | None
+    end: datetime | None
+    reason: str
+    status: str
+    notes: str = ""
+
+    @property
+    def active(self):  # CatalogPage: only a scheduled convocation can still change
+        return self.status == "SCHEDULED"
+
+    @property
+    def status_label(self):
+        return CONVOCATION_STATUSES.get(self.status, self.status)
+
+    @property
+    def code(self):
+        return self.student_name
+
+    @classmethod
+    def from_api(cls, row):
+        return cls(
+            id=str(row["id"]),
+            student_name=row.get("student_name") or "—",
+            student_number=row.get("student_number") or "",
+            parent_name=row.get("parent_name") or "—",
+            start=_when(row.get("scheduled_start")),
+            end=_when(row.get("scheduled_end")),
+            reason=row.get("reason") or "",
+            status=row.get("status") or "",
+            notes=row.get("notes") or "",
         )
 
 
@@ -264,6 +341,47 @@ class AttendanceService:
         if not (reason or "").strip():
             raise ValidationFailed("Formulaire incomplet.", details={"reason": [tr("Indiquez le motif.")]})
         return self.api.post(f"admin/qr-codes/{qr_id}/revoke/", {"reason": reason.strip()})
+
+    # --- convocations ------------------------------------------------------------------
+    def convocations(self, status=None):
+        rows = self.api.list_all("admin/convocations/", status=status or None)
+        return [Convocation.from_api(r) for r in rows]
+
+    def recipients(self, student_id):
+        """Who may be convened about this pupil: the server's answer only."""
+        return [Recipient.from_api(r) for r in self.api.list_all("admin/convocations/recipients/", student=student_id)]
+
+    def create_convocation(self, *, student_id, parent_id, day, start, end, reason):
+        """Times are the school's local time of that day, as the other screens send them."""
+        missing = {}
+        if not student_id:
+            missing["student"] = [tr("Obligatoire.")]
+        if not parent_id:
+            missing["parent"] = [tr("Obligatoire.")]
+        if not (reason or "").strip():
+            missing["reason"] = [tr("Indiquez le motif.")]
+        if day is None or start is None or end is None:
+            missing["scheduled_start"] = [tr("Obligatoire.")]
+        elif end <= start:
+            missing["scheduled_end"] = [tr("La fin doit suivre le début.")]
+        if missing:
+            raise ValidationFailed("Formulaire incomplet.", details=missing)
+        payload = {
+            "student": student_id,
+            "parent": parent_id,
+            "scheduled_start": datetime.combine(day, start).isoformat(),
+            "scheduled_end": datetime.combine(day, end).isoformat(),
+            "reason": reason.strip(),
+        }
+        return Convocation.from_api(self.api.post("admin/convocations/", payload))
+
+    def close_convocation(self, convocation_id, status, notes=""):
+        if status not in CONVOCATION_OUTCOMES:
+            raise ValidationFailed("Formulaire incomplet.", details={"status": [tr("Obligatoire.")]})
+        payload = {"status": status}
+        if (notes or "").strip():
+            payload["notes"] = notes.strip()
+        return Convocation.from_api(self.api.post(f"admin/convocations/{convocation_id}/status/", payload))
 
     def scans(self, day: date | None = None, *, guardian=None, result=None):
         rows = self.api.list_all(

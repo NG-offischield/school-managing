@@ -3,6 +3,7 @@ attendance/api.py: admin/attendance/daily/, admin/scans/; people/
 guardian_admin_api.py) for the desktop tests: the CONTRACT — attendance
 computed by the server and corrected with a reason (/correct/), scans
 filtered by guardian, annual QR codes (issue, issue-class, reissue, revoke),
+convocations (recipients = active, verified links only; closed once),
 guardians created without password (activation and suspension: admin/accounts/)."""
 
 import uuid
@@ -57,6 +58,9 @@ class AttendanceFake:
         self.attendance_queries = []
         self.qr_codes = {}  # id -> QRSerializer row
         self.corrections = []  # bodies received by /correct/
+        self.convocations = {}  # id -> AdminConvocationSerializer row
+        self.convocation_posts = []  # bodies received by POST admin/convocations/
+        self.parent_links = []  # {student, parent, name, relationship_type, ..., verified, active}
         gid = self.add_guardian("Moussa", "Bello", "G-01", activated=True)
         self.scan_rows += [
             {
@@ -99,6 +103,95 @@ class AttendanceFake:
             record.update(status=status, arrival_time=None, late_minutes=0)
         record["note"] = body["reason"].strip()
         return self._at_ok(record)
+
+    def add_parent_link(self, student_id, name, relationship="MOTHER", *, verified=True, active=True, **extra):
+        parent_id = str(uuid.uuid4())
+        self.parent_links.append(
+            {
+                "student": student_id,
+                "parent": parent_id,
+                "name": name,
+                "relationship_type": relationship,
+                "is_primary_contact": extra.get("primary", False),
+                "verified_at": f"{TODAY}T09:00:00+01:00" if verified else None,
+                "notified": extra.get("notified", True),
+                "verified": verified,
+                "active": active,
+                "phone": "+237 6 99 00 00 00",  # never exposed by the server's recipients route
+            }
+        )
+        return parent_id
+
+    def _convocations(self, request, path, body):
+        parts = path.strip("/").split("/")
+        params = request.url.params
+        if path == "admin/convocations/recipients/":
+            student = params.get("student")
+            if not student:
+                return self._at_fail(
+                    400, "VALIDATION_ERROR", details={"student": ["This query parameter is required."]}
+                )
+            if student not in self.students:
+                return self._at_fail(404, "NOT_FOUND")
+            fields = ("parent", "name", "relationship_type", "is_primary_contact", "verified_at", "notified")
+            rows = [
+                {k: link[k] for k in fields}
+                for link in self.parent_links
+                if link["student"] == student and link["verified"] and link["active"]
+            ]
+            rows.sort(key=lambda r: (not r["is_primary_contact"], r["name"]))
+            return self._page(rows, request)
+        if path == "admin/convocations/" and request.method == "GET":
+            rows = sorted(self.convocations.values(), key=lambda c: c["scheduled_start"], reverse=True)
+            if params.get("status"):
+                rows = [c for c in rows if c["status"] == params["status"]]
+            return self._page(rows, request)
+        if path == "admin/convocations/" and request.method == "POST":
+            self.convocation_posts.append(dict(body))
+            link = next(
+                (
+                    link
+                    for link in self.parent_links
+                    if link["parent"] == body.get("parent") and link["student"] == body.get("student")
+                ),
+                None,
+            )
+            if body.get("student") not in self.students:
+                return self._at_fail(404, "NOT_FOUND")
+            if link is None or not (link["verified"] and link["active"]):
+                return self._at_fail(400, "BUSINESS_RULE_VIOLATION", "parent_not_linked")
+            if not (body.get("reason") or "").strip():
+                return self._at_fail(400, "BUSINESS_RULE_VIOLATION", "reason_required")
+            if body["scheduled_end"] <= body["scheduled_start"]:
+                return self._at_fail(400, "BUSINESS_RULE_VIOLATION", "invalid_schedule")
+            student = self.students[body["student"]]
+            cid = str(uuid.uuid4())
+            self.convocations[cid] = {
+                "id": cid,
+                "student": body["student"],
+                "parent": body["parent"],
+                "scheduled_start": f"{body['scheduled_start'][:19]}+01:00",
+                "scheduled_end": f"{body['scheduled_end'][:19]}+01:00",
+                "reason": body["reason"],
+                "alert_level": "NONE",
+                "status": "SCHEDULED",
+                "notes": None,
+                "student_name": f"{student['first_name']} {student['last_name']}",
+                "student_number": student["student_number"],
+                "parent_name": link["name"],
+            }
+            return self._at_ok(self.convocations[cid], 201)
+        if len(parts) == 4 and parts[3] == "status":
+            convocation = self.convocations.get(parts[2])
+            if convocation is None:
+                return self._at_fail(404, "NOT_FOUND")
+            if body.get("status") not in ("HELD", "MISSED", "CANCELLED"):
+                return self._at_fail(400, "BUSINESS_RULE_VIOLATION", "invalid_status")
+            if convocation["status"] != "SCHEDULED":
+                return self._at_fail(400, "BUSINESS_RULE_VIOLATION", "convocation_closed")
+            convocation.update(status=body["status"], notes=body.get("notes"))
+            return self._at_ok(convocation)
+        return self._at_fail(404, "NOT_FOUND")
 
     def _enrolled(self, student_id):
         return (
@@ -234,6 +327,8 @@ class AttendanceFake:
             return self._correct(parts[2], body)
         if parts[:2] == ["admin", "qr-codes"]:
             return self._qr(request, parts, body)
+        if parts[:2] == ["admin", "convocations"]:
+            return self._convocations(request, path, body)
         if path == "admin/scans/":
             rows = [r for r in self.scan_rows if not params.get("date") or r["scanned_at"].startswith(params["date"])]
             if params.get("guardian"):

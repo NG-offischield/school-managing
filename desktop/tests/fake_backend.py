@@ -1682,9 +1682,9 @@ class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake, Pla
         if path.startswith(("admin/registrations/", "admin/link-requests/")):
             return self._parents(request, path, body, admin)
         comm = ("notifications/", "conversations/", "messages/", "forum/", "complaints/", "attachments/")
-        if path.startswith(("admin/attendance/daily/", "admin/scans/", "admin/guardians/", "admin/qr-codes/")) or (
-            path.startswith("admin/attendance/") and path.endswith("/correct/")
-        ):
+        if path.startswith(
+            ("admin/attendance/daily/", "admin/scans/", "admin/guardians/", "admin/qr-codes/", "admin/convocations/")
+        ) or (path.startswith("admin/attendance/") and path.endswith("/correct/")):
             return self._attendance(request, path, body, admin) or fail(404, "NOT_FOUND", "Introuvable.")
         if path.startswith("admin/plans/"):
             return self._plans(request, path, body, admin)

@@ -1,17 +1,25 @@
 """Vie scolaire → Présences: the day's attendance (computed by the server
 from the QR scans and the policies; an administrator corrects a record with
 a reason, audited), the gate passages (read only), the pupils' annual QR
-codes (issue, reissue, revoke) and the gate guardians (creation, activation
-code, suspension — the existing account services). Tabs: « Présences du
-jour », « Passages au portail », « Codes QR », « Gardiens ».
+codes (issue, reissue, revoke), the convocations of parents (verified links
+only) and the gate guardians (creation, activation code, suspension — the
+existing account services). Tabs: « Présences du jour », « Passages au
+portail », « Codes QR », « Convocations », « Gardiens ».
 Every call off the UI thread; every rule is the server's.
 """
 
 from PySide6.QtCore import QDate, Qt, QTime
-from PySide6.QtWidgets import QComboBox, QDialog, QLineEdit, QPlainTextEdit, QTabWidget
+from PySide6.QtWidgets import QComboBox, QDialog, QLabel, QLineEdit, QPlainTextEdit, QTabWidget
 
 from ...i18n import Lazy, Texts, Tr, tr
-from ...services.attendance import CORRECTIONS, DAILY_STATUSES, SCAN_RESULTS
+from ...services.attendance import (
+    CONVOCATION_OUTCOMES,
+    CONVOCATION_STATUSES,
+    CORRECTIONS,
+    DAILY_STATUSES,
+    SCAN_RESULTS,
+)
+from ..dialogs.finance_dialogs import StudentPicker
 from ..dialogs.teacher_dialogs import ActivationCodeDialog, ask_reason
 from ..theme import TOKENS, TokenColours
 from ..widgets import FormDialog, Page, button, date_field, time_field
@@ -400,6 +408,244 @@ class CodesPage(_ReadOnly):
             )
 
 
+class ConvocationDialog(FormDialog):
+    """Convene a parent about a pupil: the pupil is searched on the server,
+    the recipients are the server's list (active, verified links only)."""
+
+    def __init__(self, search, load_recipients, parent=None):
+        super().__init__(
+            tr("Nouvelle convocation"),
+            tr(
+                "Le parent choisi est convoqué et prévenu dans son application. "
+                "Seuls les responsables au lien vérifié peuvent être convoqués."
+            ),
+            parent,
+            save_text=tr("Convoquer"),
+            width=640,
+        )
+        self.load_recipients = load_recipients
+        self.picker = self.add_field("student", tr("Élève"), StudentPicker(search), required=True)
+        self.recipient = QComboBox()
+        self.recipient.setEnabled(False)
+        self.recipient.addItem(tr("— choisissez d'abord l'élève —"), None)
+        self.add_field("parent", tr("Responsable convoqué"), self.recipient, required=True)
+        self.recipient_help = QLabel("", objectName="help", wordWrap=True)
+        self.body.addWidget(self.recipient_help)
+        self.day = self.add_field("day", tr("Date"), date_field(), required=True, width="short")
+        self.day.setDate(QDate.currentDate().addDays(1))
+        self.start = self.add_field(
+            "start", tr("Début"), time_field(QTime(15, 0)), required=True, width="short", beside=True
+        )
+        self.end = self.add_field("end", tr("Fin"), time_field(QTime(16, 0)), required=True, width="short", beside=True)
+        reason = QPlainTextEdit(placeholderText=tr("Ex. absences répétées non justifiées"))
+        reason.setFixedHeight(72)
+        reason.setTabChangesFocus(True)
+        self.reason = self.add_field("reason", tr("Motif"), reason, required=True)
+        self.recipients = []
+        self.picker.results.currentIndexChanged.connect(lambda _: self._student_changed())
+        self.recipient.currentIndexChanged.connect(lambda _: self._recipient_changed())
+        for field in (self.start, self.end):
+            field.timeChanged.connect(lambda _: self.refresh_state())
+        self.reason.textChanged.connect(self.refresh_state)
+        self.finish()
+
+    def _student_changed(self):
+        self.recipients = []
+        self.recipient.clear()
+        self.recipient.setEnabled(False)
+        self.recipient_help.setText("")
+        if self.picker.student_id:
+            self.recipient.addItem(tr("Chargement…"), None)
+            self.load_recipients(self.picker.student_id, self.show_recipients)
+        else:
+            self.recipient.addItem(tr("— choisissez d'abord l'élève —"), None)
+        self.refresh_state()
+
+    def show_recipients(self, recipients):
+        self.recipients = list(recipients)
+        self.recipient.clear()
+        if not self.recipients:
+            self.recipient.addItem(tr("Aucun responsable vérifié"), None)
+            self.recipient_help.setText(
+                tr(
+                    "Aucun parent n'a de lien vérifié avec cet élève : "
+                    "validez d'abord un rattachement (module Parents)."
+                )
+            )
+        for recipient in self.recipients:
+            self.recipient.addItem(recipient.label, recipient.parent_id)
+        self.recipient.setEnabled(bool(self.recipients))
+        self._recipient_changed()
+
+    def _recipient_changed(self):
+        chosen = next((r for r in self.recipients if r.parent_id == self.recipient.currentData()), None)
+        if chosen is not None:
+            self.recipient_help.setText(
+                ""
+                if chosen.notified
+                else tr(
+                    "Ce parent ne recevra pas la notification (compte inactif ou notifications refusées) : "
+                    "prévenez-le aussi autrement."
+                )
+            )
+        self.refresh_state()
+
+    def missing_fields(self):
+        missing = []
+        if not self.picker.student_id:
+            missing.append(tr("Élève"))
+        if not self.recipient.currentData():
+            missing.append(tr("Responsable convoqué"))
+        if self.end.time() <= self.start.time():
+            missing.append(tr("une heure de fin après le début"))
+        if not self.reason.toPlainText().strip():
+            missing.append(tr("Motif"))
+        return missing
+
+    def values(self):
+        return {
+            "student_id": self.picker.student_id,
+            "parent_id": self.recipient.currentData(),
+            "day": self.day.date().toPython(),
+            "start": self.start.time().toPython(),
+            "end": self.end.time().toPython(),
+            "reason": self.reason.toPlainText().strip(),
+        }
+
+
+class OutcomeDialog(FormDialog):
+    """Close a scheduled convocation (held, parent absent, cancelled), with an optional note."""
+
+    def __init__(self, convocation, parent=None):
+        super().__init__(
+            tr("Clore la convocation — {0}", convocation.student_name),
+            tr("Une convocation close ne change plus ; le parent est prévenu du nouveau statut."),
+            parent,
+            save_text=tr("Enregistrer"),
+            width=520,
+        )
+        self.outcome = QComboBox()
+        for code, label in CONVOCATION_OUTCOMES.items():
+            self.outcome.addItem(label, code)
+        self.add_field("status", tr("Résultat"), self.outcome, required=True)
+        notes = QPlainTextEdit(placeholderText=tr("Compte rendu (facultatif)"))
+        notes.setFixedHeight(72)
+        notes.setTabChangesFocus(True)
+        self.notes = self.add_field("notes", tr("Notes"), notes)
+        self.finish()
+
+    def values(self):
+        return {"status": self.outcome.currentData(), "notes": self.notes.toPlainText().strip()}
+
+
+CONVOCATION_COLOURS = TokenColours(SCHEDULED="warning", HELD="success", MISSED="danger", CANCELLED="text_secondary")
+
+
+class ConvocationsPage(CatalogPage):
+    """Convocations of the school (administration list: names, never contact details)."""
+
+    title = Tr("Convocations")
+    description = Tr(
+        "Rendez-vous avec un parent au sujet d'un élève. Seuls les parents au lien vérifié peuvent être convoqués ; "
+        "chaque convocation et son issue restent dans l'historique."
+    )
+    columns = Tr(["Date", "Élève", "Responsable", "Motif", STATUS_COLUMN_TITLE])
+    noun = "convocation"
+    feminine = True
+    search_placeholder = Tr("Rechercher un élève ou un parent…")
+    status_filters = Lazy(lambda: list(ALL) + [(label, code) for code, label in CONVOCATION_STATUSES.items()])
+    has_toggle = False
+    default_sort = (0, Qt.DescendingOrder)
+    narrow_hidden = (3,)
+
+    def __init__(self, service, runner, parent=None, *, find_students=None, **kwargs):
+        self.service = service
+        self.find_students = find_students  # text -> [(id, label)]: the server's search (students/?search=)
+        self.open_dialog = self._open_dialog  # overridable in tests
+        self.open_outcome = lambda convocation: _values(OutcomeDialog(convocation, self))
+        super().__init__(runner, parent, **kwargs)
+        self.edit_button.hide()
+
+    def stretch_columns(self):
+        return {1, 3}
+
+    def extra_actions(self):
+        self.close_button = button(tr("Clore…"), tooltip=tr("Tenue, parent absent ou annulée"))
+        self.close_button.clicked.connect(self.close_convocation)
+        return [self.close_button]
+
+    def update_extra_actions(self, row):
+        if hasattr(self, "close_button"):
+            self.close_button.setEnabled(row is not None and row.active)
+            self.close_button.setToolTip(
+                tr("Tenue, parent absent ou annulée")
+                if row is None or row.active
+                else tr("Convocation déjà close : elle ne change plus.")
+            )
+
+    def open_row(self):
+        row = self.selected()
+        if row is not None and row.active:
+            self.close_convocation()
+
+    def fetch(self):
+        rows = self.service.convocations(self.status.currentData())
+        search = self.search.text().strip().lower()
+        return [
+            r for r in rows if not search or search in f"{r.student_name} {r.student_number} {r.parent_name}".lower()
+        ]
+
+    def describe_row(self, row):
+        return row.student_name
+
+    def status_cell(self, row):
+        return coloured(row.status_label, CONVOCATION_COLOURS.get(row.status, TOKENS.text_secondary))
+
+    def cells(self, row):
+        when = (f"{row.start:%d/%m/%Y %H:%M}", row.start.timestamp()) if row.start else ("—", 0)
+        return [when, row.student_name, row.parent_name, row.reason, ""]
+
+    def load_recipients(self, student_id, done):
+        self.call(
+            lambda: self.service.recipients(student_id),
+            done,
+            action=tr("Impossible de charger les responsables de l'élève"),
+        )
+
+    def search_students(self, text, done):
+        self.call(lambda: self.find_students(text), done, action=tr("Impossible de rechercher les élèves"))
+
+    def _open_dialog(self):
+        return _values(ConvocationDialog(self.search_students, self.load_recipients, self))
+
+    def add(self):
+        values = self.open_dialog()
+        if values:
+            self.call(
+                lambda: self.service.create_convocation(**values),
+                lambda saved: self._done(
+                    tr("Convocation de {0} enregistrée : le parent est prévenu.", saved.parent_name)
+                ),
+                action=tr("Impossible de créer la convocation"),
+            )
+
+    def close_convocation(self):
+        row = self.selected()
+        if row is None or not row.active:
+            return
+        values = self.open_outcome(row)
+        if values:
+            self.call(
+                lambda: self.service.close_convocation(row.id, values["status"], values["notes"]),
+                lambda saved: self._done(tr("Convocation de {0} : {1}.", saved.student_name, saved.status_label)),
+                action=tr("Impossible de clore la convocation"),
+            )
+
+    def _done(self, message):
+        self.success(message)
+        self.reload()
+
+
 class GuardianDialog(FormDialog):
     def __init__(self, parent=None):
         super().__init__(
@@ -566,7 +812,7 @@ class GuardiansPage(CatalogPage):
 class AttendancePage(Page):
     title = Tr("Présences")
 
-    def __init__(self, service, references, accounts, runner, parent=None, **kwargs):
+    def __init__(self, service, references, accounts, runner, parent=None, *, find_students=None, **kwargs):
         super().__init__(runner, parent, **kwargs)
         self.layout_.setContentsMargins(0, 8, 0, 0)
         self.tabs = QTabWidget()
@@ -574,12 +820,20 @@ class AttendancePage(Page):
         self.daily = DailyAttendancePage(service, references, runner, **kwargs)
         self.scans = ScansPage(service, runner, **kwargs)
         self.codes = CodesPage(service, references, runner, **kwargs)
+        self.convocations = ConvocationsPage(service, runner, find_students=find_students, **kwargs)
         self.guardians = GuardiansPage(service, accounts, runner, show_scans=self._scans_of, **kwargs)
-        self.pages = {"daily": self.daily, "scans": self.scans, "codes": self.codes, "guardians": self.guardians}
+        self.pages = {
+            "daily": self.daily,
+            "scans": self.scans,
+            "codes": self.codes,
+            "convocations": self.convocations,
+            "guardians": self.guardians,
+        }
         for page, label in (
             (self.daily, tr("Présences du jour")),
             (self.scans, tr("Passages au portail")),
             (self.codes, tr("Codes QR")),
+            (self.convocations, tr("Convocations")),
             (self.guardians, tr("Gardiens")),
         ):
             self.tabs.addTab(page, label)

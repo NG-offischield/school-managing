@@ -118,7 +118,12 @@ class AppController:
                 **options.get("planning", {}),
             ),
             "attendance": lambda: AttendancePage(
-                self.attendance, self.references, self.accounts, self.runner, **options.get("attendance", {})
+                self.attendance,
+                self.references,
+                self.accounts,
+                self.runner,
+                find_students=self.finance.find_students,
+                **options.get("attendance", {}),
             ),
             "finance": lambda: FinancePage(self.finance, self.runner, **options.get("finance", {})),
             "payroll": lambda: PayrollPage(
