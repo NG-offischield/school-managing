@@ -21,7 +21,8 @@ Administration (PySide6, ADMIN / SUPER_ADMIN):
     POST /admin/qr-codes/issue-class/       {school_class}
     POST /admin/qr-codes/reissue/           {student, reason}
     POST /admin/qr-codes/{id}/revoke/       {reason}
-    GET/POST /admin/convocations/           POST /admin/convocations/{id}/status/ {status, notes?}
+    GET/POST /admin/convocations/           ?student= ?status=   POST /admin/convocations/{id}/status/ {status, notes?}
+    GET  /admin/convocations/recipients/    ?student= (required)  who may be convened: ACTIVE + VERIFIED links only
 
 Every write goes through services.py. Ids in bodies / URLs are resolved
 inside the current school (404 otherwise). The QR token is only ever returned
@@ -37,10 +38,10 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.academics.models import AcademicYear, SchoolClass
-from apps.accounts.models import UserDevice
+from apps.accounts.models import MembershipStatus, UserDevice
 from apps.finance import services as finance_services
 from apps.people.api import StudentVisibilityMixin
-from apps.people.models import ParentProfile, Student
+from apps.people.models import ParentProfile, ParentStudent, Student
 from common.permissions import ADMIN_ROLES, HasSchoolRole, membership_has_role
 from common.tenancy import scope_to_current_school
 from common.views import SchoolScopedMixin
@@ -49,6 +50,7 @@ from . import services
 from .models import (
     AttendancePolicy,
     Convocation,
+    ConvocationStatus,
     DailyStatus,
     GuardianScan,
     ScanResult,
@@ -167,6 +169,38 @@ class ConvocationSerializer(serializers.ModelSerializer):
             "status",
             "notes",
         ]
+
+
+class AdminConvocationSerializer(ConvocationSerializer):
+    """Administration view (list, create, status): the ids of the parent
+    contract plus what an operator needs to recognise a convocation — never
+    contact details. The parents' own route keeps ConvocationSerializer."""
+
+    student_name = serializers.CharField(source="student.full_name", read_only=True)
+    student_number = serializers.CharField(source="student.student_number", read_only=True)
+    parent_name = serializers.CharField(source="parent.membership.user.full_name", read_only=True)
+
+    class Meta(ConvocationSerializer.Meta):
+        fields = [*ConvocationSerializer.Meta.fields, "student_name", "student_number", "parent_name"]
+
+
+class RecipientSerializer(serializers.ModelSerializer):
+    """One parent who may be convened about the student: the link is ACTIVE
+    and VERIFIED (services.create_convocation refuses anything else).
+    `parent` is the ParentProfile id POST /admin/convocations/ expects.
+    `notified`: the parent will also get the in-app notification (account
+    active and the link accepts notifications) — informative only."""
+
+    parent = serializers.UUIDField(source="parent_id", read_only=True)
+    name = serializers.CharField(source="parent.membership.user.full_name", read_only=True)
+    notified = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ParentStudent
+        fields = ["parent", "name", "relationship_type", "is_primary_contact", "verified_at", "notified"]
+
+    def get_notified(self, obj):
+        return obj.can_receive_notifications and obj.parent.membership.status == MembershipStatus.ACTIVE
 
 
 # Who may see the financial status of a scanned student. Spec §7 shows it in
@@ -500,12 +534,21 @@ class ConvocationInput(serializers.Serializer):
 
 
 class AdminConvocations(AdminMixin, generics.ListAPIView):
-    queryset = Convocation.objects.order_by("-scheduled_start")
-    serializer_class = ConvocationSerializer
+    queryset = Convocation.objects.select_related("student", "parent__membership__user").order_by("-scheduled_start")
+    serializer_class = AdminConvocationSerializer
 
     def restrict(self, queryset):
         student = self.uuid_param("student")
-        return queryset.filter(student_id=student) if student else queryset
+        if student:
+            queryset = queryset.filter(student_id=student)
+        wanted = self.request.query_params.get("status")
+        if wanted:
+            if wanted not in ConvocationStatus.values:
+                raise serializers.ValidationError(
+                    {"status": [f"Must be one of {', '.join(ConvocationStatus.values)}."]}
+                )
+            queryset = queryset.filter(status=wanted)
+        return queryset
 
     def post(self, request):
         data = ConvocationInput(data=request.data)
@@ -519,7 +562,25 @@ class AdminConvocations(AdminMixin, generics.ListAPIView):
             scheduled_end=v["scheduled_end"],
             reason=v["reason"],
         )
-        return Response(ConvocationSerializer(convocation).data, status=status.HTTP_201_CREATED)
+        return Response(AdminConvocationSerializer(convocation).data, status=status.HTTP_201_CREATED)
+
+
+class ConvocationRecipients(AdminMixin, generics.ListAPIView):
+    """The parents an administrator may convene about ONE student of the
+    school: active, verified links only (declared links grant nothing, spec
+    §9). Another school's student — or an unknown id — is a 404."""
+
+    queryset = ParentStudent.objects.select_related("parent__membership__user").order_by(
+        "-is_primary_contact", "parent__membership__user__last_name", "parent__membership__user__first_name"
+    )
+    serializer_class = RecipientSerializer
+
+    def restrict(self, queryset):
+        student_id = self.uuid_param("student")  # a malformed id is a 400
+        if student_id is None:
+            raise serializers.ValidationError({"student": ["This query parameter is required."]})
+        student = scoped(Student, student_id, self.request)
+        return queryset.filter(student=student, active=True, identity_verified=True)
 
 
 class ConvocationStatusInput(serializers.Serializer):
@@ -537,7 +598,7 @@ class ConvocationStatusUpdate(AdminMixin, APIView):
             actor=self.membership(),
             notes=data.validated_data.get("notes"),
         )
-        return Response(ConvocationSerializer(convocation).data)
+        return Response(AdminConvocationSerializer(convocation).data)
 
 
 urlpatterns = [
@@ -559,5 +620,6 @@ urlpatterns = [
     path("admin/qr-codes/reissue/", QRReissue.as_view(), name="qr-reissue"),
     path("admin/qr-codes/<uuid:pk>/revoke/", QRRevoke.as_view(), name="qr-revoke"),
     path("admin/convocations/", AdminConvocations.as_view(), name="admin-convocations"),
+    path("admin/convocations/recipients/", ConvocationRecipients.as_view(), name="admin-convocation-recipients"),
     path("admin/convocations/<uuid:pk>/status/", ConvocationStatusUpdate.as_view(), name="convocation-status"),
 ]
