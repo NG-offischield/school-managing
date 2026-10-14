@@ -30,6 +30,8 @@ ignore = [
 "tests/*" = ["S101", "S105", "S106"]  # asserts and fake passwords are fine in tests
 # DDL built from model metadata and quote_name(), never from user input (ADR 0008).
 "common/migration_operations.py" = ["S608"]
+# Editorial first version of the ISBREE texts (one sentence per string, never split).
+"apps/website/isbree_seed.py" = ["E501"]
 
 [tool.coverage.run]
 source = ["apps", "common"]

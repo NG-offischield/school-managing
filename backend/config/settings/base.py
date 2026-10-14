@@ -65,12 +65,19 @@ INSTALLED_APPS = [
     "apps.payroll",
     "apps.communication",
     "apps.documents",
+    # ISBREE public site and Espace ISBREE portal (ADR 0032).
+    "apps.website",
+    "apps.admissions",
     # Demonstration dataset (manage.py seed_demo): no model, no URL.
     "apps.demo",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # Real visitor IP behind the ISBREE web servers, only when they prove
+    # themselves with WEB_BFF_TOKEN (common/bff.py, ADR 0032). First, so every
+    # later component (throttles, sessions, security events) sees that IP.
+    "common.bff.TrustedWebServerMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     # Picks the language of user-facing messages from Accept-Language
     # (fr by default, en available) — ADR 0007. Must sit after
@@ -275,6 +282,11 @@ REST_FRAMEWORK = {
         "auth-registration": "5/min",
         # Gate scanning: a busy gate scans many pupils per minute (ADR 0011).
         "qr-scan": "240/min",
+        # ISBREE public site (ADR 0032): published contents, and pre-enrollment requests (spam).
+        "public-content": "300/min",
+        "pre-enrollment": "5/hour",
+        # Mobile application downloads from the portal (large files).
+        "app-download": "20/hour",
     },
 }
 
@@ -301,3 +313,22 @@ LOGGING = {
     },
     "root": {"handlers": ["console"], "level": "INFO"},
 }
+
+
+# --- ISBREE public site and Espace ISBREE portal (ADR 0032) ---------------------------
+# Server-to-server token of the two Next.js servers (common/bff.py): environment
+# only, never committed, never sent to a browser. Empty = forwarded IPs ignored.
+WEB_BFF_TOKEN = env("WEB_BFF_TOKEN", default="")
+# Base URL of the portal, to build invitation links (no domain is fixed yet).
+ISBREE_PORTAL_URL = env("ISBREE_PORTAL_URL", default="")
+# A portal invitation link is valid 48 h and can be re-issued with care.
+PORTAL_INVITATION_LIFETIME = timedelta(hours=env.int("PORTAL_INVITATION_LIFETIME_HOURS", default=48))
+PORTAL_INVITATION_MIN_INTERVAL = timedelta(minutes=5)
+PORTAL_INVITATION_MAX_PER_REQUEST = 10
+# Version of the privacy notice accepted with a pre-enrollment request.
+PRE_ENROLLMENT_CONSENT_VERSION = env("PRE_ENROLLMENT_CONSENT_VERSION", default="2026-10-provisoire")
+WEBSITE_IMAGE_MAX_BYTES = 10 * 1024 * 1024
+WEBSITE_IMAGE_MAX_SIDE = 2400  # stored size (re-encoded, larger images are reduced)
+WEBSITE_DOCUMENT_MAX_BYTES = 20 * 1024 * 1024
+WEBSITE_DOCUMENT_MAX_PAGES = 200
+MOBILE_APP_MAX_BYTES = 300 * 1024 * 1024

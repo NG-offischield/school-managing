@@ -38,5 +38,10 @@ urlpatterns = [
     path("api/v1/", include("apps.payroll.api")),
     path("api/v1/", include("apps.communication.api")),
     path("api/v1/", include("apps.documents.api")),
+    # ISBREE public site, pre-enrollments and Espace ISBREE portal (ADR 0032).
+    path("api/v1/", include("apps.website.public_api")),
+    path("api/v1/", include("apps.website.portal_api")),
+    path("api/v1/", include("apps.website.admin_api")),
+    path("api/v1/", include("apps.admissions.admin_api")),
     path("api/v1/", include("apps.documents.plans_api")),
 ]

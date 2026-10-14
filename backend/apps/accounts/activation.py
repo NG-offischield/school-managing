@@ -129,9 +129,11 @@ def account_summary(membership):
 
 
 @transaction.atomic
-def issue_activation(membership, *, actor, ctx=None):
+def issue_activation(membership, *, actor, ctx=None, lifetime=None):
     """New single-use code for an account WITHOUT password. Returns
-    (activation, code): the code is shown once and never stored in clear."""
+    (activation, code): the code is shown once and never stored in clear.
+    `lifetime` (timedelta): shorter validity for a portal invitation link
+    (ADR 0032); default ACCOUNT_ACTIVATION_LIFETIME."""
     _admin(actor, membership.school)
     membership = type(membership).objects.select_for_update().select_related("user", "school").get(pk=membership.pk)
     if membership.user.has_usable_password():
@@ -152,7 +154,7 @@ def issue_activation(membership, *, actor, ctx=None):
         code_hash=code_hash(code),
         issued_by=actor,
         created_at=now,
-        expires_at=now + settings.ACCOUNT_ACTIVATION_LIFETIME,
+        expires_at=now + (lifetime or settings.ACCOUNT_ACTIVATION_LIFETIME),
     )
     record_audit(
         "ACCOUNT_ACTIVATION_ISSUED",
