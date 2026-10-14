@@ -18,6 +18,7 @@ from .fake_finance import FinanceFake
 from .fake_me import MeFake
 from .fake_parents import ParentsFake
 from .fake_plans import PlansFake
+from .fake_website import WebsiteFake
 
 PASSWORD = "correct-horse-test"
 
@@ -33,7 +34,9 @@ def fail(status, code, message, details=None):
     return httpx.Response(status, json={"success": False, "error": error})
 
 
-class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake, PlansFake, MeFake, AttendanceFake):
+class FakeBackend(
+    FinanceFake, CommunicationFake, AccountsFake, ParentsFake, PlansFake, MeFake, AttendanceFake, WebsiteFake
+):
     def __init__(self, *, roles=("SUPER_ADMIN",)):
         self.roles = list(roles)
         self.init_finance()
@@ -41,6 +44,7 @@ class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake, Pla
         self.init_accounts()
         self.init_parents()
         self.init_plans()
+        self.init_website()
         self.init_me()
         self.init_attendance()  # after init_accounts: guardians have accounts
         self.sessions = {}  # access token -> refresh token
@@ -1688,6 +1692,8 @@ class FakeBackend(FinanceFake, CommunicationFake, AccountsFake, ParentsFake, Pla
             return self._attendance(request, path, body, admin) or fail(404, "NOT_FOUND", "Introuvable.")
         if path.startswith("admin/plans/"):
             return self._plans(request, path, body, admin)
+        if path.startswith(("admin/website/", "admin/pre-enrollments/")):
+            return self._website(request, path, body, admin)
         admin_comm = ("admin/communication/", "admin/forum/", "admin/complaints/")
         if path.startswith(comm) or path.startswith(admin_comm):
             return self._comm(request, path, body, admin)

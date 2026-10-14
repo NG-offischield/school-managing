@@ -30,4 +30,11 @@ NAVIGATION = [
     NavEntry("payroll", "Paie", "Gestion"),
     NavEntry("communication", "Communication", "Gestion"),
     NavEntry("documents", "Documents", "Gestion"),
+    NavEntry(
+        "website",
+        "Site ISBREE",
+        "Gestion",
+        True,
+        "Préinscriptions, contenus du site et de l'Espace ISBREE, applications mobiles.",
+    ),
 ]

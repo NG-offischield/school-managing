@@ -29,6 +29,7 @@ from ..services.plans import PlanService
 from ..services.structure import LevelService, YearService
 from ..services.students import StudentService
 from ..services.teachers import TeacherService
+from ..services.website import WebsiteService
 from .branding import SOFTWARE_NAME, software_icon
 from .dialogs.account_dialog import AccountDialog
 from .login_window import LoginWindow
@@ -47,6 +48,7 @@ from .pages.planning_page import PlanningPage
 from .pages.structure_pages import LevelsPage, YearsPage
 from .pages.students_page import StudentsPage
 from .pages.teachers_page import TeachersPage
+from .pages.website_page import WebsitePage
 from .tasks import TaskRunner
 from .theme import THEME_MODES, apply_theme, follow_system_scheme
 
@@ -79,6 +81,7 @@ class AppController:
         self.plans = PlanService(api)
         self.me = MeService(api)
         self.attendance = AttendanceService(api)
+        self.website = WebsiteService(api)
         set_language(config.language)  # before any window is built
         self.login_window = self._new_login_window()
         self.main_window = None
@@ -151,6 +154,7 @@ class AppController:
                 plans=self.plans,
                 **options.get("documents", {}),
             ),
+            "website": lambda: WebsitePage(self.website, self.references, self.runner, **options.get("website", {})),
             "courses": lambda: CoursesPage(
                 self.courses, self.subjects, self.references, self.runner, **options.get("courses", {})
             ),

@@ -320,6 +320,7 @@ def test_realtime_revocation_refreshes_then_expires(qapp):
 def controller(qapp, api, auth, backend):
     backend.seed_comm()
     backend.seed_documents()
+    backend.seed_website()
     ctrl = AppController(api, auth, ImmediateRunner(), AppConfig(api_url="http://testserver/api/v1/"))
     yield ctrl
     if ctrl.main_window is not None:
