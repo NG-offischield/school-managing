@@ -5,9 +5,11 @@
     # + fictitious demonstration data and accounts, + illustration images
     docker compose exec -e ISBREE_DEMO_PASSWORD web python manage.py seed_isbree --demo --images /app/seed-images
 
-The password (ISBREE_DEMO_PASSWORD) and the contact e-mail
-(ISBREE_CONTACT_EMAIL) come from the environment only: never stored in the
-repository, never printed. Refused with the production settings.
+The passwords (ISBREE_DEMO_PASSWORD for the demonstration accounts,
+ISBREE_ADMIN_PASSWORD for isbree.admin — required and distinct with the public
+demo settings) and the contact e-mail (ISBREE_CONTACT_EMAIL) come from the
+environment only: never stored in the repository, never printed. Refused with
+the production settings.
 """
 
 import os
@@ -27,6 +29,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         result = seed(
             password=os.environ.get("ISBREE_DEMO_PASSWORD"),
+            admin_password=os.environ.get("ISBREE_ADMIN_PASSWORD") or None,
             demo=options["demo"],
             images=options["images"],
             contact_email=os.environ.get("ISBREE_CONTACT_EMAIL") or None,

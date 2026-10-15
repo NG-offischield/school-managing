@@ -73,6 +73,17 @@ def _password(password):
     return password
 
 
+def _admin_password(admin_password, password):
+    """The administrator's password. In a PUBLIC demo (ISBREE_PUBLIC_DEMO) the shared
+    password of the demonstration accounts is published: the administrator must
+    then have its own, distinct one (ISBREE_ADMIN_PASSWORD), never handed out."""
+    if getattr(settings, "ISBREE_PUBLIC_DEMO", False) and (not admin_password or admin_password == password):
+        raise ImproperlyConfigured(
+            "Public demo: ISBREE_ADMIN_PASSWORD is required and must differ from ISBREE_DEMO_PASSWORD."
+        )
+    return _password(admin_password or password)
+
+
 # =============================================================================
 # Editorial first version — every text is flagged to_validate
 # =============================================================================
@@ -656,8 +667,9 @@ def _images(w, folder):
 
 
 @transaction.atomic
-def seed(*, password=None, demo=False, images=None, contact_email=None, contact_phone=None):
+def seed(*, password=None, admin_password=None, demo=False, images=None, contact_email=None, contact_phone=None):
     _refuse_production()
+    _admin_password(admin_password, password)  # checked even when the school already exists
     w = Seeded()
     w.school = School.objects.filter(code=CODE).first()
     if w.school is None:
@@ -671,7 +683,7 @@ def seed(*, password=None, demo=False, images=None, contact_email=None, contact_
                 email=f"admin@{DEMO_DOMAIN}",
                 first_name="Administration",
                 last_name="ISBREE",
-                password=_password(password),
+                password=_admin_password(admin_password, password),
             ),
         )
         w.school, w.admin = provisioned.school, provisioned.admin_membership

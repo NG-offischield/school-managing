@@ -122,6 +122,8 @@ DATABASES = {
         "PASSWORD": env("POSTGRES_PASSWORD"),
         "HOST": env("POSTGRES_HOST", default="localhost"),
         "PORT": env("POSTGRES_PORT", default="5432"),
+        # A hosted database (demo, ADR 0033) requires TLS: POSTGRES_SSLMODE=require.
+        "OPTIONS": {"sslmode": env("POSTGRES_SSLMODE", default="prefer")},
         # Each HTTP request runs in a transaction: a failure half-way through a
         # business operation can never leave partially written data.
         "ATOMIC_REQUESTS": True,
@@ -326,6 +328,10 @@ PORTAL_INVITATION_LIFETIME = timedelta(hours=env.int("PORTAL_INVITATION_LIFETIME
 PORTAL_INVITATION_MIN_INTERVAL = timedelta(minutes=5)
 PORTAL_INVITATION_MAX_PER_REQUEST = 10
 # Version of the privacy notice accepted with a pre-enrollment request.
+# Public demonstration (config/settings/demo.py, ADR 0033): off everywhere else.
+ISBREE_PUBLIC_DEMO = False
+DEMO_READ_ONLY_ACCOUNTS = []
+
 PRE_ENROLLMENT_CONSENT_VERSION = env("PRE_ENROLLMENT_CONSENT_VERSION", default="2026-10-provisoire")
 WEBSITE_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 WEBSITE_IMAGE_MAX_SIDE = 2400  # stored size (re-encoded, larger images are reduced)

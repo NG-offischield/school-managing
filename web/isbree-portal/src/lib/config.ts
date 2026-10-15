@@ -13,6 +13,9 @@ export const config = {
   publicUrl: trimSlash(process.env.ISBREE_PUBLIC_URL || "http://localhost:3000"),
   portalUrl: trimSlash(process.env.ISBREE_PORTAL_URL || "http://localhost:3001"),
   demoMode: process.env.ISBREE_DEMO_MODE === "true",
+  // Public demo only: the shared password of the read-only fictitious accounts, shown on the
+  // login page. Never a real account's password; never set outside the public demo.
+  demoPassword: process.env.ISBREE_DEMO_MODE === "true" ? process.env.ISBREE_DEMO_SHARED_PASSWORD || "" : "",
   bffToken: process.env.WEB_BFF_TOKEN || "",
   sessionSecret: process.env.PORTAL_SESSION_SECRET || "",
   secureCookies: (process.env.ISBREE_PORTAL_URL || "").startsWith("https://"),

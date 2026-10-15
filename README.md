@@ -1,46 +1,126 @@
-# School Platform
+# School Managing
 
-Plateforme de gestion scolaire — V1 : un établissement, architecture prête pour le multi-établissement, fonctionnement en réseau local (LAN) sans hébergement payant.
+Plateforme de gestion scolaire complète : API Django, poste d'administration Windows (PySide6), quatre applications mobiles Flutter (Parent, Enseignant, Personnel, Gardien), et pour l'établissement ISBREE (Yaoundé, Etoug-Ebe) un site public et un portail web par rôle en Next.js.
 
-**Source de vérité :** [docs/specification/School_Master_Specification_V4.docx](docs/specification/School_Master_Specification_V4.docx).
-Les écarts validés par rapport à la spec sont tracés dans [docs/adr/](docs/adr/).
+Le backend est la **seule autorité** pour les permissions, les calculs, la finance et les règles métier. Aucun client ne parle directement à PostgreSQL ou à Redis.
+
+## Démonstration
+
+> Démonstration avec des **données fictives** (préproduction gratuite). Ce n'est pas le système officiel d'ISBREE. Les services gratuits se mettent en veille : la première visite peut prendre environ une minute.
+
+| Lien | Adresse |
+|---|---|
+| Site public ISBREE | *à compléter après déploiement vérifié* |
+| Espace ISBREE (portail) | *à compléter après déploiement vérifié* |
+| Vidéo de démonstration | *à compléter après publication* |
+| Dépôt GitHub | *à compléter après publication* |
+
+Comptes de démonstration du portail (fictifs, **consultation seule**) : `parent.demo@isbree.test`, `enseignant.demo@isbree.test`, `personnel.demo@isbree.test`, `gardien.demo@isbree.test`. Le mot de passe commun est affiché sur la page de connexion de la démo.
 
 ## Architecture
 
 | Composant | Technologie | Dossier |
 |---|---|---|
-| Backend (API REST + WebSocket) | Django 5.2 LTS, DRF, Channels | `backend/` |
+| API REST + WebSocket | Django 5.2 LTS, DRF, Channels (ASGI, Daphne) | `backend/` |
 | Base de données | PostgreSQL 17 | conteneur `db` |
-| Temps réel / cache / limitation de débit | Redis 7 | conteneur `redis` |
-| Client administrateur | Python + PySide6 (bureau) | `desktop/` |
-| Enseignant / Parent / Gardien / Personnel | Flutter | `mobile/` *(enseignant, parent, gardien, personnel)* |
-| Site public ISBREE | Next.js 16 (serveur, sans accès direct à la base) | `web/isbree-public/` |
-| Espace ISBREE (portail web par rôle) | Next.js 16, BFF à cookie chiffré | `web/isbree-portal/` |
+| Temps réel, cache, limitation de débit | Redis 7 | conteneur `redis` |
+| Poste d'administration | Python + PySide6, français et anglais | `desktop/` |
+| Applications mobiles | Flutter, socle partagé `school_core` | `mobile/` (parent, enseignant, personnel, gardien) |
+| Site public ISBREE | Next.js 16 (rendu serveur, cache, CSP) | `web/isbree-public/` |
+| Espace ISBREE | Next.js 16 en BFF : jetons dans un cookie chiffré HttpOnly, rôle revérifié par l'API | `web/isbree-portal/` |
 
-Le backend est la seule autorité pour les permissions, les calculs, la finance et les règles métier. Les clients ne parlent jamais directement à PostgreSQL ou Redis.
+Les décisions d'architecture sont tracées dans [docs/adr/](docs/adr/), de 0001 à 0033. La source fonctionnelle est [docs/specification/School_Master_Specification_V4.docx](docs/specification/School_Master_Specification_V4.docx).
 
-## Démarrage rapide
+## Fonctionnalités
 
-Prérequis : Docker Desktop démarré.
+- **Socle :**
+  - multi-établissement ;
+  - authentification par jetons révocables (rotation et détection de réutilisation) ;
+  - journal de sécurité ;
+  - codes d'activation à usage unique ;
+  - messages en français et en anglais.
+- **Scolarité :**
+  - années, périodes, niveaux, matières, classes, élèves ;
+  - notes avec historique immuable, bulletins ;
+  - présences par QR annuel, retards et convocations ;
+  - planning avec conflits garantis par PostgreSQL et remplacements.
+- **Gestion :**
+  - finance avec paiements simulés, idempotence et grand livre append-only ;
+  - paie ;
+  - communication temps réel : notifications, messagerie, forum, réclamations ;
+  - documents PDF officiels versionnés aux couleurs de l'école.
+- **Parents :** inscription validée par l'école et rattachement parent-enfant vérifié.
+- **ISBREE web :**
+  - site public : formations réelles, actualités, galerie, FAQ, préinscription avec pot de miel et limitation de débit ;
+  - portail par rôle ;
+  - invitation des familles par lien d'activation valable 48 h ;
+  - téléchargement des seuls APK Release signés ;
+  - administration dans le poste (module « Site ISBREE »).
 
-```bash
-cp .env.example .env        # puis remplacer les valeurs "change-me"
-docker compose up --build   # API sur http://localhost:8000
-```
+Le détail par phase est dans la section « État d'avancement » ci-dessous.
 
-Créer l'établissement et son premier super-administrateur (il n'existe pas d'inscription admin publique) :
+## Démarrage local
 
-```bash
-docker compose exec web python manage.py bootstrap_school --code LYC-DLA --name "Lycée de Douala" --city Douala --address "Akwa" --admin-username admin --admin-email admin@example.cm --admin-first-name Jean --admin-last-name Dupont
-```
+Prérequis : Docker Desktop. Pour le web : Node.js 24. Pour le poste : Python 3.13.
 
-Lancer les tests (sur PostgreSQL réel) :
+1. Créez le fichier de configuration :
 
-```bash
-docker compose run --rm web pytest
-```
+   ```bash
+   cp .env.example .env
+   ```
 
-Voir [docs/runbook.md](docs/runbook.md) pour l'exploitation courante.
+   Remplacez ensuite les valeurs « change-me ».
+
+2. Démarrez l'API, sur <http://localhost:8000> :
+
+   ```bash
+   docker compose up --build
+   ```
+
+3. Créez l'établissement et son premier super-administrateur (il n'existe pas d'inscription d'administrateur publique) :
+
+   ```bash
+   docker compose exec web python manage.py bootstrap_school --code LYC-DLA --name "Lycée de Douala" --city Douala --address "Akwa" --admin-username admin --admin-email admin@example.cm --admin-first-name Jean --admin-last-name Dupont
+   ```
+
+Le site et le portail ISBREE, leurs variables et leurs comptes de démonstration sont décrits dans [docs/isbree-web.md](docs/isbree-web.md).
+
+## Tests
+
+| Suite | Commande |
+|---|---|
+| Backend (PostgreSQL réel) | `docker compose run --rm web pytest` |
+| Poste PySide6 | `desktop/.venv/Scripts/python -m pytest` (dans `desktop/`) |
+| Web : unitaires, types, lint | `npm test`, `npm run typecheck`, `npm run lint` (dans chaque application web) |
+| Web : bout en bout et accessibilité (Playwright + axe) | `npm run test:e2e` (API démarrée, données de démonstration) |
+
+Derniers passages complets (14 et 15/10/2026, poste de développement) :
+
+- backend : 948 tests réussis, dont 4 pour les garde-fous de la démo ;
+- poste : 709 tests réussis ;
+- site public : 10 tests unitaires et 36 tests Playwright réussis ;
+- portail : 12 tests unitaires et 16 tests Playwright réussis.
+
+## Documentation
+
+- [Exploitation](docs/runbook.md) et [base de données](docs/database-runbook.md)
+- [Site et portail ISBREE](docs/isbree-web.md)
+- [Démo publique gratuite](docs/deploiement-demo.md) et [ADR 0033](docs/adr/0033-demo-publique-gratuite.md)
+- [Script de la vidéo de démonstration](docs/video-demo.md)
+- [Fiche Git et GitHub](docs/guide-git.md)
+- Réseau local et applications mobiles : [docs/reseau-local.md](docs/reseau-local.md), [mobile/README.md](mobile/README.md)
+
+## Limites connues
+
+- **ISBREE :**
+  - les textes de l'établissement sont **provisoires**, à valider ;
+  - le logo est provisoire ;
+  - l'adresse n'est pas confirmée ;
+  - les images de démonstration sont des illustrations.
+- **Applications mobiles :** aucune version Release signée n'est publiée. Il faut d'abord le keystore de l'établissement.
+- **Démo en ligne :** hébergement gratuit, mise en veille, aucune sauvegarde automatique durable. Elle ne doit **pas** recevoir de vraies données familiales.
+- **Ressources ISBREE :** on ne peut pas encore les limiter à une fonction du personnel depuis le poste : l'API ne fournit pas la liste des fonctions.
+- **Hors périmètre actuel :** notifications push (FCM), paiement en ligne réel, mise en production.
 
 ## État d'avancement
 
@@ -63,4 +143,5 @@ Voir [docs/runbook.md](docs/runbook.md) pour l'exploitation courante.
 - [x] Parents : inscription validée par l'école, rattachement vérifié (pièce d'identité contrôlée à l'école — empreinte HMAC seulement —, désignation par l'élève, parrainage d'un second parent par code à usage unique), page Parents du poste, application Flutter parent (accueil, présences, planning, finance selon les droits, bulletins, messages ; ADR 0026)
 - [x] Gardien et Personnel : applications Flutter (portail QR existant, mes passages, notifications, planning, messages vers l'administration, rémunération) sur un socle `school_core` commun aux quatre applications (connexion, activation, temps réel, communication selon le rôle, portail ; ADR 0027)
 - [x] Site ISBREE et Espace ISBREE : site public (formations réelles, actualités, galerie, FAQ, contact, préinscription), portail par rôle (Parent, Enseignant, Personnel, Gardien), invitation par lien d'activation, téléchargement des APK Release signés, administration dans le poste (module « Site ISBREE ») — non mis en production (ADR 0032, docs/isbree-web.md)
+- [x] Démo publique préparée : réglages `demo`, comptes de démonstration en lecture seule, mot de passe administrateur distinct, `render.yaml` (ADR 0033) — déploiement à faire (comptes hébergeurs)
 - [ ] Phases suivantes — autres écrans du poste d'administration, présence par séance (fiches d'appel), envoi FCM, mise en production du site

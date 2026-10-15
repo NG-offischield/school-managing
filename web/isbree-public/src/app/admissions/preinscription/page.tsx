@@ -4,6 +4,7 @@ import Link from "next/link";
 import { EmptyState, Unavailable } from "@/components/notices";
 import { PageHeader } from "@/components/page-header";
 import { getPages, getSite } from "@/lib/api";
+import { config } from "@/lib/config";
 
 import { PreEnrollmentForm } from "./pre-enrollment-form";
 
@@ -25,6 +26,15 @@ export default async function PreEnrollmentPage() {
         </p>
       </PageHeader>
       <div className="container-page max-w-3xl py-12">
+        {config.demoMode ? (
+          <div role="note" className="mb-8 rounded-xl border-2 border-ochre bg-ochre-soft p-5">
+            <p className="font-semibold">Démonstration : ce formulaire n&apos;est pas le système d&apos;admission d&apos;ISBREE.</p>
+            <p className="mt-1">
+              Les demandes envoyées ici ne sont jamais transmises à l&apos;établissement. Saisissez uniquement des
+              informations fictives : n&apos;indiquez ni vrai nom, ni vrai téléphone, ni vraie adresse e-mail.
+            </p>
+          </div>
+        ) : null}
         {!site.ok ? (
           <Unavailable what="Le formulaire de préinscription" />
         ) : !open ? (
