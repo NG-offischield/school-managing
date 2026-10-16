@@ -12,7 +12,8 @@ services:
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     # Migrations + idempotent demo seed (fictitious accounts and contents), then the ASGI server.
-    dockerCommand: sh -c "python manage.py migrate --noinput && python manage.py seed_isbree --demo && daphne -b 0.0.0.0 -p $PORT config.asgi:application"
+    # A script, without any quoting: Render quotes dockerCommand's arguments itself.
+    dockerCommand: sh scripts/render-start.sh
     healthCheckPath: /api/v1/health/
     envVars:
       - key: DJANGO_SETTINGS_MODULE
