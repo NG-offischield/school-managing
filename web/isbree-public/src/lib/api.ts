@@ -8,10 +8,17 @@ import type { Faq, ImageRef, News, NewsSummary, Page, PageSummary, Site } from "
 /**
  * Read access to the public Django API. Every getter is a cached function
  * ("use cache"): the content is the same for every visitor (never personal),
- * refreshed every minute; a failure is cached for a few seconds only, so the
- * site recovers as soon as the backend does. A failure is returned, not
+ * refreshed every minute; a failure is retried after 30 seconds, so the site
+ * recovers shortly after the backend does. A failure is returned, not
  * thrown: pages show an honest "temporarily unavailable" state.
+ *
+ * Lifetime of a FAILED read (API down or asleep, e.g. a free host waking up
+ * during the build): retried 30 s later, yet still prerenderable. Shorter
+ * lifetimes (cacheLife("seconds"): expire 1 min < 5 min) become "dynamic
+ * holes" excluded from prerendering, which fails the build of these pages.
  */
+const UNAVAILABLE = { stale: 30, revalidate: 30, expire: 300 };
+
 export type Loaded<T> = { ok: true; data: T } | { ok: false; status: number };
 
 export function serverHeaders(extra: Record<string, string> = {}): Record<string, string> {
@@ -43,7 +50,7 @@ export async function getSite(): Promise<Loaded<Site>> {
   cacheTag("site");
   const result = await load<Site>("site/");
   if (result.ok) cacheLife("minutes");
-  else cacheLife("seconds");
+  else cacheLife(UNAVAILABLE);
   return result;
 }
 
@@ -52,7 +59,7 @@ export async function getPages(): Promise<Loaded<PageSummary[]>> {
   cacheTag("pages");
   const result = await load<PageSummary[]>("pages/");
   if (result.ok) cacheLife("minutes");
-  else cacheLife("seconds");
+  else cacheLife(UNAVAILABLE);
   return result;
 }
 
@@ -61,7 +68,7 @@ export async function getPage(slug: string): Promise<Loaded<Page>> {
   cacheTag("pages");
   const result = await load<Page>(`pages/${encodeURIComponent(slug)}/`);
   if (result.ok || result.status === 404) cacheLife("minutes");
-  else cacheLife("seconds");
+  else cacheLife(UNAVAILABLE);
   return result;
 }
 
@@ -80,7 +87,7 @@ export async function getFaq(): Promise<Loaded<Faq[]>> {
   cacheTag("faq");
   const result = await load<Faq[]>("faq/");
   if (result.ok) cacheLife("minutes");
-  else cacheLife("seconds");
+  else cacheLife(UNAVAILABLE);
   return result;
 }
 
@@ -89,7 +96,7 @@ export async function getNews(): Promise<Loaded<NewsSummary[]>> {
   cacheTag("news");
   const result = await load<NewsSummary[]>("news/?page_size=50");
   if (result.ok) cacheLife("minutes");
-  else cacheLife("seconds");
+  else cacheLife(UNAVAILABLE);
   return result;
 }
 
@@ -98,7 +105,7 @@ export async function getArticle(slug: string): Promise<Loaded<News>> {
   cacheTag("news");
   const result = await load<News>(`news/${encodeURIComponent(slug)}/`);
   if (result.ok || result.status === 404) cacheLife("minutes");
-  else cacheLife("seconds");
+  else cacheLife(UNAVAILABLE);
   return result;
 }
 
@@ -107,6 +114,6 @@ export async function getGallery(): Promise<Loaded<ImageRef[]>> {
   cacheTag("gallery");
   const result = await load<ImageRef[]>("gallery/");
   if (result.ok) cacheLife("minutes");
-  else cacheLife("seconds");
+  else cacheLife(UNAVAILABLE);
   return result;
 }
