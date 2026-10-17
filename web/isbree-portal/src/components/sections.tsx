@@ -189,11 +189,11 @@ function DemoApkCard({ apk }: { apk: DemoApk }) {
     <>
       <div className="mt-2 flex items-start gap-3">
         {/* Same icon as the installed app. */}
-        <Image src="/apps/ic_launcher.png" alt="" width={48} height={48} className="rounded-xl" />
+        <Image src={`/apps/${apk.app.toLowerCase()}.png`} alt="" width={48} height={48} className="rounded-xl" />
         <div>
           <p>{apk.purpose}</p>
           <p className="mt-1 text-sm text-muted">
-            Version {apk.versionName} · Android 10 ou plus récent · {size(apk.size)}
+            Version {apk.versionName} · Android 10 ou plus récent, téléphone 64 bits (arm64) · {size(apk.size)}
           </p>
         </div>
       </div>
@@ -218,6 +218,8 @@ function DemoApkCard({ apk }: { apk: DemoApk }) {
         </ol>
         <p className="mt-2 text-muted">
           Une version déjà installée signée différemment doit être désinstallée avant cette installation.
+          Ce fichier est prévu pour les téléphones 64 bits (arm64-v8a), soit la quasi-totalité des téléphones
+          Android récents ; les anciens téléphones 32 bits ne sont pas pris en charge.
         </p>
       </details>
       <details className="mt-2 text-sm text-muted">

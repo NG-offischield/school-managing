@@ -105,7 +105,7 @@ test.describe("role spaces (demo accounts)", () => {
         // A demonstration build: only this project's GitHub Release, and labelled as such.
         await expect(demo.first()).toHaveAttribute(
           "href",
-          /^https:\/\/github\.com\/NG-offischield\/school-managing\/releases\/download\/[^/]+\/isbree-demo-[a-z]+-debug\.apk$/,
+          /^https:\/\/github\.com\/NG-offischield\/school-managing\/releases\/download\/[^/]+\/isbree-demo-[a-z]+-arm64-v8a-debug\.apk$/,
         );
         await expect(app).toContainText("signé avec une clé de débogage");
       } else if (official === 0) {
