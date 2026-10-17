@@ -24,6 +24,8 @@ backend/staticfiles/
 # --- Flutter / Dart ----------------------------------------------------------
 mobile/**/.dart_tool/
 mobile/**/build/
+# Kotlin compiler session files written by the Gradle builds.
+mobile/**/android/.kotlin/
 # Address of the PC on the CURRENT local network (mobile/tools/configure_lan.ps1): machine-specific.
 mobile/config/lan.json
 

@@ -102,6 +102,22 @@ void main() {
     expect(shared, ['cache-path:shared/']); // never root-path, files-path or external storage
   });
 
+  test('every component declared in the manifest has its class (Android instantiates it at launch)', () {
+    // A declared provider whose class is missing kills EVERY app at startup with
+    // ClassNotFoundException, before any Dart code (crash found on 2026-10-17).
+    final manifest = read('android/src/main/AndroidManifest.xml');
+    final declared = RegExp(
+      r'<(?:provider|activity|service|receiver)[^>]*android:name="cm\.schoolmanaging\.school_core\.([A-Za-z]+)"',
+    ).allMatches(manifest).map((m) => m.group(1)!).toList();
+    expect(declared, isNotEmpty);
+    for (final name in declared) {
+      final source = read('android/src/main/kotlin/cm/schoolmanaging/school_core/$name.kt');
+      expect(source, contains('class $name'), reason: name);
+    }
+    final provider = read('android/src/main/kotlin/cm/schoolmanaging/school_core/SchoolCoreFileProvider.kt');
+    expect(provider, contains('class SchoolCoreFileProvider : FileProvider()'));
+  });
+
   test('the Android 17 permission is only requested behind an SDK_INT check', () {
     final plugin = read('android/src/main/kotlin/cm/schoolmanaging/school_core/SchoolCorePlugin.kt');
     expect(plugin, contains('fun required(sdkInt: Int): Boolean = sdkInt >= SINCE_SDK'));
