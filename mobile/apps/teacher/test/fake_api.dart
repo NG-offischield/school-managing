@@ -41,8 +41,11 @@ class FakeTeacher {
 }
 
 class FakeApi {
-  FakeApi() {
-    final today = DateTime.now();
+  final DateTime Function() now;
+
+  /// [now]: the clock of the scenario, the same one the app is given (TeacherApp.now).
+  FakeApi({DateTime Function()? now}) : now = now ?? DateTime.now {
+    final today = this.now();
     String at(int dayOffset, int hour) =>
         '${_day.format(today.add(Duration(days: dayOffset)))}T${hour.toString().padLeft(2, '0')}:00:00+01:00';
     Map<String, dynamic> session(
@@ -278,7 +281,7 @@ class FakeApi {
       final id = path.split('/')[2];
       final row = sessions.where((s) => s['id'] == id && (s['teacher'] as Map)['id'] == who.key).firstOrNull;
       if (row == null) return fail(404, 'NOT_FOUND');
-      if (DateTime.parse('${row['scheduled_start']}'.substring(0, 19)).isAfter(DateTime.now())) {
+      if (DateTime.parse('${row['scheduled_start']}'.substring(0, 19)).isAfter(now())) {
         return fail(400, 'BUSINESS_RULE_VIOLATION', details: {'rule': 'session_not_started'});
       }
       checkIns[id] = '${body['status']}';

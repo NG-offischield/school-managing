@@ -10,9 +10,12 @@ import '../profile/profile_screen.dart';
 /// Signed-in shell: 4 tabs (Accueil, Planning, Communication, Profil) and the
 /// live connection (existing ws/v1/realtime/) for the whole session.
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key, this.realtime});
+  const HomeShell({super.key, this.realtime, this.now});
 
   final RealtimeClient Function()? realtime;
+
+  /// Clock of the planning and dashboard screens (TeacherApp.now); null = DateTime.now.
+  final DateTime Function()? now;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -52,8 +55,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         body: IndexedStack(
           index: _tab,
           children: [
-            DashboardScreen(onOpenTab: open),
-            const PlanningScreen(),
+            DashboardScreen(onOpenTab: open, now: widget.now),
+            PlanningScreen(now: widget.now),
             CommunicationScreen(
               forum: true,
               composeConversation: (context) => openAbove<Conversation>(context, const NewConversationScreen()),

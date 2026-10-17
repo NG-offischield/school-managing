@@ -8,13 +8,19 @@ import 'package:school_teacher/data/teacher_repository.dart';
 
 import 'fake_api.dart';
 
+/// "Today" of every scenario: a Wednesday at noon, so that "tomorrow" and "in two days"
+/// are always in the same Monday-Sunday week as today (with the real clock the planning
+/// test failed on Saturdays and Sundays: those days fall in the next week).
+final scenarioNow = DateTime(2026, 10, 14, 12);
+
 class Harness {
-  Harness() {
+  Harness({DateTime? now}) : now = now ?? scenarioNow {
     api = ApiClient(baseUrl: 'http://testserver/api/v1/', client: MockClient(fake.call));
     auth = AuthService(api, store, requiredRole: 'TEACHER');
   }
 
-  final fake = FakeApi();
+  final DateTime now;
+  late final fake = FakeApi(now: () => now);
   final store = MemoryTokenStore();
   late final ApiClient api;
   late final AuthService auth;
@@ -23,7 +29,7 @@ class Harness {
     tester.view.physicalSize = const Size(1080, 2400); // Pixel 7a class phone
     tester.view.devicePixelRatio = 2.6;
     addTearDown(tester.view.reset);
-    final Widget app = TeacherApp(auth: auth, repository: TeacherRepository(api));
+    final Widget app = TeacherApp(auth: auth, repository: TeacherRepository(api), now: () => now);
     await tester.pumpWidget(wrap == null ? app : wrap(app));
     await auth.restore();
     await tester.pumpAndSettle();
@@ -151,6 +157,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Présence déclarée. L\'administration la validera.'), findsOneWidget);
     expect(h.fake.checkIns, {'sa1': 'PRESENT'});
+  });
+
+  testWidgets('week view runs Monday to Sunday: on a Saturday, a session in two days is next week', (tester) async {
+    final h = Harness(now: DateTime(2026, 10, 17, 12)); // Saturday: the cancelled session falls on Monday 19
+    await h.start(tester);
+    await h.login(tester, h.fake.a);
+    await tester.tap(find.text('Planning').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Semaine'));
+    await tester.pumpAndSettle();
+    expect(find.text('Vous remplacez Marie Ngo'), findsOneWidget); // tomorrow = Sunday, same week
+    expect(find.text('Annulée'), findsNothing); // Monday: not this week
+    await tester.tap(find.byTooltip('Semaine suivante'));
+    await tester.pumpAndSettle();
+    expect(find.text('Annulée'), findsWidgets);
+    expect(find.text('Vous remplacez Marie Ngo'), findsNothing);
   });
 
   testWidgets('notifications: unread badge, read on open, all read', (tester) async {

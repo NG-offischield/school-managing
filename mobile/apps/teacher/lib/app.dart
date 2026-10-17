@@ -16,6 +16,7 @@ class TeacherApp extends StatelessWidget {
     required this.repository,
     this.planFiles = const DevicePlanFiles(),
     this.realtime,
+    this.now,
   });
 
   final AuthService auth;
@@ -26,6 +27,10 @@ class TeacherApp extends StatelessWidget {
 
   /// Live connection (existing ws/v1/realtime/); null = refresh by hand (tests).
   final RealtimeClient Function()? realtime;
+
+  /// Clock of the date-based screens (planning, dashboard); null = DateTime.now.
+  /// Tests pin it so that "today" and "this week" do not depend on the day they run.
+  final DateTime Function()? now;
 
   @override
   Widget build(BuildContext context) {
@@ -51,16 +56,17 @@ class TeacherApp extends StatelessWidget {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        home: AuthGate(realtime: realtime),
+        home: AuthGate(realtime: realtime, now: now),
       ),
     );
   }
 }
 
 class AuthGate extends StatelessWidget {
-  const AuthGate({super.key, this.realtime});
+  const AuthGate({super.key, this.realtime, this.now});
 
   final RealtimeClient Function()? realtime;
+  final DateTime Function()? now;
 
   @override
   Widget build(BuildContext context) {
@@ -73,7 +79,7 @@ class AuthGate extends StatelessWidget {
         roleLabel: 'enseignant',
         alternative: SignInAlternative.activation(),
       ),
-      AuthStatus.signedIn => HomeShell(key: ValueKey(auth.identity?.userId), realtime: realtime),
+      AuthStatus.signedIn => HomeShell(key: ValueKey(auth.identity?.userId), realtime: realtime, now: now),
     };
   }
 }
