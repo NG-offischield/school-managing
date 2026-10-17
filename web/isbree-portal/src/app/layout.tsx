@@ -29,9 +29,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           Aller au contenu
         </a>
         {config.demoMode ? (
-          <div className="bg-ochre-soft text-ink" role="note">
-            <p className="container-page py-2 text-center text-sm font-semibold">
-              Version de démonstration : les comptes et les données marqués « Démonstration » sont fictifs.
+          <div className="border-b border-line bg-sand/70 text-ink" role="note">
+            <p className="container-page py-1.5 text-center text-xs">
+              Espace de démonstration : les comptes et les éléments marqués « Démo » sont fictifs.
             </p>
           </div>
         ) : null}

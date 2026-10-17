@@ -58,6 +58,32 @@ export default async function LoginPage({ searchParams }: PageProps<"/connexion"
           <strong className="text-ink">Première connexion ?</strong> Utilisez le lien d&apos;invitation remis par
           l&apos;établissement : il vous permet de choisir votre mot de passe.
         </p>
+        <div>
+          <p>
+            <strong className="text-ink">Pas encore de compte ?</strong> L&apos;Espace ISBREE est réservé aux personnes
+            autorisées par l&apos;établissement : il n&apos;y a pas d&apos;inscription libre.
+          </p>
+          <ul className="mt-1 list-disc space-y-1 pl-5">
+            <li>
+              Famille d&apos;un futur élève :{" "}
+              <a href={`${config.publicUrl}/admissions/preinscription`} className="link">
+                faites une demande de préinscription
+              </a>
+              . Si elle est acceptée, l&apos;établissement vous envoie une invitation. Une préinscription n&apos;est pas une
+              inscription et ne donne accès à aucun dossier d&apos;élève.
+            </li>
+            <li>
+              Parent d&apos;un élève déjà inscrit : demandez votre accès à l&apos;établissement. Le rattachement à votre enfant
+              est vérifié par l&apos;établissement avant tout accès à ses informations.
+            </li>
+            <li>Enseignant, personnel ou gardien : votre compte est créé par l&apos;administration de l&apos;établissement.</li>
+          </ul>
+          <p className="mt-1">
+            <a href={`${config.publicUrl}/contact`} className="link">
+              Contacter l&apos;établissement
+            </a>
+          </p>
+        </div>
         <p>
           <strong className="text-ink">Mot de passe oublié ?</strong> Contactez l&apos;établissement, qui pourra vous
           remettre un nouveau lien d&apos;activation.

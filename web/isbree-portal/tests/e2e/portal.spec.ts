@@ -99,8 +99,18 @@ test.describe("role spaces (demo accounts)", () => {
       await expect(page.getByRole("heading", { name: "Ressources" })).toBeVisible();
       // Applications: a download button only for a published release, otherwise an honest notice.
       const app = page.locator("#applications").locator("..");
-      const buttons = await app.getByRole("link", { name: /Télécharger pour Android/ }).count();
-      if (buttons === 0) await expect(app).toContainText("pas encore disponible");
+      const official = await app.getByRole("link", { name: /Télécharger pour Android/ }).count();
+      const demo = app.getByRole("link", { name: /Télécharger l'APK de démonstration/ });
+      if ((await demo.count()) > 0) {
+        // A demonstration build: only this project's GitHub Release, and labelled as such.
+        await expect(demo.first()).toHaveAttribute(
+          "href",
+          /^https:\/\/github\.com\/NG-offischield\/school-managing\/releases\/download\/[^/]+\/isbree-demo-[a-z]+-debug\.apk$/,
+        );
+        await expect(app).toContainText("signé avec une clé de débogage");
+      } else if (official === 0) {
+        await expect(app).toContainText("pas encore disponible");
+      }
       await axe(page);
       await page.getByRole("button", { name: "Se déconnecter" }).click();
       await expect(page).toHaveURL(/\/connexion/);

@@ -10,12 +10,23 @@ Le backend est la **seule autorité** pour les permissions, les calculs, la fina
 
 | Lien | Adresse |
 |---|---|
-| Site public ISBREE | *à compléter après déploiement vérifié* |
-| Espace ISBREE (portail) | *à compléter après déploiement vérifié* |
-| Vidéo de démonstration | *à compléter après publication* |
-| Dépôt GitHub | *à compléter après publication* |
+| Site public ISBREE | <https://isbree-public.onrender.com> |
+| Espace ISBREE (portail) | <https://isbree-portal.onrender.com> |
+| API (santé) | <https://isbree-api.onrender.com/api/v1/health/> |
+| Applications Android (démo) | *lien ajouté une fois la publication vérifiée* |
+| Vidéo de démonstration | *à compléter après publication de la vidéo* |
+| Dépôt GitHub | <https://github.com/NG-offischield/school-managing> |
 
 Comptes de démonstration du portail (fictifs, **consultation seule**) : `parent.demo@isbree.test`, `enseignant.demo@isbree.test`, `personnel.demo@isbree.test`, `gardien.demo@isbree.test`. Le mot de passe commun est affiché sur la page de connexion de la démo.
+
+### Applications Android de démonstration
+
+Quatre applications Flutter (Parent, Enseignant, Personnel, Gardien) sont publiées comme fichiers d'une *release* GitHub, et le portail propose à chaque rôle son application.
+
+- **Nature :** builds de **débogage**, signés avec la clé de débogage Android, configurés pour le serveur de démonstration. Ce ne sont pas des versions officielles.
+- **Vérifications faites :** sur émulateur Android 16, installation, lancement, écran de connexion et appel réel à l'API.
+- **Reste à faire :** l'essai sur un téléphone réel.
+- **Installation :** téléchargez l'APK sur le téléphone, ouvrez-le, autorisez si besoin l'installation d'applications inconnues pour le navigateur, puis installez. Une ancienne version signée autrement doit être désinstallée d'abord.
 
 ## Architecture
 

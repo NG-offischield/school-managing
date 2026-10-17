@@ -1,8 +1,10 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { formatDate } from "@/lib/format";
 import { Markup } from "@/lib/markup";
+import { type DemoApk, demoApk } from "@/lib/mobile-apps";
 import { type Role, ROLES } from "@/lib/roles";
 import {
   type AppEntry,
@@ -53,7 +55,7 @@ export function Resources({ resources, documentQuery }: { resources: Resource[];
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="font-semibold text-terracotta">{RESOURCE_KINDS[r.kind] ?? "Ressource"}</span>
               {scope ? <span className="text-muted">· {scope}</span> : null}
-              {r.is_demo ? <Badge>Démonstration</Badge> : null}
+              {r.is_demo ? <Badge tone="muted">Démo</Badge> : null}
               {r.to_validate ? <Badge tone="muted">Provisoire</Badge> : null}
             </div>
             <h3 className="text-xl">{r.title}</h3>
@@ -81,7 +83,7 @@ export function News({ news }: { news: NewsItem[] }) {
             <summary className="cursor-pointer list-none">
               <span className="flex flex-wrap items-center gap-2 text-sm text-muted">
                 {formatDate(n.event_date ?? n.published_at)}
-                {n.is_demo ? <Badge>Démonstration</Badge> : null}
+                {n.is_demo ? <Badge tone="muted">Démo</Badge> : null}
               </span>
               <span className="mt-1 block font-serif text-xl">{n.title}</span>
               <span className="mt-1 block text-muted">{n.summary}</span>
@@ -167,6 +169,8 @@ export function Apps({ apps }: { apps: AppEntry[] }) {
                 </p>
               </details>
             </>
+          ) : demoApk(app) ? (
+            <DemoApkCard apk={demoApk(app)!} />
           ) : (
             <p className="mt-2 text-muted">
               Cette application n&apos;est pas encore disponible au téléchargement. L&apos;établissement l&apos;annoncera dès
@@ -176,6 +180,55 @@ export function Apps({ apps }: { apps: AppEntry[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/** A demonstration build hosted on GitHub Releases (lib/mobile-apps.ts). */
+function DemoApkCard({ apk }: { apk: DemoApk }) {
+  return (
+    <>
+      <div className="mt-2 flex items-start gap-3">
+        {/* Same icon as the installed app. */}
+        <Image src="/apps/ic_launcher.png" alt="" width={48} height={48} className="rounded-xl" />
+        <div>
+          <p>{apk.purpose}</p>
+          <p className="mt-1 text-sm text-muted">
+            Version {apk.versionName} · Android 10 ou plus récent · {size(apk.size)}
+          </p>
+        </div>
+      </div>
+      <a href={apk.url} className="btn btn-primary mt-4" rel="noopener noreferrer">
+        Télécharger l&apos;APK de démonstration
+      </a>
+      <p className="mt-3 text-sm text-muted">
+        Build de démonstration (signé avec une clé de débogage) : il se connecte au serveur de démonstration et
+        n&apos;est pas une version officielle. Le fichier est public, hébergé sur GitHub.
+      </p>
+      <details className="mt-3 text-sm">
+        <summary className="cursor-pointer font-semibold">Installer sur Android</summary>
+        <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted">
+          <li>Téléchargez le fichier APK depuis votre téléphone Android (environ {size(apk.size)}).</li>
+          <li>Ouvrez-le depuis les téléchargements ou la notification.</li>
+          <li>
+            Si Android le demande, autorisez votre navigateur à installer des applications inconnues (Paramètres → Applications
+            → accès spécial), puis revenez à l&apos;installation.
+          </li>
+          <li>Installez, puis ouvrez l&apos;application « {apk.label} ».</li>
+          <li>Connectez-vous avec le même identifiant que dans l&apos;Espace ISBREE.</li>
+        </ol>
+        <p className="mt-2 text-muted">
+          Une version déjà installée signée différemment doit être désinstallée avant cette installation.
+        </p>
+      </details>
+      <details className="mt-2 text-sm text-muted">
+        <summary className="cursor-pointer">Vérifier le fichier</summary>
+        <p className="mt-2 break-all">
+          Paquet : {apk.package}
+          <br />
+          Empreinte SHA-256 : <code>{apk.sha256}</code>
+        </p>
+      </details>
+    </>
   );
 }
 

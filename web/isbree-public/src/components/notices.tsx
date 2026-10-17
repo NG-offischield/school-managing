@@ -2,9 +2,9 @@
 
 export function DemoBanner() {
   return (
-    <div className="bg-ochre-soft text-ink" role="note">
-      <p className="container-page py-2 text-center text-sm font-semibold">
-        Version de démonstration : certains contenus marqués « Démonstration » (lieux, actualités, comptes) sont fictifs.
+    <div className="border-b border-line bg-sand/70 text-ink" role="note">
+      <p className="container-page py-1.5 text-center text-xs">
+        Site de démonstration : les éléments marqués « Démo » sont fictifs.
       </p>
     </div>
   );
@@ -13,8 +13,11 @@ export function DemoBanner() {
 export function DemoBadge({ show = true }: { show?: boolean }) {
   if (!show) return null;
   return (
-    <span className="inline-flex items-center rounded-full bg-ochre-soft px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-ink">
-      Démonstration
+    <span
+      className="inline-flex items-center rounded-full border border-line px-2 py-0.5 text-[0.7rem] font-semibold uppercase tracking-wide text-muted"
+      title="Contenu fictif de démonstration"
+    >
+      Démo
     </span>
   );
 }
@@ -22,9 +25,8 @@ export function DemoBadge({ show = true }: { show?: boolean }) {
 export function ProvisionalNote({ show = true }: { show?: boolean }) {
   if (!show) return null;
   return (
-    <p className="mt-6 rounded-xl border border-dashed border-terracotta/60 bg-paper px-4 py-3 text-sm text-muted" role="note">
-      <strong className="text-terracotta">Contenu provisoire.</strong> Ce texte est une première proposition, en attente de
-      relecture et de validation par l&apos;établissement.
+    <p className="mt-6 text-sm italic text-muted" role="note">
+      Texte provisoire, en attente de validation par l&apos;établissement.
     </p>
   );
 }

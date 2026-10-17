@@ -1,0 +1,47 @@
+{
+  "release": "",
+  "repository": "NG-offischield/school-managing",
+  "builtOn": "2026-10-17",
+  "apps": [
+    {
+      "app": "PARENT",
+      "label": "School Managing Parent",
+      "purpose": "Suivre vos enfants : présences, emploi du temps, bulletins, paiements selon vos droits et messages de l'établissement.",
+      "package": "cm.schoolmanaging.school_parent",
+      "versionName": "0.1.0",
+      "fileName": "isbree-demo-parent-debug.apk",
+      "size": 170831701,
+      "sha256": "25ffd4f2b11e8a62da230173e93537441f89fed4fce65cab9d208357c8d21950"
+    },
+    {
+      "app": "TEACHER",
+      "label": "School Managing Enseignant",
+      "purpose": "Votre planning, vos séances et la communication avec l'établissement.",
+      "package": "cm.schoolmanaging.school_teacher",
+      "versionName": "0.1.0",
+      "fileName": "isbree-demo-teacher-debug.apk",
+      "size": 170734669,
+      "sha256": "5221aa088edfcb0ebc9de4a59a96884c4854f8be674b230ca2d73b7e868105c0"
+    },
+    {
+      "app": "STAFF",
+      "label": "School Managing Personnel",
+      "purpose": "Votre planning, vos passages au portail, les messages de l'administration et votre rémunération.",
+      "package": "cm.schoolmanaging.school_staff",
+      "versionName": "0.1.0",
+      "fileName": "isbree-demo-staff-debug.apk",
+      "size": 170718917,
+      "sha256": "e1a376359e032ae8dc6c7eabe05c64dd6c0c65c9a687900634e3733e4f33009e"
+    },
+    {
+      "app": "GUARDIAN",
+      "label": "School Managing Gardien",
+      "purpose": "Contrôle des entrées au portail par lecture du QR code des cartes, et vos passages enregistrés.",
+      "package": "cm.schoolmanaging.school_guardian",
+      "versionName": "0.1.0",
+      "fileName": "isbree-demo-guardian-debug.apk",
+      "size": 192839826,
+      "sha256": "e35c32ba3962bf02b0d8e25f3faa787bfa8e995eb2a9d796d700607214c3e201"
+    }
+  ]
+}

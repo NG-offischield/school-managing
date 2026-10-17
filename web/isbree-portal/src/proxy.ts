@@ -68,5 +68,6 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|icon.svg|robots.txt).*)"],
+  // Public static files (app icon) are not personal pages: no session check.
+  matcher: ["/((?!_next/static|_next/image|icon.svg|robots.txt|apps/).*)"],
 };

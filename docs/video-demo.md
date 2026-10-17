@@ -30,6 +30,7 @@ La vidéo garde une trace durable du projet, même si l'hébergement gratuit s'a
 | 1:50–2:10 | Lien « Espace ISBREE » → page de connexion | Comptes de démonstration en lecture seule ; les pages privées ne sont jamais indexées ni mises en cache. |
 | 2:10–2:50 | Connexion Parent | Enfant à lien **vérifié** uniquement, ressources de sa classe, actualités, FAQ ; applications « pas encore disponibles » (aucun faux lien). Puis tenter `/espace/enseignant` : « Espace non accessible ». Déconnexion. |
 | 2:50–3:20 | Connexion Enseignant, puis Gardien | Les contenus changent selon le rôle, choisi parmi les rôles détenus et revérifié par le serveur. |
+| 3:20–3:40 | Section « Applications mobiles » de l'espace connecté | Chaque rôle voit seulement son application : version, taille, empreinte SHA-256, étapes d'installation. Le build est un build de débogage pour la démonstration, hébergé sur GitHub Releases (fichier public). Si l'application est déjà installée sur un téléphone, montrer son écran de connexion. |
 | 3:20–4:20 | Schéma ou README sur GitHub | Architecture : Django/DRF + PostgreSQL + Redis (API seule autorité), deux applications Next.js en BFF (jetons dans un cookie chiffré HttpOnly), poste d'administration PySide6, quatre applications Flutter, tests (backend, desktop, Vitest, Playwright + axe). Mentionner les limites : démo, hébergement gratuit. |
 | 4:20–4:40 | Page GitHub du dépôt | « Le code et tout son historique sont publics à cette adresse. » |
 
