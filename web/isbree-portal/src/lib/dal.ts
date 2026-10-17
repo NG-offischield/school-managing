@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 
+import { logApiFailure } from "./api-url";
 import { clientIp } from "./client-ip";
 import { djangoHeaders, djangoUrl } from "./django";
 import { type Session, SESSION_COOKIE, unsealSession } from "./session";
@@ -41,13 +42,17 @@ export async function api<T>(path: string, query: Record<string, string | undefi
     response = await fetch(url, {
       headers: djangoHeaders({ token: session.access, clientIp: await visitorIp() }),
       cache: "no-store",
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(45000), // the API may be waking up (free host)
     });
-  } catch {
+  } catch (error) {
+    logApiFailure("GET", url.toString(), error);
     return { ok: false, status: 503 };
   }
   if (response.status === 401) redirect("/connexion?session=expiree");
-  if (!response.ok) return { ok: false, status: response.status };
+  if (!response.ok) {
+    if (response.status === 404 || response.status >= 500) logApiFailure("GET", url.toString(), response.status);
+    return { ok: false, status: response.status };
+  }
   const body = (await response.json()) as { data: T };
   return { ok: true, data: body.data };
 }

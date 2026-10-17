@@ -67,6 +67,9 @@ export function LoginForm({ action = login }: { action?: typeof login }) {
       <button type="submit" className="btn btn-primary w-full" disabled={pending}>
         {pending ? "Connexion…" : "Se connecter"}
       </button>
+      <p className="text-sm text-muted" aria-live="polite">
+        {pending ? "Si le service était en veille, la connexion peut prendre jusqu'à une minute." : ""}
+      </p>
     </form>
   );
 }

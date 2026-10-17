@@ -80,9 +80,19 @@ export function ActivationForm({ actions = { check: checkActivation, complete: c
     ) : (
       <div ref={alertRef} tabIndex={-1} role="alert" className="rounded-xl border border-danger bg-danger-soft p-5 text-danger">
         <p className="font-semibold">{state.error}</p>
-        <Link href="/connexion" className="mt-4 inline-block underline">
-          Aller à la page de connexion
-        </Link>
+        {state.retryCode ? (
+          <form action={dispatch} className="mt-4">
+            <input type="hidden" name="intent" value="check" />
+            <input type="hidden" name="code" value={state.retryCode} />
+            <button type="submit" className="btn btn-primary">
+              Réessayer
+            </button>
+          </form>
+        ) : (
+          <Link href="/connexion" className="mt-4 inline-block underline">
+            Aller à la page de connexion
+          </Link>
+        )}
       </div>
     );
   }

@@ -2,6 +2,7 @@ import "server-only";
 
 import { cacheLife, cacheTag } from "next/cache";
 
+import { logApiFailure } from "./api-url";
 import { config } from "./config";
 import type { Faq, ImageRef, News, NewsSummary, Page, PageSummary, Site } from "./types";
 
@@ -32,15 +33,23 @@ export function publicApiUrl(path: string) {
 }
 
 async function load<T>(path: string): Promise<Loaded<T>> {
+  const url = publicApiUrl(path);
   try {
-    const response = await fetch(publicApiUrl(path), {
+    const response = await fetch(url, {
       headers: serverHeaders(),
-      signal: AbortSignal.timeout(8000),
+      // A free API host can take up to about a minute to wake up.
+      signal: AbortSignal.timeout(25000),
     });
-    if (!response.ok) return { ok: false, status: response.status };
+    if (!response.ok) {
+      // A 404 on a detail (pages/<slug>/) is a normal "not found"; on a list it is a misconfiguration.
+      const detail = path.split("?")[0].split("/").filter(Boolean).length > 1;
+      if (response.status !== 404 || !detail) logApiFailure("GET", url, response.status);
+      return { ok: false, status: response.status };
+    }
     const body = (await response.json()) as { data: T };
     return { ok: true, data: body.data };
-  } catch {
+  } catch (error) {
+    logApiFailure("GET", url, error);
     return { ok: false, status: 503 };
   }
 }

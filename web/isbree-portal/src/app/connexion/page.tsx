@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { AuthShell } from "@/components/auth-shell";
 import { config } from "@/lib/config";
+import { wakeApiInBackground } from "@/lib/wake";
 
 import { LoginForm } from "./login-form";
 
@@ -21,6 +22,7 @@ const NOTICES: Record<string, string> = {
 
 export default async function LoginPage({ searchParams }: PageProps<"/connexion">) {
   const params = await searchParams;
+  wakeApiInBackground();
   const notice = typeof params.session === "string" ? NOTICES[params.session] : undefined;
   const loggedOut = params.deconnexion === "1";
   return (
