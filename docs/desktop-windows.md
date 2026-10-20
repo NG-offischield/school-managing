@@ -6,6 +6,8 @@ C'est le même client que `python -m school_admin`. Il ne parle qu'à l'API Djan
 
 ## Installer
 
+Téléchargement de la version 0.1.0 (fichier public, non signé) : <https://github.com/NG-offischield/school-managing/releases/tag/desktop-admin-v0.1.0>, SHA-256 `4cd391cb0a4113e919faebeb22eca34e5f8651f3bdd98ae2e5a310c288f21d17`.
+
 1. Lancez `SchoolManagingAdmin-Setup-<version>-x64.exe`.
    - L'installateur **n'est pas signé** : Windows SmartScreen peut afficher « Windows a protégé votre ordinateur ». Choisissez **Informations complémentaires → Exécuter quand même** si le fichier vient bien de ce projet (comparez son empreinte SHA-256 avec celle publiée).
 2. Aucun droit administrateur n'est demandé : le programme s'installe pour votre compte dans `%LOCALAPPDATA%\Programs\School Managing Admin`.

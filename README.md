@@ -14,6 +14,7 @@ Le backend est la **seule autorité** pour les permissions, les calculs, la fina
 | Espace ISBREE (portail) | <https://isbree-portal.onrender.com> |
 | API (santé) | <https://isbree-api.onrender.com/api/v1/health/> |
 | Applications Android (builds debug, arm64) | <https://github.com/NG-offischield/school-managing/releases/tag/demo-apk-2026-10-17> — fichiers publics, aussi proposés par rôle dans l’Espace ISBREE |
+| Client d'administration Windows (installateur non signé) | <https://github.com/NG-offischield/school-managing/releases/tag/desktop-admin-v0.1.0> — voir [docs/desktop-windows.md](docs/desktop-windows.md) |
 | Vidéo de démonstration | *à compléter après publication de la vidéo* |
 | Dépôt GitHub | <https://github.com/NG-offischield/school-managing> |
 
