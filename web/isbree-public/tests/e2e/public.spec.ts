@@ -43,9 +43,14 @@ test.describe("public pages", () => {
     }
   });
 
-  test("an unknown article is a 404", async ({ page }) => {
-    const response = await page.goto("/actualites/cette-actualite-n-existe-pas");
-    expect(response?.status()).toBe(404);
+  test("an unknown article or page is a real 404, from the first visit", async ({ page }) => {
+    // A slug never requested before (no cached render): the status must already be 404.
+    for (const path of [`/actualites/inconnue-${Date.now()}`, `/informations/inconnue-${Date.now()}`]) {
+      const response = await page.goto(path);
+      expect(response?.status(), path).toBe(404);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Cette page n'existe pas");
+      await expect(page.getByRole("link", { name: "Retour à l'accueil" })).toHaveAttribute("href", "/");
+    }
   });
 });
 

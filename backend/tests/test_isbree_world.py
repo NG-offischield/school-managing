@@ -9,6 +9,7 @@ from decimal import Decimal
 import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import connection
 from django.utils import timezone
 
 from apps.academics.models import Level, SchoolClass
@@ -168,3 +169,38 @@ def test_illustration_files_lost_by_a_restart_are_put_back(tmp_path):
     assert ContentImage.objects.count() == 1
     assert again.created == ["fichier d'image restauré : 1.jpg"]
     assert seed(password=PASSWORD, images=str(tmp_path)).created == []
+
+
+def test_an_interrupted_seed_is_resumed_without_duplicates(monkeypatch):
+    """The free host may stop a long first start (deploy timeout, sleep): the
+    finished steps stay, the next start completes the rest, nothing twice."""
+
+    def cut(*args, **kwargs):
+        raise RuntimeError("start interrupted")
+
+    monkeypatch.setattr(world, "_finance", cut)
+    with pytest.raises(RuntimeError):
+        seed(password=PASSWORD, demo=True)
+    assert Student.objects.count() == 24 and not Invoice.objects.exists()  # earlier steps kept
+    monkeypatch.undo()
+
+    resumed = seed(password=PASSWORD, demo=True)
+    assert any(line.startswith("facture") for line in resumed.created)
+    assert Student.objects.count() == 24 and Invoice.objects.count() == 24 * len(world.FEES)
+    assert demo_missing() == []
+
+
+def test_a_start_with_existing_data_stays_cheap():
+    """Every start of the demo host runs the seed against a remote database:
+    once the data exist, it only reads, in a few queries per step."""
+    seed(password=PASSWORD, demo=True)
+    count = [0]
+
+    def counter(execute, sql, params, many, context):
+        count[0] += 1
+        return execute(sql, params, many, context)
+
+    with connection.execute_wrapper(counter):
+        again = seed(password=PASSWORD, demo=True)
+    assert again.created == []
+    assert count[0] < 300, count[0]

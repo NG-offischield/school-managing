@@ -26,22 +26,23 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
+from django.db import transaction
 from django.utils import timezone
 
 from apps.academics import services as academics
 from apps.academics.models import AcademicPeriod, Level, PedagogicalCategory, PeriodType, Room, SchoolClass, Subject
 from apps.accounts.models import SchoolMembership
 from apps.attendance import services as attendance
-from apps.attendance.models import AttendancePolicy, StudentDailyAttendance
+from apps.attendance.models import AttendancePolicy, StudentDailyAttendance, StudentQRCode
 from apps.finance import services as finance
 from apps.finance.models import FeeType, Invoice, InvoiceStatus
 from apps.gradebook import services as gradebook
 from apps.gradebook.models import Assessment, Course, Grade
 from apps.people import parent_workflow
 from apps.people import services as people
-from apps.people.models import ParentStudent, Student
+from apps.people.models import ParentStudent, Student, StudentEnrollment
 from apps.scheduling import services as scheduling
-from apps.scheduling.models import ScheduleSlot, SchoolBreak
+from apps.scheduling.models import ScheduleSlot, SchoolBreak, TeachingSession
 
 DOMAIN = "isbree.test"
 CYCLE = "Premier cycle"
@@ -131,8 +132,11 @@ FEES = [
 PARTIAL_T1 = {"ISB-26-0007": Decimal("30000"), "ISB-26-0011": Decimal("40000"), "ISB-26-0017": Decimal("20000")}
 UNPAID_T1 = {"ISB-26-0015", "ISB-26-0022"}
 
-ATTENDANCE_DAYS = 10  # school days of attendance kept up to date before today
-SESSIONS_BEFORE, SESSIONS_AFTER = 21, 35  # dated sessions generated around today
+# Kept small: the seed runs at every start of the free demo host, against a remote
+# database. Dated sessions: this week and the next (from Monday); attendance: the
+# last school week. Existing rows are found with one query per step.
+ATTENDANCE_DAYS = 5  # school days of attendance kept up to date before today
+SESSION_WEEKS = 2  # weeks of dated sessions from this week's Monday
 
 
 def _key(*parts):
@@ -229,9 +233,13 @@ def _teachers(w, subjects, math_teacher):
 
 def _courses(w, classes, subjects, teachers):
     courses = {}
+    existing = {
+        (c.school_class_id, c.subject_id): c
+        for c in Course.objects.filter(school_class__in=classes.values(), active=True)
+    }
     for klass in classes.values():
         for code, _, _, hours, coefficient in SUBJECTS:
-            course = Course.objects.filter(school_class=klass, subject=subjects[code], active=True).first()
+            course = existing.get((klass.pk, subjects[code].pk))
             if course is None:
                 course = gradebook.create_course(
                     klass, subjects[code], teachers[code], actor=w.admin, coefficient=coefficient, weekly_hours=hours
@@ -297,17 +305,34 @@ def _breaks(w, year):
 
 
 def _timetable(w, year, courses):
+    existing = set(
+        ScheduleSlot.objects.filter(school=w.school, academic_year=year).values_list(
+            "course_id", "weekday", "start_time"
+        )
+    )
     for (klass, code), hours in timetable().items():
         course = courses[(klass, code)]
         for day, hour in hours:
             start, end = HOURS[hour]
-            if not ScheduleSlot.objects.filter(course=course, weekday=day, start_time=start).exists():
+            if (course.pk, day, start) not in existing:
                 scheduling.create_slot(course, actor=w.admin, weekday=day, start_time=start, end_time=end)
                 w.created.append(f"créneau {klass} {code}")
+    # Dated sessions of this week and the next. Generation is idempotent but
+    # checks every slot and day: start after the last day already generated.
     today = timezone.localdate()
-    start = max(year.start_date, today - timedelta(days=SESSIONS_BEFORE))
-    end = min(year.end_date, today + timedelta(days=SESSIONS_AFTER))
-    if start <= end:
+    monday = today - timedelta(days=today.weekday())
+    start = max(year.start_date, monday)
+    end = min(year.end_date, monday + timedelta(weeks=SESSION_WEEKS, days=-1))
+    last = (
+        TeachingSession.objects.filter(school=w.school, academic_year=year, date__gte=start, date__lte=end)
+        .order_by("-date")
+        .values_list("date", flat=True)
+        .first()
+    )
+    if last is not None:
+        start = last + timedelta(days=1)
+    school_days = [start + timedelta(days=n) for n in range((end - start).days + 1)]
+    if any(day.isoweekday() in WEEKDAYS for day in school_days):  # else: nothing to generate, no audit entry
         summary = scheduling.generate_sessions(w.school, actor=w.admin, date_from=start, date_to=end)
         if summary["created"]:
             w.created.append(f"{summary['created']} séances datées")
@@ -320,8 +345,9 @@ def _timetable(w, year, courses):
 
 def _students(w, classes):
     students = {}
+    existing = {s.student_number: s for s in Student.objects.filter(school=w.school)}
     for number, first_name, last_name, sex, born, klass in STUDENTS:
-        student = Student.objects.filter(school=w.school, student_number=number).first()
+        student = existing.get(number)
         legacy = LEGACY_NUMBERS.get(number)
         if student is None and legacy:
             student = Student.objects.filter(school=w.school, student_number=legacy[0]).first()
@@ -443,10 +469,16 @@ def _mark(student, code, assessment_name):
 def _marks(w, sequences, courses, students):
     today = timezone.localdate()
     pupils = {}
-    for student in students.values():
-        enrollment = student.enrollments.filter(status="ACTIVE").select_related("school_class").first()
-        if enrollment:
-            pupils.setdefault(enrollment.school_class.name, []).append(student)
+    for enrollment in StudentEnrollment.objects.filter(student__in=students.values(), status="ACTIVE").select_related(
+        "school_class", "student"
+    ):
+        pupils.setdefault(enrollment.school_class.name, []).append(enrollment.student)
+    # What already exists, in two queries (the seed runs at every start).
+    assessments = {
+        (a.course_id, a.academic_period_id, a.name): a
+        for a in Assessment.objects.filter(school=w.school, academic_period__in=sequences)
+    }
+    marked = set(Grade.objects.filter(assessment__in=assessments.values()).values_list("assessment_id", "student_id"))
     for sequence in sequences:
         for name, kind, offset in [
             ("Interrogation écrite", "TEST", 14),
@@ -457,7 +489,7 @@ def _marks(w, sequences, courses, students):
                 continue  # not held yet: no invented future marks
             for (klass, code), course in courses.items():
                 label = f"{name} — {sequence.name}"
-                assessment = Assessment.objects.filter(course=course, academic_period=sequence, name=label).first()
+                assessment = assessments.get((course.pk, sequence.pk, label))
                 if assessment is None:
                     assessment = gradebook.create_assessment(
                         course,
@@ -470,7 +502,7 @@ def _marks(w, sequences, courses, students):
                     )
                     w.created.append(f"évaluation {klass} {code} {label}")
                 for student in pupils.get(klass, []):
-                    if not Grade.objects.filter(assessment=assessment, student=student).exists():
+                    if (assessment.pk, student.pk) not in marked:
                         gradebook.enter_grade(assessment, student, _mark(student, code, label), actor=w.admin)
 
 
@@ -480,12 +512,21 @@ def _marks(w, sequences, courses, students):
 
 
 def _attendance(w, year, guardian_member, students):
+    policies = set(AttendancePolicy.objects.filter(school=w.school).values_list("day_of_week", flat=True))
     for day in WEEKDAYS:
-        if not AttendancePolicy.objects.filter(school=w.school, day_of_week=day).exists():
+        if day not in policies:
             attendance.set_policy(
                 w.school, day, actor=w.admin, late_after_time=time(7, 30), morning_absence_cutoff=time(10, 0)
             )
-    qr = {number: attendance.issue_qr_code(s, actor=w.admin, academic_year=year) for number, s in students.items()}
+    # The pupils' annual QR codes: issued once (issue_qr_code returns the active one).
+    active = {
+        q.student_id: q
+        for q in StudentQRCode.objects.filter(student__in=students.values(), academic_year=year, status="ACTIVE")
+    }
+    qr = {
+        number: active.get(s.pk) or attendance.issue_qr_code(s, actor=w.admin, academic_year=year)
+        for number, s in students.items()
+    }
     tz = ZoneInfo(w.school.timezone)
     breaks = list(SchoolBreak.objects.filter(academic_year=year))
     days, day = [], timezone.localdate() - timedelta(days=1)
@@ -494,8 +535,11 @@ def _attendance(w, year, guardian_member, students):
         if day.isoweekday() in WEEKDAYS and not any(b.start_datetime <= moment <= b.end_datetime for b in breaks):
             days.append(day)
         day -= timedelta(days=1)
+    recorded = set(
+        StudentDailyAttendance.objects.filter(school=w.school, date__in=days).values_list("date", flat=True).distinct()
+    )
     for day in reversed(days):
-        if StudentDailyAttendance.objects.filter(school=w.school, date=day).exists():
+        if day in recorded:
             continue
         for number in students:
             roll = _key(number, day) % 100
@@ -520,15 +564,32 @@ def _finance(w, year, students):
             w.school, actor=w.admin, code=code, name=name
         )
     y = year.start_date.year
+    # Existing invoices of these fees, and those already paid in part or in full, in two queries.
+    invoices = {}
+    for invoice_id, student_id, fee_type_id in (
+        Invoice.objects.filter(school=w.school, student__in=students.values(), lines__fee_type__in=fee_types.values())
+        .exclude(status=InvoiceStatus.CANCELLED)
+        .order_by("issue_date")
+        .values_list("pk", "student_id", "lines__fee_type_id")
+    ):
+        invoices.setdefault((student_id, fee_type_id), invoice_id)
+    settled = set(
+        Invoice.objects.filter(pk__in=invoices.values())
+        .exclude(status=InvoiceStatus.ISSUED)
+        .values_list("pk", flat=True)
+    )
     for number, student in students.items():
         for code, _, amount, month, day in FEES:
             fee_type = fee_types[code]
-            invoice = (
-                Invoice.objects.filter(school=w.school, student=student, lines__fee_type=fee_type)
-                .exclude(status=InvoiceStatus.CANCELLED)
-                .first()
-            )
-            if invoice is None:
+            paid = Decimal("0")
+            if code == "INSCRIPTION":
+                paid = amount
+            elif code == "SCOLARITE_T1" and number not in UNPAID_T1:
+                paid = PARTIAL_T1.get(number, amount)
+            invoice_id = invoices.get((student.pk, fee_type.pk))
+            if invoice_id is not None and (invoice_id in settled or not paid):
+                continue  # exists, and already paid at the desk or meant to stay unpaid
+            if invoice_id is None:
                 invoice = finance.issue_invoice(
                     student,
                     actor=w.admin,
@@ -536,11 +597,8 @@ def _finance(w, year, students):
                     lines=[{"fee_type": fee_type, "unit_price": amount}],
                 )
                 w.created.append(f"facture {code} {number}")
-            paid = Decimal("0")
-            if code == "INSCRIPTION":
-                paid = amount
-            elif code == "SCOLARITE_T1" and number not in UNPAID_T1:
-                paid = PARTIAL_T1.get(number, amount)
+            else:
+                invoice = Invoice.objects.get(pk=invoice_id)
             if paid:
                 outcome = finance.initiate_payment(
                     student,
@@ -564,14 +622,22 @@ def structure(w, year):
 
 
 def build(w, *, year, classes, subjects, maths_teacher, parent_member, guardian_member):
-    """Complete the school life around the demo accounts of isbree_seed._demo."""
-    teachers = _teachers(w, subjects, maths_teacher)
-    courses = _courses(w, classes, subjects, teachers)
-    _breaks(w, year)
-    _timetable(w, year, courses)
-    students = _students(w, classes)
-    _family(w, parent_member, students)
-    sequences = _periods(w, year)
-    _marks(w, sequences, courses, students)
-    _attendance(w, year, guardian_member, students)
-    _finance(w, year, students)
+    """Complete the school life around the demo accounts of isbree_seed._demo.
+    One transaction per step: each step finds what exists by natural keys, so
+    a run interrupted between two steps is completed by the next one."""
+    with transaction.atomic():
+        teachers = _teachers(w, subjects, maths_teacher)
+        courses = _courses(w, classes, subjects, teachers)
+        _breaks(w, year)
+    with transaction.atomic():
+        _timetable(w, year, courses)
+    with transaction.atomic():
+        students = _students(w, classes)
+        _family(w, parent_member, students)
+        sequences = _periods(w, year)
+    with transaction.atomic():
+        _marks(w, sequences, courses, students)
+    with transaction.atomic():
+        _attendance(w, year, guardian_member, students)
+    with transaction.atomic():
+        _finance(w, year, students)

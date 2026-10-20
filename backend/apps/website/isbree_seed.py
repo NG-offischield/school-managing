@@ -697,7 +697,9 @@ def _shared_password(w, membership, password):
         w.created.append(f"mot de passe partagé aligné : {user.email}")
 
 
-def _demo(w, password):
+@transaction.atomic
+def _demo_accounts(w, password):
+    """The structure and the four demo accounts: one transaction."""
     school, actor = w.school, w.admin
     year = _year(w)
     classes, subjects = world.structure(w, year)
@@ -779,6 +781,15 @@ def _demo(w, password):
     for member in (teacher_member, staff_member, guardian_member, parent_member):
         member.user.refresh_from_db()
         _shared_password(w, member, password)
+    return year, classes, subjects, teacher, parent_member, guardian_member
+
+
+def _demo(w, password):
+    """Accounts first, then the school life step by step (one transaction per
+    step, see isbree_world.build), then the news and resources. A start cut
+    short (deploy timeout, host put to sleep) keeps the finished steps: the
+    next start resumes from there."""
+    year, classes, subjects, teacher, parent_member, guardian_member = _demo_accounts(w, password)
     world.build(
         w,
         year=year,
@@ -788,7 +799,8 @@ def _demo(w, password):
         parent_member=parent_member,
         guardian_member=guardian_member,
     )
-    _demo_content(w, classes["6e A"])
+    with transaction.atomic():
+        _demo_content(w, classes["6e A"])
 
 
 # =============================================================================
@@ -858,11 +870,24 @@ def _images(w, folder):
 # =============================================================================
 
 
-@transaction.atomic
 def seed(*, password=None, admin_password=None, demo=False, images=None, contact_email=None, contact_phone=None):
+    """Idempotent. One transaction per stage (school and contents, images, demo
+    accounts, each step of the school life): an interrupted run is resumed by
+    the next one, never duplicated."""
     _refuse_production()
     _admin_password(admin_password, password)  # checked even when the school already exists
     w = Seeded()
+    with transaction.atomic():
+        _school_and_contents(w, admin_password, password, contact_email, contact_phone)
+    if images:  # first: the demo news use them as covers
+        with transaction.atomic():
+            _images(w, images)
+    if demo:
+        _demo(w, password)
+    return w
+
+
+def _school_and_contents(w, admin_password, password, contact_email, contact_phone):
     w.school = School.objects.filter(code=CODE).first()
     if w.school is None:
         provisioned = SchoolProvisioningService().provision(
@@ -894,8 +919,3 @@ def seed(*, password=None, admin_password=None, demo=False, images=None, contact
         w.school.save(update_fields=[*changed, "updated_at"])
         w.created.append("coordonnées de contact")
     _editorial(w)
-    if images:  # first: the demo news use them as covers
-        _images(w, images)
-    if demo:
-        _demo(w, password)
-    return w

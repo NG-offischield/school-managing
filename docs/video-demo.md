@@ -23,16 +23,20 @@ La vidéo garde une trace durable du projet, même si l'hébergement gratuit s'a
 
 | Temps | Écran | À dire (idée, pas à lire mot à mot) |
 |---|---|---|
-| 0:00–0:20 | Accueil du site public | « School Managing est une plateforme de gestion scolaire. Voici sa démonstration pour un établissement fictif, ISBREE. Les contenus marqués *Démonstration* sont fictifs. » |
-| 0:20–0:50 | À propos, Formations, Vie scolaire | Présentation de l'école ; les niveaux affichés viennent de la base (seuls ceux ouverts à la préinscription) ; tout est administrable. |
+| 0:00–0:20 | Accueil du site public, puis le pied de page | « School Managing est une plateforme de gestion scolaire, présentée ici pour ISBREE avec des données fictives. » Montrer la mention du pied de page et le lien « En savoir plus sur cette démonstration ». |
+| 0:20–0:50 | À propos, Formations (niveaux de la 6e à la 3e, salles de classe), Vie scolaire (sport, événements), Galerie | Les niveaux et les images viennent de la base et sont administrables ; les photos sont légendées « image d'illustration ». |
 | 0:50–1:10 | Actualités, FAQ, Contact (lien téléphone), menu sur mobile (fenêtre étroite) | Navigation, accessibilité (tests axe automatisés), version mobile. |
-| 1:10–1:50 | Admissions → Préinscription | Montrer l'encadré « Démonstration », une erreur de saisie corrigée, puis l'envoi : la référence `PRE-…` vient du serveur. « Une demande acceptée n'inscrit pas l'élève : l'établissement invite la famille dans son Espace ISBREE. » |
+| 1:10–1:50 | Admissions → Préinscription | Montrer l'encadré « Formulaire de démonstration », une erreur de saisie corrigée, puis l'envoi : la référence `PRE-…` vient du serveur et la demande reste dans la base de démonstration (personne ne rappelle). « Une demande acceptée n'inscrit pas l'élève : l'établissement invite la famille dans son Espace ISBREE. » |
 | 1:50–2:10 | Lien « Espace ISBREE » → page de connexion | Comptes de démonstration en lecture seule ; les pages privées ne sont jamais indexées ni mises en cache. |
-| 2:10–2:50 | Connexion Parent | Enfant à lien **vérifié** uniquement, ressources de sa classe, actualités, FAQ ; applications « pas encore disponibles » (aucun faux lien). Puis tenter `/espace/enseignant` : « Espace non accessible ». Déconnexion. |
+| 2:10–2:50 | Connexion Parent (`parent.demo@isbree.test`) | Deux enfants à lien **vérifié** (Léa Mballa, 6e A ; Noah Mballa, 4e A) : changer d'enfant change les ressources de classe ; actualités, FAQ. Puis tenter `/espace/enseignant` : « Espace non accessible ». Déconnexion. |
 | 2:50–3:20 | Connexion Enseignant, puis Gardien | Les contenus changent selon le rôle, choisi parmi les rôles détenus et revérifié par le serveur. |
 | 3:20–3:40 | Section « Applications mobiles » de l'espace connecté | Chaque rôle voit seulement son application : version, taille, empreinte SHA-256, étapes d'installation. Le build est un build de débogage pour la démonstration, hébergé sur GitHub Releases (fichier public). Si l'application est déjà installée sur un téléphone, montrer son écran de connexion. |
 | 3:20–4:20 | Schéma ou README sur GitHub | Architecture : Django/DRF + PostgreSQL + Redis (API seule autorité), deux applications Next.js en BFF (jetons dans un cookie chiffré HttpOnly), poste d'administration PySide6, quatre applications Flutter, tests (backend, desktop, Vitest, Playwright + axe). Mentionner les limites : démo, hébergement gratuit. |
 | 4:20–4:40 | Page GitHub du dépôt | « Le code et tout son historique sont publics à cette adresse. » |
+
+**Données visibles dans les applications mobiles** (si un téléphone Android 64 bits a l'APK installé) : emploi du temps de la 6e A, notes de la séquence 1, présences de la dernière semaine d'école, factures (payée, partiellement payée, en retard). Ces écrans n'ont pas encore été vérifiés avec ces données, ni sur émulateur ni sur téléphone (seuls l'installation, le lancement et l'écran de connexion l'ont été, sur émulateur) : faites un essai complet sur votre téléphone avant d'enregistrer.
+
+**À vérifier avant d'enregistrer :** la connexion en ligne des quatre comptes de démonstration (voir docs/deploiement-demo.md, étape 4). Si une étape échoue, ne l'enregistrez pas.
 
 ## Checklist OBS Studio (Windows)
 
