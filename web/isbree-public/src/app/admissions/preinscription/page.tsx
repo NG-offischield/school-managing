@@ -5,13 +5,15 @@ import { EmptyState, Unavailable } from "@/components/notices";
 import { PageHeader } from "@/components/page-header";
 import { getPages, getSite } from "@/lib/api";
 import { config } from "@/lib/config";
+import { pageMetadata } from "@/lib/seo";
 
 import { PreEnrollmentForm } from "./pre-enrollment-form";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Préinscription",
-  description: "Formulaire de préinscription en ligne à ISBREE.",
-};
+  description: "Formulaire de demande de préinscription en ligne à ISBREE, pour les niveaux de la 6e à la 3e.",
+  path: "/admissions/preinscription",
+});
 
 export default async function PreEnrollmentPage() {
   const [site, pages] = await Promise.all([getSite(), getPages()]);

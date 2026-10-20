@@ -4,11 +4,13 @@ import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/page-header";
 import { config } from "@/lib/config";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "À propos de cette démonstration",
-  description: "Ce que montre la démonstration de la plateforme ISBREE, et ce qui y est fictif.",
-};
+  description: "Démonstration de la plateforme de gestion scolaire : ce qui est fictif (élèves, résultats, actualités) et ce qui fonctionne réellement.",
+  path: "/demonstration",
+});
 
 /** Served in the public demonstration only (ISBREE_DEMO_MODE): what is fictitious,
  * what really runs, and what has no effect outside this environment. Every

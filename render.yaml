@@ -114,3 +114,7 @@ services:
           envVarKey: WEB_BFF_TOKEN
       - key: ISBREE_TRUSTED_PROXY_HOPS
         value: "1"
+      # Google Search Console ownership token (docs/seo.md), given by Google. Optional:
+      # without it, no verification tag. Read at build time: redeploy after setting it.
+      - key: GOOGLE_SITE_VERIFICATION
+        sync: false

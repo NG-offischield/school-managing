@@ -130,3 +130,51 @@ test.describe("pre-enrollment", () => {
     await expect(page.getByText(/PRE-\d{4}-\d{4}/)).toBeVisible();
   });
 });
+
+// Search engines (docs/seo.md): what Google reads, without a browser.
+test.describe("search engines", () => {
+  test("robots.txt allows the public pages and names the sitemap", async ({ request, baseURL }) => {
+    const robots = await (await request.get("/robots.txt")).text();
+    expect(robots).toMatch(/^Allow: \/$/m);
+    expect(robots).not.toMatch(/^Disallow: \/$/m);
+    expect(robots).toContain(`Sitemap: ${new URL("/sitemap.xml", baseURL).href}`);
+  });
+
+  test("the sitemap lists canonical public pages only", async ({ request }) => {
+    const response = await request.get("/sitemap.xml");
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toContain("xml");
+    const xml = await response.text();
+    expect(xml).toMatch(/<urlset[^>]+sitemaps\.org/);
+    const urls = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]).pathname);
+    expect(urls).toEqual(expect.arrayContaining(["/", "/a-propos", "/formations", "/actualites", "/faq", "/contact"]));
+    // Never the portal, the API, the image route, nor a duplicate of a dedicated page.
+    for (const path of urls) {
+      expect(path).not.toMatch(/^\/(espace|connexion|api|images)\b/);
+      expect(path).not.toMatch(/^\/informations\/(a-propos|vie-scolaire|admissions|approche-pedagogique)$/);
+    }
+    for (const path of urls.slice(0, 12)) {
+      expect((await request.get(path)).status(), path).toBe(200); // every listed page answers
+    }
+  });
+
+  test("each page has its own canonical URL, description and share image, and may be indexed", async ({ page }) => {
+    const seen = new Set<string>();
+    for (const [path, canonical] of [
+      ["/", "/"],
+      ["/formations", "/formations"],
+      ["/actualites/rentree-scolaire", "/actualites/rentree-scolaire"],
+      ["/informations/a-propos", "/a-propos"], // same text as /a-propos: that page is the canonical one
+    ]) {
+      await page.goto(path);
+      const href = await page.locator('link[rel="canonical"]').getAttribute("href");
+      expect(new URL(href!).pathname.replace(/\/$/, "") || "/", path).toBe(canonical.replace(/\/$/, "") || "/");
+      const description = await page.locator('meta[name="description"]').getAttribute("content");
+      expect(description?.length, path).toBeGreaterThan(40);
+      seen.add(description!);
+      await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", /\/opengraph-image/);
+      await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /^index, follow/);
+    }
+    expect(seen.size).toBe(4); // no description copied on every page
+  });
+});

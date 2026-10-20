@@ -4,11 +4,13 @@ import { NewsCard } from "@/components/news-card";
 import { EmptyState, Unavailable } from "@/components/notices";
 import { PageHeader } from "@/components/page-header";
 import { getNews } from "@/lib/api";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Actualités",
-  description: "Les actualités et les événements d'ISBREE.",
-};
+  description: "Actualités et événements d'ISBREE : vie de l'établissement, rencontres avec les familles et temps forts de l'année.",
+  path: "/actualites",
+});
 
 export default async function NewsPage() {
   const news = await getNews();

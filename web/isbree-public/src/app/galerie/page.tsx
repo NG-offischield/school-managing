@@ -5,11 +5,13 @@ import { EmptyState, Unavailable } from "@/components/notices";
 import { PageHeader } from "@/components/page-header";
 import { getGallery } from "@/lib/api";
 import { IMAGE_CATEGORIES, type ImageRef } from "@/lib/types";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Galerie",
-  description: "Galerie d'images d'ISBREE.",
-};
+  description: "Galerie d'images d'illustration : salles de classe, établissement et activités sportives.",
+  path: "/galerie",
+});
 
 export default async function GalleryPage() {
   const gallery = await getGallery();

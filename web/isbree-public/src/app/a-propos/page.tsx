@@ -3,11 +3,13 @@ import type { Metadata } from "next";
 import { EditorialSection } from "@/components/editorial";
 import { PageHeader } from "@/components/page-header";
 import { getSite } from "@/lib/api";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "À propos",
   description: "Qui est ISBREE, ses valeurs et son approche pédagogique.",
-};
+  path: "/a-propos",
+});
 
 export default async function AboutPage() {
   const site = await getSite();

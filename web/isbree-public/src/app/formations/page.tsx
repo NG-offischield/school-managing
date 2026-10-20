@@ -6,11 +6,13 @@ import { EmptyState, Unavailable } from "@/components/notices";
 import { PageHeader } from "@/components/page-header";
 import { getGallery, getSite } from "@/lib/api";
 import type { Level } from "@/lib/types";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Formations",
-  description: "Les niveaux ouverts à la préinscription à ISBREE.",
-};
+  description: "Les niveaux ouverts à la préinscription à ISBREE, de la 6e à la 3e, et les salles de classe.",
+  path: "/formations",
+});
 
 /** Only the levels the school really offers (Level.public_visible): nothing invented. */
 export default async function FormationsPage() {

@@ -8,6 +8,7 @@ import { getPage, getPages } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { config } from "@/lib/config";
 import { Markup } from "@/lib/markup";
+import { DEDICATED_ROUTES, pageMetadata } from "@/lib/seo";
 
 /**
  * The other administrable pages: legal notice, privacy, terms, rules and any
@@ -29,7 +30,13 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps<"/informations/[slug]">): Promise<Metadata> {
   const { slug } = await params;
   const page = await getPage(slug);
-  return page.ok ? { title: page.data.title, description: page.data.summary } : { title: "Informations" };
+  if (!page.ok) return { title: "Informations" };
+  // A text also shown on a dedicated route (À propos, Vie scolaire...): that route is the canonical one.
+  return pageMetadata({
+    title: page.data.title,
+    description: page.data.summary,
+    path: DEDICATED_ROUTES[page.data.kind] ?? `/informations/${slug}`,
+  });
 }
 
 export default async function InformationPage({ params }: PageProps<"/informations/[slug]">) {

@@ -6,11 +6,13 @@ import { allIllustrations, Figure, IllustrationNote } from "@/components/figure"
 import { NewsCard } from "@/components/news-card";
 import { PageHeader } from "@/components/page-header";
 import { getGallery, getNews } from "@/lib/api";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Vie scolaire",
   description: "Activités, événements et vie de l'établissement ISBREE.",
-};
+  path: "/vie-scolaire",
+});
 
 export default async function SchoolLifePage() {
   const [gallery, news] = await Promise.all([getGallery(), getNews()]);

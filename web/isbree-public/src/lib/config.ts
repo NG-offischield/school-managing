@@ -15,4 +15,6 @@ export const config = {
   portalUrl: normalizeSiteUrl(process.env.ISBREE_PORTAL_URL, "http://localhost:3001"),
   demoMode: process.env.ISBREE_DEMO_MODE === "true",
   bffToken: process.env.WEB_BFF_TOKEN || "",
+  // Google Search Console ownership token (docs/seo.md): public by nature, set on the host, never in the code.
+  googleSiteVerification: process.env.GOOGLE_SITE_VERIFICATION || "",
 };

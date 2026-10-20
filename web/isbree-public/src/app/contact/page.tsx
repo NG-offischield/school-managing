@@ -4,11 +4,13 @@ import { Unavailable } from "@/components/notices";
 import { PageHeader } from "@/components/page-header";
 import { getSite } from "@/lib/api";
 import { formatPhone, telHref } from "@/lib/format";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Contact",
   description: "Contacter ISBREE à Etoug-Ebe, Yaoundé : téléphone, e-mail et accès.",
-};
+  path: "/contact",
+});
 
 export default async function ContactPage() {
   const site = await getSite();

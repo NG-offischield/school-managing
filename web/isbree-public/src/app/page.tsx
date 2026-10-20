@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Figure } from "@/components/figure";
@@ -5,7 +6,24 @@ import { LogoMark } from "@/components/logo";
 import { NewsCard } from "@/components/news-card";
 import { ProvisionalNote, Unavailable } from "@/components/notices";
 import { getGallery, getNews, getSite } from "@/lib/api";
+import { config } from "@/lib/config";
 import { formatPhone, telHref } from "@/lib/format";
+import { pageMetadata } from "@/lib/seo";
+
+const HOME_TITLE = config.demoMode
+  ? "ISBREE — démonstration d'une plateforme de gestion scolaire"
+  : "ISBREE — Établissement scolaire à Yaoundé";
+
+export const metadata: Metadata = {
+  ...pageMetadata({
+    title: HOME_TITLE,
+    description: config.demoMode
+      ? "Vitrine d'un établissement scolaire à Etoug-Ebe, Yaoundé, et démonstration de sa plateforme de gestion : formations, vie scolaire, actualités, préinscription en ligne et espace des familles. Données scolaires fictives."
+      : "ISBREE, établissement scolaire à Etoug-Ebe, Yaoundé : présentation, formations, vie scolaire, actualités et préinscription en ligne.",
+    path: "/",
+  }),
+  title: { absolute: HOME_TITLE }, // complete title: not "… · ISBREE"
+};
 
 const STEPS = [
   { title: "Préinscription en ligne", text: "Vous remplissez le formulaire : il ne prend que quelques minutes." },

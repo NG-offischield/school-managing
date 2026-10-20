@@ -4,11 +4,13 @@ import { EmptyState, ProvisionalNote, Unavailable } from "@/components/notices";
 import { PageHeader } from "@/components/page-header";
 import { getFaq } from "@/lib/api";
 import { FAQ_CATEGORIES, type Faq } from "@/lib/types";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Questions fréquentes",
   description: "Réponses aux questions fréquentes sur ISBREE, la préinscription et l'Espace ISBREE.",
-};
+  path: "/faq",
+});
 
 export default async function FaqPage() {
   const faq = await getFaq();

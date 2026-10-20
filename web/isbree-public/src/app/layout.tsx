@@ -13,10 +13,15 @@ const sourceSans = Source_Sans_3({ variable: "--font-source", subsets: ["latin"]
 export const metadata: Metadata = {
   metadataBase: new URL(config.publicUrl),
   title: { default: "ISBREE — Établissement scolaire à Yaoundé", template: "%s · ISBREE" },
-  description:
-    "ISBREE, établissement scolaire à Etoug-Ebe, Yaoundé : présentation, formations, vie scolaire, actualités et préinscription en ligne.",
+  description: config.demoMode
+    ? "Démonstration de la plateforme de gestion scolaire d'ISBREE, à Etoug-Ebe, Yaoundé : site public, préinscription et espace des familles. Données scolaires fictives."
+    : "ISBREE, établissement scolaire à Etoug-Ebe, Yaoundé : présentation, formations, vie scolaire, actualités et préinscription en ligne.",
   applicationName: "ISBREE",
+  // Each page sets its own canonical URL and Open Graph data (lib/seo.ts).
   openGraph: { type: "website", locale: "fr_CM", siteName: "ISBREE" },
+  robots: { index: true, follow: true },
+  // <meta name="google-site-verification"> only when the real token is configured.
+  ...(config.googleSiteVerification ? { verification: { google: config.googleSiteVerification } } : {}),
   formatDetection: { telephone: false },
 };
 

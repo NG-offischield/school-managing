@@ -3,11 +3,13 @@ import Link from "next/link";
 
 import { EditorialSection } from "@/components/editorial";
 import { PageHeader } from "@/components/page-header";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Admissions",
   description: "Comment demander une place à ISBREE : les étapes de la préinscription en ligne.",
-};
+  path: "/admissions",
+});
 
 export default function AdmissionsPage() {
   return (

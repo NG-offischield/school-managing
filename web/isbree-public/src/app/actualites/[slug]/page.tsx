@@ -7,6 +7,7 @@ import { Unavailable } from "@/components/notices";
 import { getArticle, getNews } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { Markup } from "@/lib/markup";
+import { pageMetadata } from "@/lib/seo";
 import { NEWS_CATEGORIES } from "@/lib/types";
 
 /** Cache Components needs at least one param: a placeholder when nothing is published (-> 404). */
@@ -26,7 +27,12 @@ export async function generateMetadata({ params }: PageProps<"/actualites/[slug]
   const { slug } = await params;
   const article = await getArticle(slug);
   if (!article.ok) return { title: "Actualité" };
-  return { title: article.data.title, description: article.data.summary };
+  return pageMetadata({
+    title: article.data.title,
+    description: article.data.summary,
+    path: `/actualites/${slug}`,
+    type: "article",
+  });
 }
 
 export default async function ArticlePage({ params }: PageProps<"/actualites/[slug]">) {
