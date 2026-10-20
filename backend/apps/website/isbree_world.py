@@ -27,6 +27,7 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from django.db import transaction
+from django.db.models import Max
 from django.utils import timezone
 
 from apps.academics import services as academics
@@ -317,25 +318,33 @@ def _timetable(w, year, courses):
             if (course.pk, day, start) not in existing:
                 scheduling.create_slot(course, actor=w.admin, weekday=day, start_time=start, end_time=end)
                 w.created.append(f"créneau {klass} {code}")
-    # Dated sessions of this week and the next. Generation is idempotent but
-    # checks every slot and day: start after the last day already generated.
+    # Dated sessions of this week and the next, class by class (one transaction
+    # each). Generation is idempotent but checks every slot and day: each class
+    # starts after the last day already generated for it.
     today = timezone.localdate()
     monday = today - timedelta(days=today.weekday())
-    start = max(year.start_date, monday)
+    first = max(year.start_date, monday)
     end = min(year.end_date, monday + timedelta(weeks=SESSION_WEEKS, days=-1))
-    last = (
-        TeachingSession.objects.filter(school=w.school, academic_year=year, date__gte=start, date__lte=end)
-        .order_by("-date")
-        .values_list("date", flat=True)
-        .first()
+    generated = dict(
+        TeachingSession.objects.filter(school=w.school, academic_year=year, date__gte=first, date__lte=end)
+        .values_list("school_class_id")
+        .annotate(last=Max("date"))
+        .order_by()
     )
-    if last is not None:
-        start = last + timedelta(days=1)
-    school_days = [start + timedelta(days=n) for n in range((end - start).days + 1)]
-    if any(day.isoweekday() in WEEKDAYS for day in school_days):  # else: nothing to generate, no audit entry
-        summary = scheduling.generate_sessions(w.school, actor=w.admin, date_from=start, date_to=end)
-        if summary["created"]:
-            w.created.append(f"{summary['created']} séances datées")
+    created = 0
+    for klass in sorted({course.school_class for course in courses.values()}, key=lambda k: k.name):
+        last = generated.get(klass.pk)
+        start = last + timedelta(days=1) if last else first
+        school_days = [start + timedelta(days=n) for n in range((end - start).days + 1)]
+        if not any(day.isoweekday() in WEEKDAYS for day in school_days):
+            continue  # nothing to generate (and no audit entry)
+        with transaction.atomic():
+            summary = scheduling.generate_sessions(
+                w.school, actor=w.admin, date_from=start, date_to=end, school_class=klass
+            )
+        created += summary["created"]
+    if created:
+        w.created.append(f"{created} séances datées")
 
 
 # =============================================================================
@@ -347,35 +356,36 @@ def _students(w, classes):
     students = {}
     existing = {s.student_number: s for s in Student.objects.filter(school=w.school)}
     for number, first_name, last_name, sex, born, klass in STUDENTS:
-        student = existing.get(number)
-        legacy = LEGACY_NUMBERS.get(number)
-        if student is None and legacy:
-            student = Student.objects.filter(school=w.school, student_number=legacy[0]).first()
-            if student is not None:
-                student = people.admin_update_student(
-                    student,
+        with transaction.atomic():  # one unit: an interrupted run resumes after it
+            student = existing.get(number)
+            legacy = LEGACY_NUMBERS.get(number)
+            if student is None and legacy:
+                student = Student.objects.filter(school=w.school, student_number=legacy[0]).first()
+                if student is not None:
+                    student = people.admin_update_student(
+                        student,
+                        actor=w.admin,
+                        student_number=number,
+                        registration_number=number.replace("ISB", "INS"),
+                        last_name=last_name,
+                        date_of_birth=date.fromisoformat(born),
+                    )
+                    w.created.append(f"élève renommé {first_name} {last_name}")
+            if student is None:
+                student = people.admin_create_student(
+                    w.school,
                     actor=w.admin,
+                    enrollment={"school_class": classes[klass]},
                     student_number=number,
                     registration_number=number.replace("ISB", "INS"),
+                    first_name=first_name,
                     last_name=last_name,
                     date_of_birth=date.fromisoformat(born),
+                    sex=sex,
+                    birth_place="Yaoundé",
                 )
-                w.created.append(f"élève renommé {first_name} {last_name}")
-        if student is None:
-            student = people.admin_create_student(
-                w.school,
-                actor=w.admin,
-                enrollment={"school_class": classes[klass]},
-                student_number=number,
-                registration_number=number.replace("ISB", "INS"),
-                first_name=first_name,
-                last_name=last_name,
-                date_of_birth=date.fromisoformat(born),
-                sex=sex,
-                birth_place="Yaoundé",
-            )
-            w.created.append(f"élève {first_name} {last_name}")
-        students[number] = student
+                w.created.append(f"élève {first_name} {last_name}")
+            students[number] = student
     return students
 
 
@@ -488,22 +498,23 @@ def _marks(w, sequences, courses, students):
             if held > min(today - timedelta(days=2), sequence.end_date):
                 continue  # not held yet: no invented future marks
             for (klass, code), course in courses.items():
-                label = f"{name} — {sequence.name}"
-                assessment = assessments.get((course.pk, sequence.pk, label))
-                if assessment is None:
-                    assessment = gradebook.create_assessment(
-                        course,
-                        sequence,
-                        actor=w.admin,
-                        name=label,
-                        assessment_type=kind,
-                        max_score=Decimal("20"),
-                        assessment_date=held,
-                    )
-                    w.created.append(f"évaluation {klass} {code} {label}")
-                for student in pupils.get(klass, []):
-                    if (assessment.pk, student.pk) not in marked:
-                        gradebook.enter_grade(assessment, student, _mark(student, code, label), actor=w.admin)
+                with transaction.atomic():  # one unit: an interrupted run resumes after it
+                    label = f"{name} — {sequence.name}"
+                    assessment = assessments.get((course.pk, sequence.pk, label))
+                    if assessment is None:
+                        assessment = gradebook.create_assessment(
+                            course,
+                            sequence,
+                            actor=w.admin,
+                            name=label,
+                            assessment_type=kind,
+                            max_score=Decimal("20"),
+                            assessment_date=held,
+                        )
+                        w.created.append(f"évaluation {klass} {code} {label}")
+                    for student in pupils.get(klass, []):
+                        if (assessment.pk, student.pk) not in marked:
+                            gradebook.enter_grade(assessment, student, _mark(student, code, label), actor=w.admin)
 
 
 # =============================================================================
@@ -539,17 +550,18 @@ def _attendance(w, year, guardian_member, students):
         StudentDailyAttendance.objects.filter(school=w.school, date__in=days).values_list("date", flat=True).distinct()
     )
     for day in reversed(days):
-        if day in recorded:
-            continue
-        for number in students:
-            roll = _key(number, day) % 100
-            if roll < 4:
-                continue  # absent: closing the day records it
-            minutes = 40 if roll < 10 else 5 + roll % 25  # 07:35 (late) or 07:05-07:29
-            arrival = datetime.combine(day, time(7), tz) + timedelta(minutes=minutes)
-            attendance.scan(qr[number].token, actor=guardian_member, at=arrival)
-        attendance.finalize_day(w.school, day, actor=w.admin)
-        w.created.append(f"présences du {day:%d/%m/%Y}")
+        with transaction.atomic():  # one unit: an interrupted run resumes after it
+            if day in recorded:
+                continue
+            for number in students:
+                roll = _key(number, day) % 100
+                if roll < 4:
+                    continue  # absent: closing the day records it
+                minutes = 40 if roll < 10 else 5 + roll % 25  # 07:35 (late) or 07:05-07:29
+                arrival = datetime.combine(day, time(7), tz) + timedelta(minutes=minutes)
+                attendance.scan(qr[number].token, actor=guardian_member, at=arrival)
+            attendance.finalize_day(w.school, day, actor=w.admin)
+            w.created.append(f"présences du {day:%d/%m/%Y}")
 
 
 # =============================================================================
@@ -579,37 +591,38 @@ def _finance(w, year, students):
         .values_list("pk", flat=True)
     )
     for number, student in students.items():
-        for code, _, amount, month, day in FEES:
-            fee_type = fee_types[code]
-            paid = Decimal("0")
-            if code == "INSCRIPTION":
-                paid = amount
-            elif code == "SCOLARITE_T1" and number not in UNPAID_T1:
-                paid = PARTIAL_T1.get(number, amount)
-            invoice_id = invoices.get((student.pk, fee_type.pk))
-            if invoice_id is not None and (invoice_id in settled or not paid):
-                continue  # exists, and already paid at the desk or meant to stay unpaid
-            if invoice_id is None:
-                invoice = finance.issue_invoice(
-                    student,
-                    actor=w.admin,
-                    due_date=date(y + (month < 9), month, day),
-                    lines=[{"fee_type": fee_type, "unit_price": amount}],
-                )
-                w.created.append(f"facture {code} {number}")
-            else:
-                invoice = Invoice.objects.get(pk=invoice_id)
-            if paid:
-                outcome = finance.initiate_payment(
-                    student,
-                    actor=w.admin,
-                    amount=paid,
-                    payment_method="CASH",
-                    idempotency_key=f"isbree-demo-{number}-{code}",
-                    invoices=[invoice],
-                )
-                if not outcome.replayed:
-                    w.created.append(f"paiement {code} {number}")
+        with transaction.atomic():  # one unit: an interrupted run resumes after it
+            for code, _, amount, month, day in FEES:
+                fee_type = fee_types[code]
+                paid = Decimal("0")
+                if code == "INSCRIPTION":
+                    paid = amount
+                elif code == "SCOLARITE_T1" and number not in UNPAID_T1:
+                    paid = PARTIAL_T1.get(number, amount)
+                invoice_id = invoices.get((student.pk, fee_type.pk))
+                if invoice_id is not None and (invoice_id in settled or not paid):
+                    continue  # exists, and already paid at the desk or meant to stay unpaid
+                if invoice_id is None:
+                    invoice = finance.issue_invoice(
+                        student,
+                        actor=w.admin,
+                        due_date=date(y + (month < 9), month, day),
+                        lines=[{"fee_type": fee_type, "unit_price": amount}],
+                    )
+                    w.created.append(f"facture {code} {number}")
+                else:
+                    invoice = Invoice.objects.get(pk=invoice_id)
+                if paid:
+                    outcome = finance.initiate_payment(
+                        student,
+                        actor=w.admin,
+                        amount=paid,
+                        payment_method="CASH",
+                        idempotency_key=f"isbree-demo-{number}-{code}",
+                        invoices=[invoice],
+                    )
+                    if not outcome.replayed:
+                        w.created.append(f"paiement {code} {number}")
 
 
 # =============================================================================
@@ -623,21 +636,19 @@ def structure(w, year):
 
 def build(w, *, year, classes, subjects, maths_teacher, parent_member, guardian_member):
     """Complete the school life around the demo accounts of isbree_seed._demo.
-    One transaction per step: each step finds what exists by natural keys, so
-    a run interrupted between two steps is completed by the next one."""
+    Small transactions (a slot, a class's sessions, a pupil, an assessment, a
+    school day, a pupil's fees): each unit finds what exists by natural keys,
+    so a run interrupted anywhere (slow first run on the free host, cut short)
+    keeps what it finished and the next run completes the rest."""
     with transaction.atomic():
         teachers = _teachers(w, subjects, maths_teacher)
         courses = _courses(w, classes, subjects, teachers)
         _breaks(w, year)
+    _timetable(w, year, courses)  # each slot (service) and each class's sessions
+    students = _students(w, classes)  # each pupil
     with transaction.atomic():
-        _timetable(w, year, courses)
-    with transaction.atomic():
-        students = _students(w, classes)
         _family(w, parent_member, students)
         sequences = _periods(w, year)
-    with transaction.atomic():
-        _marks(w, sequences, courses, students)
-    with transaction.atomic():
-        _attendance(w, year, guardian_member, students)
-    with transaction.atomic():
-        _finance(w, year, students)
+    _marks(w, sequences, courses, students)  # each assessment with its marks
+    _attendance(w, year, guardian_member, students)  # each school day
+    _finance(w, year, students)  # each pupil's invoices and payments

@@ -6,18 +6,30 @@
 set -eu
 
 python manage.py migrate --noinput
-# Idempotent: creates the fictitious demo data once, then only completes them
-# (dated sessions and attendance around today) and puts back the illustration
-# files (seed-images/) that a restart without persistent disk erased. With
-# existing data it only reads (~150 queries); the first, longer run commits step
-# by step, so a start cut short is resumed by the next one. On failure, the API
-# starts ONLY if what the demo cannot work without is already there (school,
-# the four demo accounts, a verified child...): it keeps serving the existing
-# data, with the error in the logs. Otherwise the start fails, rather than an
-# API that looks ready but refuses every login.
-if ! python manage.py seed_isbree --demo --images seed-images; then
-    echo "ERREUR : seed_isbree --demo --images a échoué (trace ci-dessus)." >&2
-    python manage.py seed_isbree --check-demo
-    echo "AVERTISSEMENT : démarrage avec les données de démonstration existantes, sans la mise à jour du seed." >&2
+
+# The fictitious demo data (seed_isbree --demo, idempotent, never deletes).
+# Render cancels a deploy whose service does not open its port in time, and the
+# first complete run is long against the remote database: run synchronously,
+# it was cancelled again and again (the old instance kept serving).
+#
+# - The demo essentials already exist (school, the four demo accounts, a
+#   verified child, enrolled pupils: seed_isbree --check-demo): the API starts
+#   at once and the seed completes the rest in the background, in small
+#   transactions (an interrupted run keeps its work, the next start resumes).
+#   Its outcome is logged: "seed_isbree terminé" or "ERREUR : seed_isbree".
+# - They do not exist (new database): the seed runs BEFORE the API starts; if
+#   it fails, the start fails, rather than an API that looks ready but refuses
+#   every login.
+if python manage.py seed_isbree --check-demo; then
+    (
+        if python manage.py seed_isbree --demo --images seed-images; then
+            echo "seed_isbree terminé : données de démonstration à jour."
+        else
+            echo "ERREUR : seed_isbree --demo --images a échoué (trace ci-dessus) ; l'API sert les données existantes." >&2
+        fi
+    ) &
+else
+    echo "Données de démonstration absentes : seed complet avant le démarrage de l'API."
+    python manage.py seed_isbree --demo --images seed-images
 fi
 exec daphne -b 0.0.0.0 -p "${PORT:-10000}" config.asgi:application
