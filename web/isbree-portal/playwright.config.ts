@@ -32,10 +32,13 @@ export default defineConfig({
     { name: "desktop", use: { viewport: { width: 1280, height: 800 } } },
     { name: "mobile", use: { viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true } },
   ],
-  webServer: {
-    command: "npm run dev",
-    url: "http://localhost:3001/connexion",
-    reuseExistingServer: true,
-    timeout: 120_000,
-  },
+  // Against the online portal (E2E_PORTAL_URL), no local server is started.
+  webServer: process.env.E2E_PORTAL_URL
+    ? undefined
+    : {
+        command: "npm run dev",
+        url: "http://localhost:3001/connexion",
+        reuseExistingServer: true,
+        timeout: 120_000,
+      },
 });

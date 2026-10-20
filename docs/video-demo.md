@@ -36,7 +36,17 @@ La vidéo garde une trace durable du projet, même si l'hébergement gratuit s'a
 
 **Données visibles dans les applications mobiles** (si un téléphone Android 64 bits a l'APK installé) : emploi du temps de la 6e A, notes de la séquence 1, présences de la dernière semaine d'école, factures (payée, partiellement payée, en retard). Ces écrans n'ont pas encore été vérifiés avec ces données, ni sur émulateur ni sur téléphone (seuls l'installation, le lancement et l'écran de connexion l'ont été, sur émulateur) : faites un essai complet sur votre téléphone avant d'enregistrer.
 
-**À vérifier avant d'enregistrer :** la connexion en ligne des quatre comptes de démonstration (voir docs/deploiement-demo.md, étape 4). Si une étape échoue, ne l'enregistrez pas.
+**À vérifier avant d'enregistrer :** la connexion en ligne des quatre comptes de démonstration, en une commande (le mot de passe est celui affiché sur la page de connexion du portail ; tapez-le dans votre terminal, ne le filmez pas) :
+
+```bash
+cd web/isbree-portal && E2E_PORTAL_URL=https://isbree-portal.onrender.com E2E_DEMO_PASSWORD=<mot de passe affiché> npx playwright test -g "role spaces"
+```
+
+Si une étape échoue, ne l'enregistrez pas.
+
+**Si un service en ligne n'est pas prêt** (veille, déploiement en cours) : filmez la même séquence en local, avec la base de démonstration et non la base `school` (`docker compose up -d`, `seed_isbree --demo --images seed-images`, puis `npm run build && npm start` dans `web/isbree-public` et `web/isbree-portal`). Toutes les étapes du script ont été vérifiées en local par les tests de bout en bout (site : 36, portail : 16). Pour la séquence « Applications mobiles », les liens GitHub Releases sont les mêmes qu'en ligne.
+
+**Ne pas filmer :** la commande de test ci-dessus, un fichier `.env`, le tableau de bord Render ou Neon.
 
 ## Checklist OBS Studio (Windows)
 
