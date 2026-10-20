@@ -62,7 +62,7 @@ test.describe("role spaces (demo accounts)", () => {
     await signIn(page, ACCOUNTS.parent);
     await expect(page).toHaveURL(/\/espace\/parent$/);
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Bonjour");
-    await expect(page.getByRole("navigation", { name: "Choix de l'enfant" })).toContainText("Léa Démo");
+    await expect(page.getByRole("navigation", { name: "Choix de l'enfant" })).toContainText("Léa Mballa");
     await expect(page.getByRole("heading", { name: /Ressources — Léa/ })).toBeVisible();
     await axe(page);
 
@@ -79,7 +79,7 @@ test.describe("role spaces (demo accounts)", () => {
 
     // An unknown child id falls back to the parent's own child.
     await page.goto("/espace/parent?enfant=00000000-0000-0000-0000-000000000000");
-    await expect(page.getByRole("link", { name: /Léa Démo/ })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("link", { name: /Léa Mballa/ })).toHaveAttribute("aria-current", "page");
 
     await page.getByRole("button", { name: "Se déconnecter" }).click();
     await expect(page).toHaveURL(/\/connexion\?deconnexion=1$/);

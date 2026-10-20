@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Source_Sans_3 } from "next/font/google";
 
-import { DemoBanner } from "@/components/notices";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { config } from "@/lib/config";
@@ -33,7 +32,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         >
           Aller au contenu
         </a>
-        {config.demoMode ? <DemoBanner /> : null}
         <SiteHeader />
         <main id="contenu" tabIndex={-1} className="flex-1 focus:outline-none">
           {children}

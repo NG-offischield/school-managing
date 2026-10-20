@@ -21,17 +21,22 @@ export default async function PreEnrollmentPage() {
     <>
       <PageHeader eyebrow="Admissions" title="Demande de préinscription">
         <p>
-          Cette demande ne vaut pas inscription. L&apos;établissement l&apos;examine et vous recontacte. Seules les
-          informations utiles au traitement de la demande sont demandées.
+          Cette demande ne vaut pas inscription.{" "}
+          {config.demoMode ? "" : "L'établissement l'examine et vous recontacte. "}Seules les informations utiles au
+          traitement de la demande sont demandées.
         </p>
       </PageHeader>
       <div className="container-page max-w-3xl py-12">
         {config.demoMode ? (
-          <div role="note" className="mb-8 rounded-xl border-2 border-ochre bg-ochre-soft p-5">
-            <p className="font-semibold">Démonstration : ce formulaire n&apos;est pas le système d&apos;admission d&apos;ISBREE.</p>
+          <div role="note" className="mb-8 rounded-xl border-l-4 border-ochre bg-ochre-soft p-5">
+            <p className="font-semibold">Formulaire de démonstration</p>
             <p className="mt-1">
-              Les demandes envoyées ici ne sont jamais transmises à l&apos;établissement. Saisissez uniquement des
-              informations fictives : n&apos;indiquez ni vrai nom, ni vrai téléphone, ni vraie adresse e-mail.
+              Votre demande sera enregistrée et numérotée dans la base de démonstration, sans être transmise à
+              l&apos;établissement : personne ne vous recontactera. Saisissez uniquement des informations fictives, ni vrai
+              nom, ni vrai téléphone, ni vraie adresse e-mail.{" "}
+              <Link href="/demonstration" className="link">
+                En savoir plus
+              </Link>
             </p>
           </div>
         ) : null}
@@ -51,6 +56,7 @@ export default async function PreEnrollmentPage() {
             years={site.data.years}
             relationships={site.data.relationships}
             privacyHref={privacy ? `/informations/${privacy.slug}` : null}
+            demo={config.demoMode}
           />
         )}
       </div>

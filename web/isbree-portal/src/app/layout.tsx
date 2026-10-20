@@ -28,14 +28,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         >
           Aller au contenu
         </a>
-        {config.demoMode ? (
-          <div className="border-b border-line bg-sand/70 text-ink" role="note">
-            <p className="container-page py-1.5 text-center text-xs">
-              Espace de démonstration : les comptes et les éléments marqués « Démo » sont fictifs.
-            </p>
-          </div>
-        ) : null}
         {children}
+        {config.demoMode ? (
+          <footer className="mt-auto border-t border-line bg-sand/50">
+            <p className="container-page py-5 text-sm text-muted" role="note">
+              Démonstration logicielle : les comptes, élèves, classes, résultats, actualités et opérations affichés sont
+              fictifs et ne correspondent pas aux données d&apos;un établissement réel.{" "}
+              <a href={`${config.publicUrl}/demonstration`} className="link">
+                En savoir plus
+              </a>
+            </p>
+          </footer>
+        ) : null}
       </body>
     </html>
   );

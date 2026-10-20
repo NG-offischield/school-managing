@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { DemoBadge, Unavailable } from "@/components/notices";
+import { Unavailable } from "@/components/notices";
 import { PageHeader } from "@/components/page-header";
 import { getSite } from "@/lib/api";
 import { formatPhone, telHref } from "@/lib/format";
@@ -78,7 +78,7 @@ export default async function ContactPage() {
         {locations.length ? (
           <section aria-labelledby="lieux">
             <h2 id="lieux" className="text-2xl">
-              Nos sites
+              {locations.length > 1 ? "Nos sites" : "Où nous trouver"}
             </h2>
             <ul className="mt-5 space-y-4">
               {locations.map((location) => (
@@ -86,7 +86,6 @@ export default async function ContactPage() {
                   <p className="flex flex-wrap items-center gap-2 text-lg font-semibold">
                     {location.name}
                     {location.is_main ? <span className="text-sm font-normal text-muted">(site principal)</span> : null}
-                    <DemoBadge show={location.is_demo} />
                   </p>
                   {location.description ? <p className="mt-1 text-muted">{location.description}</p> : null}
                   {location.address_text ? <p className="mt-1">{location.address_text}</p> : null}

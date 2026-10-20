@@ -9,48 +9,73 @@
 - a first version of every editorial content, ALL flagged `to_validate`:
   wording proposed for the school to correct, nothing presented as an
   official rule, fee, date, diploma or accreditation;
-- with --demo: fictitious demonstration data, flagged `is_demo` or named
-  "(démo)": two levels, a class, two locations ("Campus Horizon", "Annexe
-  Les Manguiers"), demo news, and one account per portal role (parent with a
-  VERIFIED child, teacher with a course and a weekly slot, staff with a
+- with --demo: fictitious demonstration data — one account per portal role
+  (parent with two VERIFIED children, mathematics teacher, staff with a
   function, gate guardian) whose password is ISBREE_DEMO_PASSWORD (never
-  stored nor printed; reserved .test addresses);
+  stored nor printed; reserved .test addresses), the school life around them
+  (isbree_world: classes, timetable, marks, attendance, fees) and news and
+  role resources flagged `is_demo`. The public site and the portal state once,
+  in their footer, that these data are fictitious;
 - with --images DIR: the illustration images (re-encoded, EXIF removed),
   always flagged `is_illustration` (they do not show ISBREE).
 
-Idempotent: every object is looked up first; nothing is deleted or rewritten
-(an existing content keeps the school's edits).
+Idempotent: every object is looked up first; nothing is deleted. A content is
+rewritten only while it still holds the first seed's text (titles marked
+"(démonstration)", names "… Démo", text ending with the provisional notice):
+an existing content edited by the school keeps its edits.
 """
 
+import hashlib
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 from django.utils import timezone
 
 from apps.academics import services as academics
-from apps.academics.models import AcademicYear, AcademicYearStatus, Level, PedagogicalCategory, SchoolClass, Subject
+from apps.academics.models import AcademicYear, AcademicYearStatus
 from apps.accounts import activation
 from apps.accounts.models import MembershipRole, MembershipStatus, Role, RoleCode, SchoolMembership, User
+from apps.communication.attachments import private_storage
 from apps.core.models import School
 from apps.core.services import FirstAdmin, SchoolProvisioningService
-from apps.gradebook import services as gradebook
-from apps.gradebook.models import Course
 from apps.people import parent_workflow
 from apps.people import services as people
-from apps.people.models import EmployeeType, ParentStudent, RegistrationRequest, StaffFunction, Student
+from apps.people.models import EmployeeType, RegistrationRequest, StaffFunction
 
+from . import files
+from . import isbree_world as world
 from . import services as web
-from .models import ContentImage, FaqEntry, NewsArticle, Page, RoleResource, SiteLocation, SiteProfile
+from .models import (
+    ContentImage,
+    FaqEntry,
+    NewsArticle,
+    Page,
+    PublicationStatus,
+    RoleResource,
+    SiteLocation,
+    SiteProfile,
+)
 
 CODE = "ISBREE"
 DEMO_DOMAIN = "isbree.test"
 PRODUCTION_SETTINGS = "config.settings.production"
 DEFAULT_PHONE = "+237698686729"  # given by the school in the specification
+
+# Fictitious names of the demo accounts (the first demo seed called them all "<first name> Démo").
+DEMO_PEOPLE = {
+    "teacher": ("Samuel", "Ateba"),
+    "staff": ("Agnès", "Biloa"),
+    "guardian": ("Marc", "Owona"),
+    "parent": ("Claire", "Mballa"),
+}
+LEGACY_LAST_NAME = "Démo"
 
 
 @dataclass
@@ -291,8 +316,15 @@ def _editorial(w):
     profile, created = SiteProfile.objects.get_or_create(school=school, defaults={**PROFILE, "to_validate": True})
     if created:
         w.created.append("présentation de l'établissement")
-    for order, (kind, slug, title, summary, body, audiences) in enumerate(PAGES):
-        if not Page.objects.filter(school=school, slug=slug).exists():
+    for order, (kind, slug, title, summary, seeded_body, audiences) in enumerate(PAGES):
+        # The provisional status is shown from the `to_validate` flag: the same
+        # sentence at the end of the text only repeated it (first seed).
+        body = seeded_body.removesuffix(f"\n\n{PROVISIONAL}")
+        existing = Page.objects.filter(school=school, slug=slug).first()
+        if existing is not None and existing.body == seeded_body != body:
+            web.save_content("pages", school, actor=actor, values={"body": body}, instance=existing)
+            w.created.append(f"page {slug} : mention provisoire en double retirée")
+        if existing is None:
             web.save_content(
                 "pages",
                 school,
@@ -333,132 +365,242 @@ def _editorial(w):
 # Demonstration (--demo): fictitious, flagged
 # =============================================================================
 
-DEMO_NEWS = [
-    (
-        "journee-portes-ouvertes",
-        "Journée portes ouvertes (démonstration)",
-        "EVENT",
-        "Une actualité fictive pour présenter la mise en page des événements.",
-        ["PUBLIC", "PARENT"],
-    ),
-    (
-        "rentree-scolaire",
-        "Préparer la rentrée (démonstration)",
-        "NEWS",
-        "Une actualité fictive : les informations réelles de rentrée seront publiées par l'établissement.",
-        ["PUBLIC", "PARENT", "TEACHER", "STAFF"],
-    ),
-    (
-        "reunion-equipe",
-        "Réunion de l'équipe (démonstration)",
-        "ANNOUNCEMENT",
-        "Une annonce fictive réservée au personnel.",
-        ["TEACHER", "STAFF"],
-    ),
-]
+
+def _saturday_after(day):
+    return day + timedelta(days=(5 - day.weekday()) % 7)
 
 
-def _demo_content(w, klass):
-    school, actor = w.school, w.admin
-    for order, (name, description, address, is_main) in enumerate(
-        [
-            (
-                "Établissement ISBREE",
-                "Le site de l'établissement.",
-                "Etoug-Ebe, Yaoundé (adresse exacte à confirmer)",
-                True,
-            ),
-            ("Campus Horizon", "Lieu FICTIF de démonstration.", "", False),
-            ("Annexe Les Manguiers", "Lieu FICTIF de démonstration.", "", False),
-        ]
-    ):
-        if not SiteLocation.objects.filter(school=school, name=name).exists():
-            web.save_content(
-                "locations",
-                school,
-                actor=actor,
-                values={
-                    "name": name,
-                    "description": description,
-                    "address_text": address,
-                    "is_main": is_main,
-                    "status": "PUBLISHED",
-                    "is_demo": not is_main,
-                    "to_validate": is_main,
-                    "order": order,
-                },
-            )
-            w.created.append(f"lieu {name}")
-    for slug, title, category, summary, audiences in DEMO_NEWS:
-        if not NewsArticle.objects.filter(school=school, slug=slug).exists():
-            web.save_content(
-                "news",
-                school,
-                actor=actor,
-                values={
-                    "slug": slug,
-                    "title": title,
-                    "category": category,
-                    "summary": summary,
-                    "body": f"{summary}\n\nCette actualité est une donnée de démonstration.",
-                    "audiences": audiences,
-                    "status": "PUBLISHED",
-                    "is_demo": True,
-                },
-            )
-            w.created.append(f"actualité {slug}")
-    resources = [
+def demo_news(y):
+    """Fictitious news of the school year starting in September of `y`:
+    (slug, title, category, published on, event date, summary, body, audiences)."""
+    return [
+        (
+            "rentree-scolaire",
+            f"Une rentrée sereine pour l'année {y}-{y + 1}",
+            "NEWS",
+            date(y, 9, 4),
+            None,
+            "Les élèves de la 6e à la 3e ont retrouvé leurs classes : emplois du temps, fournitures et premiers repères.",
+            "Les quatre classes du premier cycle ont fait leur rentrée dans le calme. Chaque élève a reçu son emploi "
+            "du temps et sa carte d'élève, présentée chaque matin au portail.\n\n## Les premiers jours\n- Accueil "
+            "des classes par leur professeur principal\n- Présentation du règlement intérieur\n- Remise des "
+            "listes de fournitures, aussi consultables dans l'Espace ISBREE\n\nLes familles retrouvent l'emploi du "
+            "temps, les notes et les absences dans l'application Parent.",
+            ["PUBLIC", "PARENT", "TEACHER", "STAFF"],
+        ),
+        (
+            "reunion-equipe",
+            "Conseil pédagogique de début d'année",
+            "ANNOUNCEMENT",
+            date(y, 9, 9),
+            None,
+            "L'équipe enseignante a arrêté les progressions et le calendrier des évaluations du premier trimestre.",
+            "Le conseil pédagogique a réuni les professeurs des sept disciplines.\n\n## Décisions\n- Deux "
+            "évaluations par séquence et par matière : une interrogation écrite et un devoir surveillé\n- Saisie "
+            "des notes dans l'application Enseignant au plus tard une semaine après l'évaluation\n- Progressions "
+            "publiées dans la rubrique Ressources",
+            ["TEACHER", "STAFF"],
+        ),
+        (
+            "semaine-de-la-lecture",
+            "Semaine de la lecture : les 6e à la bibliothèque",
+            "NEWS",
+            date(y, 10, 2),
+            None,
+            "Pendant une semaine, les élèves de 6e A ont découvert la bibliothèque et présenté leur livre préféré.",
+            "Chaque jour, une heure de français a eu lieu à la bibliothèque. Les élèves ont choisi un roman, puis "
+            "l'ont présenté à leurs camarades en quelques minutes.\n\nL'activité se poursuit toute l'année : un "
+            "créneau de lecture libre est proposé chaque vendredi.",
+            ["PUBLIC", "PARENT"],
+        ),
+        (
+            "journee-portes-ouvertes",
+            "Journée portes ouvertes",
+            "EVENT",
+            date(y, 10, 12),
+            _saturday_after(date(y, 11, 10)),
+            "Familles et futurs élèves sont invités à découvrir les classes, les enseignants et la vie de l'établissement.",
+            "## Au programme\n- Visite des salles de classe\n- Rencontre avec les professeurs principaux\n- "
+            "Présentation de la préinscription en ligne et de l'Espace ISBREE\n\nL'entrée est libre, de 9 h à 13 h.",
+            ["PUBLIC", "PARENT"],
+        ),
+        (
+            "rencontre-parents-professeurs",
+            "Rencontre parents-professeurs du premier trimestre",
+            "EVENT",
+            date(y, 10, 15),
+            _saturday_after(date(y, 11, 21)),
+            "Chaque famille rencontre le professeur principal pour faire le point sur les résultats de la séquence 1.",
+            "Les rendez-vous durent quinze minutes. Les notes de la séquence 1 sont déjà consultables dans "
+            "l'application Parent : elles serviront de base à l'échange.\n\nLes familles qui ne peuvent pas venir "
+            "peuvent demander un autre créneau à l'administration.",
+            ["PARENT", "TEACHER"],
+        ),
+        (
+            "tournoi-inter-classes",
+            "Tournoi de football inter-classes",
+            "EVENT",
+            date(y, 11, 20),
+            date(y, 12, 11),
+            "Les quatre classes s'affrontent avant les congés de Noël, encadrées par le professeur d'EPS.",
+            "Les matchs se jouent pendant les heures d'EPS de la semaine, la finale le vendredi après-midi. "
+            "Chaque classe présente une équipe mixte.",
+            ["PUBLIC", "PARENT", "TEACHER", "STAFF"],
+        ),
+    ]
+
+
+# Titles given by the first demo seed (renamed only while still unchanged).
+LEGACY_NEWS_TITLES = {
+    "journee-portes-ouvertes": "Journée portes ouvertes (démonstration)",
+    "rentree-scolaire": "Préparer la rentrée (démonstration)",
+    "reunion-equipe": "Réunion de l'équipe (démonstration)",
+}
+LEGACY_LOCATIONS = {"Campus Horizon", "Annexe Les Manguiers"}  # invented places: archived
+# Cover of each demo news item: an illustration (IMAGE_TEXTS), by its alternative text.
+NEWS_COVERS = {
+    "rentree-scolaire": "Des élèves dans la cour d'un établissement",
+    "reunion-equipe": "Un amphithéâtre aux tables alignées",
+    "semaine-de-la-lecture": "Des élèves travaillent en classe",
+    "journee-portes-ouvertes": "Un bâtiment scolaire moderne entouré de verdure",
+    "rencontre-parents-professeurs": "Une salle de classe lumineuse",
+    "tournoi-inter-classes": "Des enfants jouent au football sur un terrain en herbe",
+}
+
+
+def demo_resources(klass):
+    """(kind, title, legacy title of the first seed, body, audiences, scope)."""
+    return [
         (
             "SUPPLIES",
-            f"Liste de fournitures — {klass.name} (démonstration)",
-            "Exemple de liste : cahiers, stylos, règle. La liste officielle sera publiée par l'établissement.",
+            f"Liste de fournitures — {klass.name}",
+            "Liste de fournitures — 6e A (démo) (démonstration)",
+            "- 6 cahiers de 200 pages grand format\n- 4 cahiers de 100 pages\n- 1 cahier de travaux pratiques\n- "
+            "Stylos bleu, rouge, vert et noir, crayon à papier, gomme\n- Règle de 30 cm, équerre, rapporteur, compas\n"
+            "- Calculatrice de collège\n- Dictionnaire de français\n- Tenue de sport pour l'EPS",
             ["PARENT"],
             {"school_class": klass},
         ),
         (
             "PRACTICAL_INFO",
+            "Horaires et entrées des élèves",
             "Horaires et entrées (démonstration)",
-            "Exemple d'information pratique destinée aux familles.",
+            "- Ouverture du portail : 7 h\n- Début des cours : 7 h 30 ; après 7 h 30, l'élève est noté en retard\n- "
+            "Fin des cours : 14 h 50, le mercredi 11 h 25\n- À l'entrée, l'élève présente sa carte (QR code) au "
+            "gardien : la présence est enregistrée et visible dans l'application Parent\n- Toute absence doit être "
+            "justifiée auprès de l'administration",
             ["PARENT"],
             {},
         ),
         (
             "PROGRAMME",
-            f"Progression de mathématiques — {klass.level.name} (démonstration)",
-            "Exemple de progression pédagogique publiée pour les enseignants du niveau.",
+            f"Progression de mathématiques — {klass.level.name}",
+            "Progression de mathématiques — 6e (démo) (démonstration)",
+            "## Premier trimestre\n- Séquence 1 : nombres entiers et décimaux, opérations\n- Séquence 2 : droites, "
+            "segments, cercles ; fractions\n\n## Deuxième trimestre\n- Séquence 3 : angles, symétrie axiale\n- "
+            "Séquence 4 : proportionnalité, pourcentages\n\n## Troisième trimestre\n- Séquence 5 : périmètres et "
+            "aires\n- Séquence 6 : volumes, organisation de données",
             ["TEACHER"],
             {"level": klass.level},
         ),
         (
             "MISSION",
+            "Missions du secrétariat",
             "Missions du secrétariat (démonstration)",
-            "Exemple de description de poste : accueil, gestion des dossiers, relais d'information.",
+            "- Accueil des familles et des visiteurs\n- Tenue des dossiers des élèves et des préinscriptions\n- "
+            "Encaissement des frais au guichet et remise des reçus\n- Relais des informations de l'administration",
             ["STAFF"],
-            {"staff_function": StaffFunction.objects.filter(school=school, code="SECRETARIAT").first()},
+            {"staff_function": None},  # filled in _demo_content
         ),
         (
             "PROCEDURE",
+            "Contrôle des entrées au portail",
             "Contrôle des accès au portail (démonstration)",
-            "Exemple de procédure : vérifier le QR code de l'élève avec l'application Gardien, orienter les visiteurs vers l'accueil.",
+            "- Scanner la carte (QR code) de chaque élève avec l'application Gardien\n- Un élève sans carte est "
+            "orienté vers l'administration\n- Les visiteurs sont accompagnés jusqu'à l'accueil\n- Signaler tout "
+            "incident à l'administration le jour même",
             ["GUARDIAN"],
             {},
         ),
     ]
-    for kind, title, body, audiences, scope in resources:
-        if not RoleResource.objects.filter(school=school, title=title).exists():
+
+
+def _demo_content(w, klass):
+    school, actor = w.school, w.admin
+    main = "Établissement ISBREE"
+    if not SiteLocation.objects.filter(school=school, name=main).exists():
+        web.save_content(
+            "locations",
+            school,
+            actor=actor,
+            values={
+                "name": main,
+                "description": "Le site de l'établissement.",
+                "address_text": "Etoug-Ebe, Yaoundé (adresse exacte à confirmer)",
+                "is_main": True,
+                "status": "PUBLISHED",
+                "is_demo": False,
+                "to_validate": True,
+                "order": 0,
+            },
+        )
+        w.created.append(f"lieu {main}")
+    for location in SiteLocation.objects.filter(
+        school=school, name__in=LEGACY_LOCATIONS, is_demo=True, status=PublicationStatus.PUBLISHED
+    ):
+        web.save_content("locations", school, actor=actor, values={"status": "ARCHIVED"}, instance=location)
+        w.created.append(f"lieu fictif archivé : {location.name}")
+
+    tz = ZoneInfo(school.timezone)
+    today = timezone.localdate()
+    year = klass.academic_year.start_date.year
+    for slug, title, category, published, event_date, summary, body, audiences in demo_news(year):
+        values = {
+            "slug": slug,
+            "title": title,
+            "category": category,
+            "summary": summary,
+            "body": body,
+            "event_date": event_date,
+            "audiences": audiences,
+        }
+        article = NewsArticle.objects.filter(school=school, slug=slug).first()
+        if article is not None and article.title != LEGACY_NEWS_TITLES.get(slug):
+            continue  # exists and was not the first seed's text: the school's edits are kept
+        if article is None and published > today:
+            continue  # not published yet: added by a later run
+        row = web.save_content(
+            "news",
+            school,
+            actor=actor,
+            values={**values, "status": "PUBLISHED", "is_demo": True},
+            instance=article,
+        )
+        NewsArticle.objects.filter(pk=row.pk).update(published_at=datetime.combine(published, time(9), tz))
+        w.created.append(f"actualité {slug}" + (" réécrite" if article else ""))
+    # Covers: only for a demo news item still without one (an edited cover is kept).
+    for slug, alt in NEWS_COVERS.items():
+        image = ContentImage.objects.filter(school=school, alt_text=alt).first()
+        article = NewsArticle.objects.filter(school=school, slug=slug, is_demo=True, cover__isnull=True).first()
+        if image is not None and article is not None:
+            web.save_content("news", school, actor=actor, values={"slug": slug, "cover": image}, instance=article)
+            w.created.append(f"couverture de l'actualité {slug}")
+
+    function = StaffFunction.objects.filter(school=school, code="SECRETARIAT").first()
+    for kind, title, legacy, body, audiences, scope in demo_resources(klass):
+        if "staff_function" in scope:
+            scope = {"staff_function": function}
+        values = {"kind": kind, "title": title, "body": body, "audiences": audiences}
+        old = RoleResource.objects.filter(school=school, title=legacy).first()
+        if old is not None:
+            web.save_content("resources", school, actor=actor, values=values, instance=old)
+            w.created.append(f"ressource renommée : {title}")
+        elif not RoleResource.objects.filter(school=school, title=title).exists():
             web.save_content(
                 "resources",
                 school,
                 actor=actor,
-                values={
-                    "kind": kind,
-                    "title": title,
-                    "body": body,
-                    "audiences": audiences,
-                    "status": "PUBLISHED",
-                    "is_demo": True,
-                    **{k: v for k, v in scope.items() if v is not None},
-                },
+                values={**values, "status": "PUBLISHED", "is_demo": True, **{k: v for k, v in scope.items() if v}},
             )
             w.created.append(f"ressource {kind}")
 
@@ -503,118 +645,150 @@ def _account(w, *, email, first_name, last_name, role, password):
     return membership
 
 
+def _rename_user(w, membership, first_name, last_name):
+    """The first demo seed named every account "<first name> Démo": give the
+    person a full fictitious name (only when the seeded name is unchanged)."""
+    user = membership.user
+    if user.last_name == LEGACY_LAST_NAME and user.first_name == first_name:
+        user.last_name = last_name
+        user.save(update_fields=["last_name"])
+        w.created.append(f"nom complété : {first_name} {last_name}")
+
+
+DEMO_LOGINS = [f"{prefix}.demo@{DEMO_DOMAIN}" for prefix in ("parent", "enseignant", "personnel", "gardien")]
+
+
+def demo_missing():
+    """What the demonstration cannot work without (read only; [] = complete):
+    the school, the four active demo accounts with a password, the demo
+    parent's verified child, a class with its pupils."""
+    from apps.people.models import ParentStudent, StudentEnrollment
+
+    school = School.objects.filter(code=CODE).first()
+    if school is None:
+        return [f"établissement {CODE}"]
+    missing = []
+    for email in DEMO_LOGINS:
+        member = (
+            SchoolMembership.objects.filter(school=school, user__email__iexact=email).select_related("user").first()
+        )
+        if member is None or member.status != MembershipStatus.ACTIVE or not member.user.is_active:
+            missing.append(f"compte actif {email}")
+        elif not member.user.has_usable_password():
+            missing.append(f"mot de passe du compte {email}")
+    if not ParentStudent.objects.filter(
+        parent__membership__user__email__iexact=DEMO_LOGINS[0], identity_verified=True, active=True
+    ).exists():
+        missing.append("enfant vérifié du parent de démonstration")
+    if not StudentEnrollment.objects.filter(school=school, status="ACTIVE").exists():
+        missing.append("élèves inscrits dans une classe")
+    return missing
+
+
+def _shared_password(w, membership, password):
+    """Public demo (ISBREE_PUBLIC_DEMO): the portal publishes ISBREE_DEMO_PASSWORD
+    for the four read-only demo accounts. An account created with an earlier
+    value would refuse the published one (401 at every login), so their password
+    follows the configured value. Never isbree.admin, never outside the public demo."""
+    user = membership.user
+    if getattr(settings, "ISBREE_PUBLIC_DEMO", False) and password and not user.check_password(password):
+        user.set_password(password)
+        user.save(update_fields=["password"])
+        w.created.append(f"mot de passe partagé aligné : {user.email}")
+
+
 def _demo(w, password):
     school, actor = w.school, w.admin
     year = _year(w)
-    levels = []
-    for order, (code, name) in enumerate([("6E", "6e (démo)"), ("5E", "5e (démo)")]):
-        level = Level.objects.filter(school=school, code=code).first() or academics.create_level(
-            school, actor=actor, code=code, name=name, cycle="Démonstration", order_index=order, public_visible=True
-        )
-        levels.append(level)
-    klass = SchoolClass.objects.filter(
-        school=school, academic_year=year, name="6e A (démo)"
-    ).first() or academics.create_class(school, actor=actor, name="6e A (démo)", level=levels[0], academic_year=year)
-    category = PedagogicalCategory.objects.filter(school=school, code="SCI").first() or academics.create_category(
-        school, actor=actor, code="SCI", name="Sciences (démo)"
-    )
-    maths = Subject.objects.filter(school=school, code="MATH").first() or academics.create_subject(
-        school, actor=actor, code="MATH", name="Mathématiques", category=category
-    )
+    classes, subjects = world.structure(w, year)
+    maths = subjects["MATH"]
     function = StaffFunction.objects.filter(school=school, code="SECRETARIAT").first() or StaffFunction.objects.create(
-        school=school, code="SECRETARIAT", name="Secrétariat (démo)"
+        school=school, code="SECRETARIAT", name="Secrétariat"
     )
-    # Teacher with a course.
+    if function.name == "Secrétariat (démo)":
+        function.name = "Secrétariat"
+        function.save(update_fields=["name"])
+    # The demo teacher: mathematics in every class (isbree_world).
+    first, last = DEMO_PEOPLE["teacher"]
     teacher_email = f"enseignant.demo@{DEMO_DOMAIN}"
     teacher_member = SchoolMembership.objects.filter(school=school, user__email__iexact=teacher_email).first()
     if teacher_member is None:
         teacher = people.admin_create_teacher(
             school,
             actor=actor,
-            first_name="Samuel",
-            last_name="Démo",
+            first_name=first,
+            last_name=last,
             email=teacher_email,
-            employee_number="ENS-DEMO-01",
-            pedagogical_category=category,
+            employee_number="ENS-MATH-01",
+            pedagogical_category=maths.category,
             primary_subject=maths,
         )
         teacher_member = teacher.employee.membership
         w.created.append(f"enseignant {teacher_email}")
+    _rename_user(w, teacher_member, first, last)
     if not teacher_member.user.has_usable_password():
         _, code = activation.issue_activation(teacher_member, actor=actor)
         activation.complete_activation(code, _password(password))
     teacher = teacher_member.employee_profile.teacher_profile
-    if not Course.objects.filter(school_class=klass, subject=maths, teacher=teacher).exists():
-        gradebook.create_course(klass, maths, teacher, actor=actor, weekly_hours=4)
     # Staff member with a function.
+    first, last = DEMO_PEOPLE["staff"]
     staff_member = _account(
         w,
         email=f"personnel.demo@{DEMO_DOMAIN}",
-        first_name="Agnès",
-        last_name="Démo",
+        first_name=first,
+        last_name=last,
         role=RoleCode.STAFF,
         password=password,
     )
+    _rename_user(w, staff_member, first, last)
     if not hasattr(staff_member, "employee_profile"):
-        employee = people.create_employee(staff_member, employee_number="PER-DEMO-01", employee_type=EmployeeType.STAFF)
-        staff = people.create_staff(employee, staff_number="PER-DEMO-01")
+        employee = people.create_employee(staff_member, employee_number="PER-SEC-01", employee_type=EmployeeType.STAFF)
+        staff = people.create_staff(employee, staff_number="PER-SEC-01")
         people.assign_staff_function(staff, function, actor=actor)
     # Gate guardian.
+    first, last = DEMO_PEOPLE["guardian"]
     guardian_email = f"gardien.demo@{DEMO_DOMAIN}"
     guardian_member = SchoolMembership.objects.filter(school=school, user__email__iexact=guardian_email).first()
     if guardian_member is None:
         guardian_member = people.admin_create_guardian(
-            school, actor=actor, first_name="Marc", last_name="Démo", email=guardian_email, guardian_number="G-DEMO-01"
+            school, actor=actor, first_name=first, last_name=last, email=guardian_email, guardian_number="G-01"
         ).membership
         w.created.append(f"gardien {guardian_email}")
+    _rename_user(w, guardian_member, first, last)
     if not guardian_member.user.has_usable_password():
         _, code = activation.issue_activation(guardian_member, actor=actor)
         activation.complete_activation(code, _password(password))
-    # A pupil and a parent with a VERIFIED link (real workflow, ADR 0026).
-    student = Student.objects.filter(
-        school=school, student_number="ISB-DEMO-001"
-    ).first() or people.admin_create_student(
-        school,
-        actor=actor,
-        enrollment={"school_class": klass},
-        student_number="ISB-DEMO-001",
-        registration_number="ISB-INS-DEMO-001",
-        first_name="Léa",
-        last_name="Démo",
-        date_of_birth=date(2014, 3, 12),
-        sex="F",
-    )
+    # A parent, then her two children with VERIFIED links (real workflow, ADR 0026).
+    first, last = DEMO_PEOPLE["parent"]
     parent_email = f"parent.demo@{DEMO_DOMAIN}"
     if not User.objects.filter(email__iexact=parent_email).exists():
         parent_workflow.register_parent(
-            first_name="Claire",
-            last_name="Démo",
+            first_name=first,
+            last_name=last,
             email=parent_email,
             password=_password(password),
             school_code=school.code,
         )
         w.created.append(f"parent {parent_email}")
     parent_member = SchoolMembership.objects.get(school=school, user__email__iexact=parent_email)
+    _rename_user(w, parent_member, first, last)
     pending = RegistrationRequest.objects.filter(membership=parent_member, status="PENDING").first()
     if pending is not None:
         parent_workflow.approve_registration(pending, actor=actor)
         parent_member = SchoolMembership.objects.get(pk=parent_member.pk)  # ACTIVE now, with the PARENT role
-    if not ParentStudent.objects.filter(
-        parent__membership=parent_member, student=student, identity_verified=True
-    ).exists():
-        request = parent_workflow.request_link(
-            parent_member,
-            student_number=student.student_number,
-            date_of_birth=student.date_of_birth,
-            relationship_type="MOTHER",
-            document_type="CNI",
-            document_number="DEMO-0001",
-        )
-        parent_workflow.check_identity(request, actor=actor, document_type="CNI", document_number="DEMO-0001")
-        parent_workflow.record_student_approval(request, actor=actor, decision="APPROVED", note="Démonstration ISBREE")
-        parent_workflow.approve_link_request(request, actor=actor, can_receive_notifications=True)
-        w.created.append("lien parent-enfant vérifié (démo)")
-    _demo_content(w, klass)
+    for member in (teacher_member, staff_member, guardian_member, parent_member):
+        member.user.refresh_from_db()
+        _shared_password(w, member, password)
+    world.build(
+        w,
+        year=year,
+        classes=classes,
+        subjects=subjects,
+        maths_teacher=teacher,
+        parent_member=parent_member,
+        guardian_member=guardian_member,
+    )
+    _demo_content(w, classes["6e A"])
 
 
 # =============================================================================
@@ -636,13 +810,31 @@ IMAGE_TEXTS = {
 }
 
 
+def _restore_file(w, image, path):
+    """A host without a persistent disk (the free public demo) loses the stored
+    files at each restart while the database keeps their rows: put the
+    illustration back at the same path, re-encoded by the same checks."""
+    storage = private_storage()
+    if storage.exists(image.storage_path):
+        return
+    checked = files.check_image(SimpleUploadedFile(path.name, path.read_bytes()))
+    storage.save(image.storage_path, ContentFile(checked.content))
+    digest = hashlib.sha256(checked.content).hexdigest()
+    if (image.sha256, image.size) != (digest, len(checked.content)):
+        image.sha256, image.size = digest, len(checked.content)
+        image.save(update_fields=["sha256", "size", "updated_at"])
+    w.created.append(f"fichier d'image restauré : {path.name}")
+
+
 def _images(w, folder):
     folder = Path(folder)
     for order, path in enumerate(sorted(folder.iterdir(), key=lambda p: (len(p.stem), p.stem))):
         if path.stem not in IMAGE_TEXTS or path.suffix.lower() not in (".jpg", ".jpeg", ".png", ".webp"):
             continue
         alt, caption, category = IMAGE_TEXTS[path.stem]
-        if ContentImage.objects.filter(school=w.school, alt_text=alt).exists():
+        existing = ContentImage.objects.filter(school=w.school, alt_text=alt).first()
+        if existing is not None:
+            _restore_file(w, existing, path)
             continue
         upload = SimpleUploadedFile(path.name, path.read_bytes())
         web.add_image(
@@ -702,8 +894,8 @@ def seed(*, password=None, admin_password=None, demo=False, images=None, contact
         w.school.save(update_fields=[*changed, "updated_at"])
         w.created.append("coordonnées de contact")
     _editorial(w)
+    if images:  # first: the demo news use them as covers
+        _images(w, images)
     if demo:
         _demo(w, password)
-    if images:
-        _images(w, images)
     return w

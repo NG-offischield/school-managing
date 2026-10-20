@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Figure } from "@/components/figure";
-import { DemoBadge, Unavailable } from "@/components/notices";
+import { Unavailable } from "@/components/notices";
 import { getArticle, getNews } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { Markup } from "@/lib/markup";
@@ -50,7 +50,6 @@ export default async function ArticlePage({ params }: PageProps<"/actualites/[sl
           <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted">
             <span className="font-semibold text-terracotta">{NEWS_CATEGORIES[a.category] ?? "Actualité"}</span>
             {date ? <span>· {a.event_date ? `Le ${date}` : `Publié le ${date}`}</span> : null}
-            <DemoBadge show={a.is_demo} />
           </div>
           <h1 className="mt-3 max-w-3xl text-4xl sm:text-5xl">{a.title}</h1>
           <p className="mt-4 max-w-2xl text-lg text-muted">{a.summary}</p>

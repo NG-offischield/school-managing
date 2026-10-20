@@ -10,6 +10,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.test import override_settings
 from rest_framework.test import APIClient
 
+from apps.accounts.models import SchoolMembership
 from apps.accounts.services import ClientContext, login
 from apps.website.isbree_seed import seed
 
@@ -66,6 +67,33 @@ def test_public_demo_requires_a_distinct_administrator_password():
     result = seed(password=shared, admin_password="Admin-Prive-2026-Solide")
     admin = result.admin.user
     assert admin.check_password("Admin-Prive-2026-Solide") and not admin.check_password(shared)
+
+
+DEMO_LOGINS = [
+    "parent.demo@isbree.test",
+    "enseignant.demo@isbree.test",
+    "personnel.demo@isbree.test",
+    "gardien.demo@isbree.test",
+]
+
+
+def test_the_published_password_opens_the_demo_accounts_even_after_it_changed():
+    """The portal publishes ISBREE_DEMO_PASSWORD. Accounts created with an
+    earlier value used to keep it (every published login refused with 401):
+    in the public demo, the seed aligns them; the administrator is never touched."""
+    first, new, admin_password = "Demo-Ancien-2026-Solide", "Demo-Nouveau-2026-Solide", "Admin-Prive-2026-Solide"
+    with override_settings(ISBREE_PUBLIC_DEMO=True):
+        seed(password=first, admin_password=admin_password, demo=True)
+        result = seed(password=new, admin_password=admin_password, demo=True)
+    for email in DEMO_LOGINS:
+        issued = login(email, new, DEVICE, ClientContext())  # the real login service
+        assert issued.access_token, email
+    assert result.admin.user.check_password(admin_password)
+    assert sum("mot de passe partagé aligné" in line for line in result.created) == 4
+
+    # Outside the public demo, an existing password is never changed by the seed.
+    seed(password="Demo-Autre-2026-Solide", demo=True)
+    assert all(SchoolMembership.objects.get(user__email=email).user.check_password(new) for email in DEMO_LOGINS)
 
 
 def test_demo_settings_keep_the_production_hardening():

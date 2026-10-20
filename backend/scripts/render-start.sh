@@ -6,6 +6,17 @@
 set -eu
 
 python manage.py migrate --noinput
-# Idempotent: creates the fictitious demo data once, then changes nothing.
-python manage.py seed_isbree --demo
+# Idempotent: creates the fictitious demo data once, then only completes them
+# (dated sessions and attendance around today) and puts back the illustration
+# files (seed-images/) that a restart without persistent disk erased. One
+# transaction: a failure changes nothing. The API then starts ONLY if what the
+# demo cannot work without
+# is already there (school, the four demo accounts, a verified child...): it
+# keeps serving yesterday's data, with the error in the logs. Otherwise the
+# start fails, rather than an API that looks ready but refuses every login.
+if ! python manage.py seed_isbree --demo --images seed-images; then
+    echo "ERREUR : seed_isbree --demo --images a échoué (trace ci-dessus)." >&2
+    python manage.py seed_isbree --check-demo
+    echo "AVERTISSEMENT : démarrage avec les données de démonstration existantes, sans la mise à jour du seed." >&2
+fi
 exec daphne -b 0.0.0.0 -p "${PORT:-10000}" config.asgi:application

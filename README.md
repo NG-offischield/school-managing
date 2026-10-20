@@ -13,7 +13,7 @@ Le backend est la **seule autorité** pour les permissions, les calculs, la fina
 | Site public ISBREE | <https://isbree-public.onrender.com> |
 | Espace ISBREE (portail) | <https://isbree-portal.onrender.com> |
 | API (santé) | <https://isbree-api.onrender.com/api/v1/health/> |
-| Applications Android (démo) | *lien ajouté une fois la publication vérifiée* |
+| Applications Android (builds debug, arm64) | <https://github.com/NG-offischield/school-managing/releases/tag/demo-apk-2026-10-17> — fichiers publics, aussi proposés par rôle dans l’Espace ISBREE |
 | Vidéo de démonstration | *à compléter après publication de la vidéo* |
 | Dépôt GitHub | <https://github.com/NG-offischield/school-managing> |
 

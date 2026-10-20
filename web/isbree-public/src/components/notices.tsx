@@ -1,29 +1,11 @@
-/** Honesty notices (ADR 0032): demo data, provisional texts, illustrations, outages. */
+/** Honesty notices (ADR 0032): provisional texts, outages. The fictitious data of the
+ * demonstration are stated once, in the footer and on /demonstration (site-footer.tsx). */
 
-export function DemoBanner() {
-  return (
-    <div className="border-b border-line bg-sand/70 text-ink" role="note">
-      <p className="container-page py-1.5 text-center text-xs">
-        Site de démonstration : les éléments marqués « Démo » sont fictifs.
-      </p>
-    </div>
-  );
-}
+import { config } from "@/lib/config";
 
-export function DemoBadge({ show = true }: { show?: boolean }) {
-  if (!show) return null;
-  return (
-    <span
-      className="inline-flex items-center rounded-full border border-line px-2 py-0.5 text-[0.7rem] font-semibold uppercase tracking-wide text-muted"
-      title="Contenu fictif de démonstration"
-    >
-      Démo
-    </span>
-  );
-}
-
+/** In the demonstration every text is provisional: the footer says it once instead. */
 export function ProvisionalNote({ show = true }: { show?: boolean }) {
-  if (!show) return null;
+  if (!show || config.demoMode) return null;
   return (
     <p className="mt-6 text-sm italic text-muted" role="note">
       Texte provisoire, en attente de validation par l&apos;établissement.

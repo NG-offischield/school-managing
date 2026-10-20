@@ -55,7 +55,6 @@ export function Resources({ resources, documentQuery }: { resources: Resource[];
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="font-semibold text-terracotta">{RESOURCE_KINDS[r.kind] ?? "Ressource"}</span>
               {scope ? <span className="text-muted">· {scope}</span> : null}
-              {r.is_demo ? <Badge tone="muted">Démo</Badge> : null}
               {r.to_validate ? <Badge tone="muted">Provisoire</Badge> : null}
             </div>
             <h3 className="text-xl">{r.title}</h3>
@@ -83,7 +82,6 @@ export function News({ news }: { news: NewsItem[] }) {
             <summary className="cursor-pointer list-none">
               <span className="flex flex-wrap items-center gap-2 text-sm text-muted">
                 {formatDate(n.event_date ?? n.published_at)}
-                {n.is_demo ? <Badge tone="muted">Démo</Badge> : null}
               </span>
               <span className="mt-1 block font-serif text-xl">{n.title}</span>
               <span className="mt-1 block text-muted">{n.summary}</span>

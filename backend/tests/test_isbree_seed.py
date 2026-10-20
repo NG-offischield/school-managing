@@ -37,10 +37,10 @@ def test_contents_only_then_demo_then_idempotent(tmp_path):
     assert ParentStudent.objects.filter(
         parent__membership__user__email="parent.demo@isbree.test", identity_verified=True, active=True
     ).exists()
-    assert set(SiteLocation.objects.filter(school=school, is_demo=True).values_list("name", flat=True)) == {
-        "Campus Horizon",
-        "Annexe Les Manguiers",
-    }
+    # Only the school's real location (address still to confirm): no invented campus.
+    assert list(SiteLocation.objects.filter(school=school).values_list("name", "is_demo", "to_validate")) == [
+        ("Établissement ISBREE", False, True)
+    ]
     assert not NewsArticle.objects.filter(school=school, is_demo=False).exists()
     assert not RoleResource.objects.filter(school=school, is_demo=False).exists()
     image = ContentImage.objects.get(school=school)

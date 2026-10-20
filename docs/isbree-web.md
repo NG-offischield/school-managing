@@ -52,7 +52,7 @@ cd web/isbree-portal && npm install && npm run dev   # http://localhost:3001
 
 Comptes de démonstration (`--demo`) :
 
-- `parent.demo@isbree.test` : enfant « Léa Démo », lien vérifié ;
+- `parent.demo@isbree.test` (Claire Mballa) : enfants « Léa Mballa » (6e A) et « Noah Mballa » (4e A), liens vérifiés ;
 - `enseignant.demo@isbree.test`, `personnel.demo@isbree.test`, `gardien.demo@isbree.test`.
 
 Le mot de passe est celui passé dans `ISBREE_DEMO_PASSWORD`. En local, il est conservé dans `.env.isbree.local`, qui est ignoré par git.

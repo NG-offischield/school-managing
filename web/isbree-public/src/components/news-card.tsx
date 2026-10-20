@@ -5,7 +5,6 @@ import { NEWS_CATEGORIES, type NewsSummary } from "@/lib/types";
 
 import { Figure } from "./figure";
 import { LogoMark } from "./logo";
-import { DemoBadge } from "./notices";
 
 export function NewsCard({ article }: { article: NewsSummary }) {
   const date = article.event_date ? formatDate(article.event_date) : formatDate(article.published_at);
@@ -27,7 +26,6 @@ export function NewsCard({ article }: { article: NewsSummary }) {
               <span>{article.event_date ? `Le ${date}` : date}</span>
             </>
           ) : null}
-          <DemoBadge show={article.is_demo} />
         </div>
         <h3 className="text-xl">
           <Link href={`/actualites/${article.slug}`} className="after:absolute after:inset-0 group-hover:underline">

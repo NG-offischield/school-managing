@@ -22,11 +22,20 @@ type Props = {
   relationships: Choice[];
   privacyHref: string | null;
   action?: typeof submitPreEnrollment;
+  /** Public demonstration: the request stays in the demo database, nobody calls back. */
+  demo?: boolean;
 };
 
 const initial: SubmitState = { status: "idle" };
 
-export function PreEnrollmentForm({ levels, years, relationships, privacyHref, action = submitPreEnrollment }: Props) {
+export function PreEnrollmentForm({
+  levels,
+  years,
+  relationships,
+  privacyHref,
+  action = submitPreEnrollment,
+  demo = false,
+}: Props) {
   const [state, formAction, pending] = useActionState(action, initial);
   const [localErrors, setLocalErrors] = useState<FieldErrors | null>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
@@ -69,16 +78,25 @@ export function PreEnrollmentForm({ levels, years, relationships, privacyHref, a
         {state.reference ? (
           <p className="mt-3">
             Référence de votre demande : <strong className="font-mono text-lg">{state.reference}</strong>. Conservez-la :
-            elle vous sera utile pour tout échange avec l&apos;établissement.
+            {demo ? "elle identifie la demande dans la base de démonstration." : "elle vous sera utile pour tout échange avec l'établissement."}
           </p>
         ) : null}
-        <p className="mt-3">
-          L&apos;établissement examine chaque demande. Vous serez contacté par téléphone ou par e-mail. Une préinscription
-          n&apos;est pas une inscription définitive.
-        </p>
-        <p className="mt-3 text-muted">
-          Aucun e-mail automatique n&apos;est envoyé à ce stade : la réponse vient directement de l&apos;établissement.
-        </p>
+        {demo ? (
+          <p className="mt-3">
+            Cette demande est enregistrée dans la base de démonstration : elle n&apos;est pas transmise à
+            l&apos;établissement et personne ne vous contactera.
+          </p>
+        ) : (
+          <>
+            <p className="mt-3">
+              L&apos;établissement examine chaque demande. Vous serez contacté par téléphone ou par e-mail. Une
+              préinscription n&apos;est pas une inscription définitive.
+            </p>
+            <p className="mt-3 text-muted">
+              Aucun e-mail automatique n&apos;est envoyé à ce stade : la réponse vient directement de l&apos;établissement.
+            </p>
+          </>
+        )}
         <Link href="/" className="btn btn-secondary mt-6">
           Retour à l&apos;accueil
         </Link>

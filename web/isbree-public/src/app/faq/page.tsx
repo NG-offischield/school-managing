@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { DemoBadge, EmptyState, ProvisionalNote, Unavailable } from "@/components/notices";
+import { EmptyState, ProvisionalNote, Unavailable } from "@/components/notices";
 import { PageHeader } from "@/components/page-header";
 import { getFaq } from "@/lib/api";
 import { FAQ_CATEGORIES, type Faq } from "@/lib/types";
@@ -55,7 +55,7 @@ export default async function FaqPage() {
                     <details key={entry.id} className="group p-5">
                       <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 text-lg font-semibold">
                         <span>
-                          {entry.question} <DemoBadge show={entry.is_demo} />
+                          {entry.question}
                         </span>
                         <span aria-hidden="true" className="text-2xl text-terracotta transition-transform group-open:rotate-45">
                           +

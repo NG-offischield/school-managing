@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { Figure } from "@/components/figure";
 import { EmptyState, Unavailable } from "@/components/notices";
 import { PageHeader } from "@/components/page-header";
-import { getSite } from "@/lib/api";
+import { getGallery, getSite } from "@/lib/api";
 import type { Level } from "@/lib/types";
 
 export const metadata: Metadata = {
@@ -13,7 +14,9 @@ export const metadata: Metadata = {
 
 /** Only the levels the school really offers (Level.public_visible): nothing invented. */
 export default async function FormationsPage() {
-  const site = await getSite();
+  const [site, gallery] = await Promise.all([getSite(), getGallery()]);
+  // Class pictures not used elsewhere (home page, school life): the last three.
+  const classrooms = gallery.ok ? gallery.data.filter((i) => i.category === "CLASSROOMS").slice(-3) : [];
   const groups = new Map<string, Level[]>();
   if (site.ok) {
     for (const level of site.data.levels) {
@@ -54,6 +57,18 @@ export default async function FormationsPage() {
             Année{site.data.years.length > 1 ? "s" : ""} scolaire{site.data.years.length > 1 ? "s" : ""} ouverte
             {site.data.years.length > 1 ? "s" : ""} : {site.data.years.map((y) => y.name).join(", ")}.
           </p>
+        ) : null}
+        {classrooms.length ? (
+          <section aria-labelledby="salles" className="mt-14">
+            <h2 id="salles" className="text-3xl">
+              Les salles de classe
+            </h2>
+            <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {classrooms.map((image) => (
+                <Figure key={image.id} image={image} sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" />
+              ))}
+            </div>
+          </section>
         ) : null}
         <div className="mt-10 flex flex-wrap gap-3">
           <Link href="/admissions/preinscription" className="btn btn-primary">

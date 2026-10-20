@@ -79,11 +79,13 @@ describe("activation", () => {
 });
 
 describe("mobile applications", () => {
-  it("offers a download only for a published release, never a fake link", () => {
+  it("offers a download only for a published file, never a fake link", () => {
     render(
       <Apps
         apps={[
           { app: "PARENT", label: "Application Parent", release: null },
+          // An application without any published file (official or demonstration build).
+          { app: "LIBRARY" as "PARENT", label: "Application Bibliothèque", release: null },
           {
             app: "TEACHER",
             label: "Application Enseignant",
@@ -105,8 +107,15 @@ describe("mobile applications", () => {
       />,
     );
     const links = screen.getAllByRole("link", { name: /Télécharger/ });
-    expect(links).toHaveLength(1);
-    expect(links[0]).toHaveAttribute("href", "/applications/0670a608-9fda-47e2-8f78-453fc6492e5d/telecharger");
+    expect(links).toHaveLength(2);
+    // Parent: no official release, the published debug build of the GitHub Release (lib/mobile-apps.json).
+    expect(links[0]).toHaveAttribute(
+      "href",
+      "https://github.com/NG-offischield/school-managing/releases/download/demo-apk-2026-10-17/isbree-demo-parent-arm64-v8a-debug.apk",
+    );
+    expect(screen.getByText(/signé avec une clé de débogage/)).toHaveTextContent("Le fichier est public");
+    // Teacher: an official release served by the portal itself.
+    expect(links[1]).toHaveAttribute("href", "/applications/0670a608-9fda-47e2-8f78-453fc6492e5d/telecharger");
     expect(screen.getByText(/pas encore disponible/)).toBeInTheDocument();
     expect(screen.queryByText(/iOS|App Store/)).toBeNull();
   });

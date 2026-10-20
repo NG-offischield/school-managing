@@ -1,7 +1,7 @@
 import { getPageOfKind } from "@/lib/api";
 import { Markup } from "@/lib/markup";
 
-import { DemoBadge, EmptyState, ProvisionalNote, Unavailable } from "./notices";
+import { EmptyState, ProvisionalNote, Unavailable } from "./notices";
 
 /** The body of the administrable page of a kind, with its honesty notices. */
 export async function EditorialSection({
@@ -20,7 +20,7 @@ export async function EditorialSection({
     <section aria-labelledby={heading ? `page-${page.data.slug}` : undefined}>
       {heading ? (
         <h2 id={`page-${page.data.slug}`} className="mb-4 text-3xl">
-          {page.data.title} <DemoBadge show={page.data.is_demo} />
+          {page.data.title}
         </h2>
       ) : null}
       <Markup source={page.data.body} />

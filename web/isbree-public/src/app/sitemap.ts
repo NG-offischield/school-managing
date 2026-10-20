@@ -8,7 +8,8 @@ import { config } from "@/lib/config";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [pages, news] = await Promise.all([getPages(), getNews()]);
   const base = config.publicUrl;
-  const fixed = ["", ...NAVIGATION.map((n) => n.href), "/admissions/preinscription"].map((path) => ({
+  const extra = config.demoMode ? ["/demonstration"] : [];
+  const fixed = ["", ...NAVIGATION.map((n) => n.href), "/admissions/preinscription", ...extra].map((path) => ({
     url: `${base}${path}`,
   }));
   const information = pages.ok

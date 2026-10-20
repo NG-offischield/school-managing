@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { logout } from "@/lib/auth-actions";
+import { config } from "@/lib/config";
 import { type Role, ROLES, spaceHref } from "@/lib/roles";
 
 import { Logo } from "./logo";
@@ -17,6 +18,10 @@ export function PortalHeader({ name, roles, current }: { name: string; roles: Ro
           <Logo />
         </Link>
         <div className="flex flex-wrap items-center gap-3">
+          {/* Back to the public site: a plain link, the two sites share no session. */}
+          <a href={config.publicUrl} className="link text-sm font-semibold">
+            Site ISBREE
+          </a>
           <p className="text-sm text-muted">
             Connecté : <span className="font-semibold text-ink">{name}</span>
           </p>

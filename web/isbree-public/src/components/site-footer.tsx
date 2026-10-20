@@ -89,6 +89,25 @@ export async function SiteFooter() {
           ) : null}
         </div>
       </div>
+      {config.demoMode ? (
+        <div className="border-t border-white/15">
+          <div className="container-page py-6 text-sm text-sand">
+            <p className="max-w-4xl" role="note">
+              <strong className="text-paper">Démonstration logicielle.</strong> ISBREE présente ici une démonstration de
+              sa plateforme de gestion scolaire. Les élèves, familles, personnels, classes, résultats, actualités,
+              images, statistiques et opérations affichés sont fictifs : ils ont été créés pour illustrer le
+              fonctionnement de la plateforme et ne correspondent pas aux données d&apos;un établissement scolaire
+              réel. Les textes de présentation sont des propositions en attente de validation.{" "}
+              <Link
+                href="/demonstration"
+                className="font-semibold text-paper underline decoration-ochre underline-offset-4 hover:decoration-2"
+              >
+                En savoir plus sur cette démonstration
+              </Link>
+            </p>
+          </div>
+        </div>
+      ) : null}
       <div className="border-t border-white/15">
         <div className="container-page flex flex-col gap-2 py-5 text-sm text-sand sm:flex-row sm:justify-between">
           <p>© {year} ISBREE. Tous droits réservés.</p>

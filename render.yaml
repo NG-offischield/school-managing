@@ -78,8 +78,13 @@ services:
           envVarKey: WEB_BFF_TOKEN
       - key: PORTAL_SESSION_SECRET
         generateValue: true
+      # Shown on the login page: it IS the API's ISBREE_DEMO_PASSWORD (one value, never
+      # typed twice — two hand-entered copies refuse every demo login once they differ).
       - key: ISBREE_DEMO_SHARED_PASSWORD
-        sync: false
+        fromService:
+          type: web
+          name: isbree-api
+          envVarKey: ISBREE_DEMO_PASSWORD
       - key: ISBREE_TRUSTED_PROXY_HOPS
         value: "1"
 

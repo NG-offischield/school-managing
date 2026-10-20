@@ -34,7 +34,6 @@ export default async function PortalPage({ params, searchParams }: PageProps<"/p
         </nav>
         <h1 className="mt-4 text-4xl">{p.title}</h1>
         <div className="mt-3 flex gap-2">
-          {p.is_demo ? <Badge>Démonstration</Badge> : null}
           {p.to_validate ? <Badge tone="muted">Contenu provisoire, à valider par l&apos;établissement</Badge> : null}
         </div>
         <div className="mt-8">

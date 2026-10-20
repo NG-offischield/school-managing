@@ -79,7 +79,7 @@ Le fichier [`render.yaml`](../render.yaml) décrit quatre services. Aucun secret
    | isbree-api | `ISBREE_PORTAL_URL` | URL du portail, par exemple `https://isbree-portal.onrender.com` (lue dans Render après création) |
    | portail et site | `DJANGO_INTERNAL_API_URL` | `https://<url de isbree-api>/api/v1` |
    | portail et site | `ISBREE_PUBLIC_URL`, `ISBREE_PORTAL_URL` | les deux URL Render |
-   | isbree-portal | `ISBREE_DEMO_SHARED_PASSWORD` | **la même** valeur que `ISBREE_DEMO_PASSWORD`, affichée sur la page de connexion |
+   | isbree-portal | `ISBREE_DEMO_SHARED_PASSWORD` | rien à saisir : `render.yaml` la lit dans `ISBREE_DEMO_PASSWORD` de `isbree-api` (`fromService`). Hors Blueprint, copiez **exactement** la même valeur. Le seed aligne à chaque démarrage le mot de passe des 4 comptes de démonstration sur `ISBREE_DEMO_PASSWORD` |
 
    `DJANGO_SECRET_KEY`, `WEB_BFF_TOKEN` et `PORTAL_SESSION_SECRET` sont **générés par Render**. Ils sont distincts de ceux du poste de développement et n'apparaissent dans aucun fichier.
 4. Appliquez le Blueprint. Une fois les URL connues, complétez les variables d'URL, puis relancez chaque service (**Manual Deploy → Deploy latest commit**).
@@ -101,12 +101,12 @@ Ne déclarez pas la démo opérationnelle tant que ces points ne sont pas vérif
 | `GET https://<api>/api/v1/health/` | 200 `{"status":"ok"}` |
 | Logs `isbree-api` | migrations appliquées, seed « rien de nouveau » au 2e démarrage |
 | Site public : accueil, À propos, Formations, Actualités, FAQ, Galerie, Contact, menu mobile | pages affichées, bandeau « Version de démonstration » |
-| Préinscription | encadré « Démonstration », référence `PRE-…` reçue avec des données fictives |
+| Préinscription | encadré « Formulaire de démonstration » près du formulaire, référence `PRE-…` reçue avec des données fictives, aucun « vous serez contacté » |
 | Portail sans session | `/espace/parent` → page de connexion ; en-têtes `X-Robots-Tag: noindex` et `Cache-Control: no-store` |
-| Connexion `parent.demo@isbree.test` | espace Parent, enfant « Léa Démo », déconnexion |
+| Connexion `parent.demo@isbree.test` | espace Parent, enfants « Léa Mballa » (6e A) et « Noah Mballa » (4e A), déconnexion |
 | `/espace/enseignant` avec le compte Parent | « Espace non accessible » |
 | Compte démo : toute écriture (ex. changer de mot de passe dans une application mobile) | refusée : 403 `DEMO_READ_ONLY` |
-| Applications mobiles | « pas encore disponible » (aucun APK publié, aucun faux lien) |
+| Applications mobiles | carte de l’application du rôle, bouton vers l’APK debug arm64 de la Release `demo-apk-2026-10-17` (fichier public sur GitHub) |
 | Adresse visiteur | une préinscription crée un événement de sécurité avec l'IP du visiteur et non celle de Render ; sinon ajuster `ISBREE_TRUSTED_PROXY_HOPS` |
 | Contrôle de santé Render | si le service reste « unhealthy » alors que `/health/` répond, vérifier l'hôte utilisé par le contrôle (`DJANGO_ALLOWED_HOSTS`) |
 

@@ -14,7 +14,9 @@ export const metadata: Metadata = {
 
 export default async function SchoolLifePage() {
   const [gallery, news] = await Promise.all([getGallery(), getNews()]);
-  const pictures = gallery.ok ? gallery.data.filter((i) => i.category !== "CAMPUS").slice(0, 4) : [];
+  // Sport first, then class life; the first class picture already illustrates the home page.
+  const byCategory = (category: string) => (gallery.ok ? gallery.data.filter((i) => i.category === category) : []);
+  const pictures = [...byCategory("SPORTS"), ...byCategory("CLASSROOMS").slice(1)].slice(0, 4);
   const events = news.ok ? news.data.filter((n) => n.category === "EVENT" || n.category === "SCHOOL_LIFE").slice(0, 3) : [];
   return (
     <>
