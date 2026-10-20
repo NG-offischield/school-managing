@@ -118,6 +118,8 @@ Derniers passages complets (14 et 15/10/2026, poste de développement) :
 - [Site et portail ISBREE](docs/isbree-web.md)
 - [Démo publique gratuite](docs/deploiement-demo.md) et [ADR 0033](docs/adr/0033-demo-publique-gratuite.md)
 - [Script de la vidéo de démonstration](docs/video-demo.md)
+- [Référencement Google du site public](docs/seo.md)
+- [Client d'administration Windows : installateur et build](docs/desktop-windows.md)
 - [Fiche Git et GitHub](docs/guide-git.md)
 - Réseau local et applications mobiles : [docs/reseau-local.md](docs/reseau-local.md), [mobile/README.md](mobile/README.md)
 

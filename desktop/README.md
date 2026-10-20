@@ -12,6 +12,10 @@ py -3 -m venv .venv
 
 Python 3.12 ou plus récent. Les dépendances sont PySide6, httpx et keyring ; pytest et ruff pour le développement.
 
+## Installateur Windows (sans Python)
+
+Un installateur Windows 10 / 11 64 bits est construit par `packaging\build.ps1` (PyInstaller + Inno Setup) : voir [docs/desktop-windows.md](../docs/desktop-windows.md) (installation, données du poste, build, vérifications).
+
 ## Configuration de l'URL du backend
 
 L'URL est cherchée dans cet ordre :

@@ -1,0 +1,2 @@
+# Build tools of the Windows package (packaging/build.ps1); not needed to run the client.
+pyinstaller==6.22.3

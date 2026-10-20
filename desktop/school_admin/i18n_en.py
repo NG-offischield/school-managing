@@ -1678,6 +1678,7 @@ ENGLISH = {
     "Une des factures choisies n'appartient pas à cet élève.": "One of the chosen invoices does not belong to this student.",
     "Une des factures choisies n'est plus payable (payée ou annulée).": "One of the chosen invoices is no longer payable (paid or cancelled).",
     "Une erreur imprévue est survenue. Réessayez ; si elle persiste, contactez le support.": "An unexpected error occurred. Try again; if it persists, contact support.",
+    "Une erreur inattendue s'est produite. Elle a été enregistrée dans le journal du poste ; réessayez.": "An unexpected error occurred. It was recorded in the workstation log; please try again.",
     "Une facture doit avoir au moins une ligne.": "An invoice must have at least one line.",
     "Une matière appartient toujours à une catégorie pédagogique existante.": "A subject always belongs to an existing teaching category.",
     "Une obligation de paiement pour un élève.": "A payment obligation for a student.",

@@ -3,13 +3,15 @@
 import sys
 
 from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 
+from .. import __version__
 from ..api.client import ApiClient
 from ..auth.device import device_info
 from ..auth.session import AuthService
 from ..auth.token_store import KeyringTokenStore
 from ..config import load_config, save_preference
+from ..diagnostics import install_excepthook, logger, server_label, setup_logging
 from ..i18n import LANGUAGES, language, set_language, tr
 from ..realtime import RealtimeClient, socket_url
 from ..services.accounts import AccountService
@@ -280,11 +282,24 @@ class AppController:
         )
 
 
+def _report_unexpected_error():
+    QMessageBox.critical(
+        None,
+        SOFTWARE_NAME,
+        tr("Une erreur inattendue s'est produite. Elle a été enregistrée dans le journal du poste ; réessayez."),
+    )
+
+
 def main(argv=None):
+    log_path = setup_logging()
     app = QApplication(argv if argv is not None else sys.argv)
+    install_excepthook(_report_unexpected_error)
     app.setApplicationName(SOFTWARE_NAME)  # identity of the program (paths, settings): never translated
     app.setWindowIcon(software_icon())
     config = load_config()
+    logger.info(
+        "Démarrage %s %s (serveur %s, journal %s)", SOFTWARE_NAME, __version__, server_label(config.api_url), log_path
+    )
     apply_theme(app, config.theme)  # Système (default) / Clair / Sombre, desktop.json
     follow_system_scheme(app)
     api = ApiClient(config.api_url, timeout=config.timeout, language=config.language)
@@ -295,4 +310,5 @@ def main(argv=None):
     controller.start()
     code = app.exec()
     api.close()
+    logger.info("Fermeture (code %s)", code)
     return code
