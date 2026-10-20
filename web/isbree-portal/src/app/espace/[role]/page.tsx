@@ -117,6 +117,15 @@ export default async function SpacePage({ params, searchParams }: PageProps<"/es
             >
               <Resources resources={resources} documentQuery={documentQuery} />
             </Section>
+            {ctx.apps.length ? (
+              <Section
+                id="applications"
+                title="Applications mobiles"
+                intro="L'application Android de votre rôle, à installer sur votre téléphone."
+              >
+                <Apps apps={ctx.apps} />
+              </Section>
+            ) : null}
             <Section id="actualites" title="Actualités">
               <News news={ctx.news} />
             </Section>
@@ -125,11 +134,6 @@ export default async function SpacePage({ params, searchParams }: PageProps<"/es
             </Section>
           </div>
           <aside className="space-y-10 lg:sticky lg:top-6 lg:self-start">
-            {ctx.apps.length ? (
-              <Section id="applications" title="Applications mobiles">
-                <Apps apps={ctx.apps} />
-              </Section>
-            ) : null}
             {ctx.pages.length ? (
               <Section id="informations" title="Informations">
                 <Pages pages={ctx.pages} role={role} />

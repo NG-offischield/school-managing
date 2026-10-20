@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { EditorialSection } from "@/components/editorial";
-import { Figure } from "@/components/figure";
+import { allIllustrations, Figure, IllustrationNote } from "@/components/figure";
 import { NewsCard } from "@/components/news-card";
 import { PageHeader } from "@/components/page-header";
 import { getGallery, getNews } from "@/lib/api";
@@ -35,9 +35,15 @@ export default async function SchoolLifePage() {
             </div>
             <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {pictures.map((image) => (
-                <Figure key={image.id} image={image} sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" />
+                <Figure
+                  key={image.id}
+                  image={image}
+                  showCredit={!allIllustrations(pictures)}
+                  sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
+                />
               ))}
             </div>
+            {allIllustrations(pictures) ? <IllustrationNote /> : null}
           </section>
         ) : null}
         {events.length ? (

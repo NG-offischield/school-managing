@@ -46,7 +46,7 @@ Les limites de débit de Django comptent par adresse : connexion, activation, pr
 - **Marquage honnête :**
   - `to_validate` signale un texte **provisoire**, affiché comme tel au lecteur ;
   - `is_demo` signale une donnée **fictive** (bandeau `ISBREE_DEMO_MODE`) ;
-  - `is_illustration` signale une image qui ne représente pas l'établissement. La légende le dit toujours.
+  - `is_illustration` signale une image qui ne représente pas l'établissement. La légende le dit toujours : en clair sous une image isolée ; dans une grille composée uniquement d'illustrations, une seule mention visible sous la grille, et la mention complète reste dans la légende de chaque image pour les lecteurs d'écran.
 - **Adresse :** l'adresse exacte n'est publiée qu'une fois `address_confirmed` coché.
 - **Formations :** n'affichent **que** les niveaux `public_visible` réellement ouverts.
 - **Fichiers :**

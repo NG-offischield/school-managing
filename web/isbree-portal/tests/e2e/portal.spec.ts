@@ -100,7 +100,7 @@ test.describe("role spaces (demo accounts)", () => {
       // Applications: a download button only for a published release, otherwise an honest notice.
       const app = page.locator("#applications").locator("..");
       const official = await app.getByRole("link", { name: /Télécharger pour Android/ }).count();
-      const demo = app.getByRole("link", { name: /Télécharger l'APK de démonstration/ });
+      const demo = app.getByRole("link", { name: "Télécharger l'APK (version de test)" });
       if ((await demo.count()) > 0) {
         // A demonstration build: only this project's GitHub Release, and labelled as such.
         await expect(demo.first()).toHaveAttribute(

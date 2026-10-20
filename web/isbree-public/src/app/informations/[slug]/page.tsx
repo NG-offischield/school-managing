@@ -16,6 +16,10 @@ import { Markup } from "@/lib/markup";
  */
 const NONE = "aucune-page";
 
+/** A blocking route (params read outside <Suspense>), as Next.js recommends for it.
+ * The 404 status of an unknown slug is set earlier, by src/proxy.ts. */
+export const instant = false;
+
 export async function generateStaticParams() {
   const pages = await getPages();
   const slugs = pages.ok ? pages.data.map((p) => ({ slug: p.slug })) : [];

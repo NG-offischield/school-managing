@@ -12,6 +12,10 @@ import { NEWS_CATEGORIES } from "@/lib/types";
 /** Cache Components needs at least one param: a placeholder when nothing is published (-> 404). */
 const NONE = "aucune-actualite";
 
+/** A blocking route (params read outside <Suspense>), as Next.js recommends for it.
+ * The 404 status of an unknown slug is set earlier, by src/proxy.ts. */
+export const instant = false;
+
 export async function generateStaticParams() {
   const news = await getNews();
   const slugs = news.ok ? news.data.map((n) => ({ slug: n.slug })) : [];
@@ -56,7 +60,16 @@ export default async function ArticlePage({ params }: PageProps<"/actualites/[sl
         </div>
       </header>
       <div className="container-page py-12">
-        {a.cover ? <Figure image={a.cover} className="mb-10 max-w-3xl" sizes="(min-width: 768px) 48rem, 100vw" /> : null}
+        {a.cover ? (
+          // Never wider than the picture itself (small illustrations would be blurred), at most 48rem.
+          <Figure
+            image={a.cover}
+            className="mb-10 w-full"
+            imageClassName="aspect-[4/3] w-full object-cover"
+            sizes="(min-width: 768px) 48rem, 100vw"
+            style={{ maxWidth: `min(48rem, ${a.cover.width ?? 768}px)` }}
+          />
+        ) : null}
         {a.body ? <Markup source={a.body} /> : null}
         <Link href="/actualites" className="link mt-10 inline-block font-semibold">
           ← Toutes les actualités

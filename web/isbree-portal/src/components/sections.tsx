@@ -47,7 +47,8 @@ function size(bytes: number | null) {
 export function Resources({ resources, documentQuery }: { resources: Resource[]; documentQuery: string }) {
   if (!resources.length) return <Empty>Aucune ressource n&apos;est publiée pour le moment.</Empty>;
   return (
-    <ul className="grid gap-4 md:grid-cols-2">
+    // Two columns only when there is something to put side by side.
+    <ul className={`grid gap-4 ${resources.length > 1 ? "md:grid-cols-2" : ""}`}>
       {resources.map((r) => {
         const scope = [r.school_class, r.level, r.academic_year, r.staff_function].filter(Boolean).join(" · ");
         return (
@@ -122,12 +123,20 @@ export function FaqList({ faq }: { faq: Faq[] }) {
 export function Pages({ pages, role }: { pages: PageSummary[]; role: Role }) {
   if (!pages.length) return null;
   return (
-    <ul className="grid gap-3 sm:grid-cols-2">
+    <ul className="card divide-y divide-line overflow-hidden">
       {pages.map((p) => (
         <li key={p.slug}>
-          <Link href={`/pages/${p.slug}?role=${role}`} className="card block h-full p-4 hover:border-ink">
-            <span className="font-semibold">{p.title}</span>
-            {p.summary ? <span className="mt-1 block text-sm text-muted">{p.summary}</span> : null}
+          <Link
+            href={`/pages/${p.slug}?role=${role}`}
+            className="flex min-h-11 items-center justify-between gap-3 px-4 py-3 hover:bg-sand/60 focus-visible:bg-sand/60"
+          >
+            <span className="min-w-0">
+              <span className="block font-semibold">{p.title}</span>
+              {p.summary ? <span className="mt-0.5 block text-sm text-muted">{p.summary}</span> : null}
+            </span>
+            <span aria-hidden="true" className="shrink-0 text-muted">
+              ›
+            </span>
           </Link>
         </li>
       ))}
@@ -136,48 +145,72 @@ export function Pages({ pages, role }: { pages: PageSummary[]; role: Role }) {
 }
 
 /**
- * Mobile applications of the roles held. Only a PUBLISHED release (a signed
- * release APK checked by Django) gets a download button; otherwise the
- * application is honestly announced as not yet available. Android only.
+ * Mobile applications of the roles held. A PUBLISHED release (a signed release
+ * APK checked by Django) is served by the portal; otherwise the demonstration
+ * build of the GitHub Release (lib/mobile-apps.ts), labelled as such; otherwise
+ * the application is honestly announced as not yet available. Android only.
  */
 export function Apps({ apps }: { apps: AppEntry[] }) {
   if (!apps.length) return null;
   return (
-    <ul className="grid gap-4 md:grid-cols-2">
-      {apps.map(({ app, label, release }) => (
-        <li key={app} className="card p-5">
-          <h3 className="text-xl">{label}</h3>
-          {release ? (
-            <>
-              <p className="mt-1 text-sm text-muted">
-                Version {release.version_name}
-                {release.min_android ? ` · Android ${release.min_android} ou plus récent` : ""} · {size(release.size)}
-                {release.published_at ? ` · publiée le ${formatDate(release.published_at)}` : ""}
-              </p>
-              {release.release_notes ? <p className="mt-3">{release.release_notes}</p> : null}
-              <a href={`/applications/${release.id}/telecharger`} className="btn btn-primary mt-4">
-                Télécharger pour Android (APK)
-              </a>
-              <details className="mt-3 text-sm text-muted">
-                <summary className="cursor-pointer">Vérifier le fichier</summary>
-                <p className="mt-2 break-all">
-                  Paquet : {release.package}
-                  <br />
-                  Empreinte SHA-256 : <code>{release.sha256}</code>
-                </p>
-              </details>
-            </>
-          ) : demoApk(app) ? (
-            <DemoApkCard apk={demoApk(app)!} />
-          ) : (
-            <p className="mt-2 text-muted">
-              Cette application n&apos;est pas encore disponible au téléchargement. L&apos;établissement l&apos;annoncera dès
-              qu&apos;une version officielle sera publiée.
-            </p>
-          )}
-        </li>
-      ))}
+    <ul className={`grid gap-6 ${apps.length > 1 ? "md:grid-cols-2" : ""}`}>
+      {apps.map(({ app, label, release }) => {
+        const demo = release ? null : demoApk(app);
+        return (
+          <li key={app} className="card flex min-w-0 flex-col p-5 sm:p-6">
+            <div className="flex items-center gap-4">
+              {/* Same icon as the installed app (decorative: the title names it). */}
+              <Image
+                src={`/apps/${app.toLowerCase()}.png`}
+                alt=""
+                width={56}
+                height={56}
+                loading="eager"
+                className="h-14 w-14 shrink-0 rounded-2xl"
+              />
+              <div className="min-w-0">
+                <h3 className="text-xl leading-tight">{label}</h3>
+                <p className="mt-1 text-sm text-muted">Android</p>
+              </div>
+            </div>
+            {release ? <OfficialRelease release={release} /> : demo ? <DemoApkCard apk={demo} /> : <NotYet />}
+          </li>
+        );
+      })}
     </ul>
+  );
+}
+
+function NotYet() {
+  return (
+    <p className="mt-4 text-muted">
+      Cette application n&apos;est pas encore disponible au téléchargement. L&apos;établissement l&apos;annoncera dès
+      qu&apos;une version officielle sera publiée.
+    </p>
+  );
+}
+
+function OfficialRelease({ release }: { release: NonNullable<AppEntry["release"]> }) {
+  return (
+    <>
+      <p className="mt-4 text-sm text-muted">
+        Version {release.version_name}
+        {release.min_android ? ` · Android ${release.min_android} ou plus récent` : ""} · {size(release.size)}
+        {release.published_at ? ` · publiée le ${formatDate(release.published_at)}` : ""}
+      </p>
+      {release.release_notes ? <p className="mt-3">{release.release_notes}</p> : null}
+      <a href={`/applications/${release.id}/telecharger`} className="btn btn-primary mt-5 w-full sm:w-auto sm:self-start">
+        Télécharger pour Android (APK)
+      </a>
+      <details className="mt-4 text-sm text-muted">
+        <summary className="cursor-pointer font-semibold text-ink">Vérifier le fichier</summary>
+        <p className="mt-2 break-all">
+          Paquet : {release.package}
+          <br />
+          Empreinte SHA-256 : <code>{release.sha256}</code>
+        </p>
+      </details>
+    </>
   );
 }
 
@@ -185,43 +218,41 @@ export function Apps({ apps }: { apps: AppEntry[] }) {
 function DemoApkCard({ apk }: { apk: DemoApk }) {
   return (
     <>
-      <div className="mt-2 flex items-start gap-3">
-        {/* Same icon as the installed app. */}
-        <Image src={`/apps/${apk.app.toLowerCase()}.png`} alt="" width={48} height={48} className="rounded-xl" />
-        <div>
-          <p>{apk.purpose}</p>
-          <p className="mt-1 text-sm text-muted">
-            Version {apk.versionName} · Android 10 ou plus récent, téléphone 64 bits (arm64) · {size(apk.size)}
-          </p>
-        </div>
-      </div>
-      <a href={apk.url} className="btn btn-primary mt-4" rel="noopener noreferrer">
-        Télécharger l&apos;APK de démonstration
+      <p className="mt-4">{apk.purpose}</p>
+      <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+        <dt className="text-muted">Version</dt>
+        <dd>{apk.versionName} (version de test, debug)</dd>
+        <dt className="text-muted">Téléphone</dt>
+        <dd>Android 10 ou plus récent, 64 bits (arm64)</dd>
+        <dt className="text-muted">Taille</dt>
+        <dd>{size(apk.size)}</dd>
+      </dl>
+      <a href={apk.url} className="btn btn-primary mt-5 w-full sm:w-auto sm:self-start" rel="noopener noreferrer">
+        Télécharger l&apos;APK (version de test)
       </a>
       <p className="mt-3 text-sm text-muted">
-        Build de démonstration (signé avec une clé de débogage) : il se connecte au serveur de démonstration et
+        Build de démonstration signé avec une clé de débogage : il se connecte au serveur de démonstration et
         n&apos;est pas une version officielle. Le fichier est public, hébergé sur GitHub.
       </p>
-      <details className="mt-3 text-sm">
+      <details className="mt-4 text-sm">
         <summary className="cursor-pointer font-semibold">Installer sur Android</summary>
         <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted">
-          <li>Téléchargez le fichier APK depuis votre téléphone Android (environ {size(apk.size)}).</li>
+          <li>Téléchargez le fichier depuis votre téléphone Android (environ {size(apk.size)}).</li>
           <li>Ouvrez-le depuis les téléchargements ou la notification.</li>
           <li>
-            Si Android le demande, autorisez votre navigateur à installer des applications inconnues (Paramètres → Applications
-            → accès spécial), puis revenez à l&apos;installation.
+            Si Android le demande, autorisez votre navigateur à installer des applications inconnues (Paramètres →
+            Applications → accès spécial), puis revenez à l&apos;installation.
           </li>
           <li>Installez, puis ouvrez l&apos;application « {apk.label} ».</li>
           <li>Connectez-vous avec le même identifiant que dans l&apos;Espace ISBREE.</li>
         </ol>
         <p className="mt-2 text-muted">
-          Une version déjà installée signée différemment doit être désinstallée avant cette installation.
-          Ce fichier est prévu pour les téléphones 64 bits (arm64-v8a), soit la quasi-totalité des téléphones
-          Android récents ; les anciens téléphones 32 bits ne sont pas pris en charge.
+          Une version déjà installée signée différemment doit être désinstallée avant cette installation. Les anciens
+          téléphones 32 bits ne sont pas pris en charge.
         </p>
       </details>
       <details className="mt-2 text-sm text-muted">
-        <summary className="cursor-pointer">Vérifier le fichier</summary>
+        <summary className="cursor-pointer font-semibold text-ink">Vérifier le fichier</summary>
         <p className="mt-2 break-all">
           Paquet : {apk.package}
           <br />

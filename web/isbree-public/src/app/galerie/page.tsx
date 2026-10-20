@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { Figure } from "@/components/figure";
+import { allIllustrations, Figure } from "@/components/figure";
 import { EmptyState, Unavailable } from "@/components/notices";
 import { PageHeader } from "@/components/page-header";
 import { getGallery } from "@/lib/api";
@@ -18,13 +18,16 @@ export default async function GalleryPage() {
     for (const image of gallery.data) groups.set(image.category, [...(groups.get(image.category) ?? []), image]);
   }
   const illustrations = gallery.ok && gallery.data.some((i) => i.is_illustration);
+  // All of them illustrations: said once in the header, not under each picture.
+  const onlyIllustrations = gallery.ok && allIllustrations(gallery.data);
   return (
     <>
       <PageHeader eyebrow="Galerie" title="En images">
         {illustrations ? (
           <p>
-            Les images marquées « illustration » ont été choisies pour présenter le site : elles ne sont pas des
-            photographies d&apos;ISBREE.
+            {onlyIllustrations
+              ? "Ces images sont des illustrations choisies pour présenter le site : elles ne sont pas des photographies d'ISBREE."
+              : "Les images marquées « illustration » ont été choisies pour présenter le site : elles ne sont pas des photographies d'ISBREE."}
           </p>
         ) : null}
       </PageHeader>
@@ -41,7 +44,7 @@ export default async function GalleryPage() {
               </h2>
               <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {images.map((image) => (
-                  <Figure key={image.id} image={image} />
+                  <Figure key={image.id} image={image} showCredit={!onlyIllustrations} />
                 ))}
               </div>
             </section>
