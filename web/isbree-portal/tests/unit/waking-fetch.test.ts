@@ -10,7 +10,7 @@ describe("calls to an API that is waking up (free host)", () => {
   it("retries the host's own 502 / 503 / 504 until the API answers", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(answer(502)).mockResolvedValueOnce(answer(503)).mockResolvedValue(answer(200));
     vi.stubGlobal("fetch", fetchMock);
-    const response = await fetchWhileWaking("https://api.test/x/", { method: "POST" }, { budgetMs: 5000, pauseMs: 1 });
+    const response = await fetchWhileWaking("https://api.test/x/", {}, { budgetMs: 5000, pauseMs: 1 });
     expect(response.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ActivationState, FormState } from "@/lib/auth-actions";
 import { portalRoles, roleFromSlug, spaceHref } from "@/lib/roles";
+import type { Readiness } from "@/lib/wait-for-api";
 
 vi.mock("@/lib/auth-actions", () => ({
   login: vi.fn(),
@@ -33,10 +34,70 @@ describe("roles", () => {
 });
 
 describe("login form", () => {
+  const ready = vi.fn(async (): Promise<Readiness> => "ready");
+
+  async function fillAndSubmit(user: ReturnType<typeof userEvent.setup>, button = "Se connecter") {
+    await user.type(screen.getByLabelText("Identifiant"), "parent.demo@isbree.test");
+    await user.type(screen.getByLabelText("Mot de passe"), "un-mot-de-passe");
+    await user.click(screen.getByRole("button", { name: button }));
+  }
+
+  it("API ready at once: the credentials are sent once", async () => {
+    const action = vi.fn(async (): Promise<FormState> => ({}));
+    const user = userEvent.setup();
+    render(<LoginForm action={action} wait={ready} />);
+    await fillAndSubmit(user);
+    await vi.waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+    const sent = (action.mock.calls[0] as unknown as [unknown, FormData])[1];
+    expect(sent.get("identifier")).toBe("parent.demo@isbree.test");
+  });
+
+  it("API waking up: a clear waiting state, then ONE automatic sign-in, without clicking again", async () => {
+    let wake!: () => void;
+    const wait = vi.fn(
+      ({ onWaiting }: { onWaiting?: () => void } = {}) =>
+        new Promise<Readiness>((resolve) => {
+          onWaiting?.();
+          wake = () => resolve("ready");
+        }),
+    );
+    const action = vi.fn(async (): Promise<FormState> => ({}));
+    const user = userEvent.setup();
+    render(<LoginForm action={action} wait={wait} />);
+    await fillAndSubmit(user);
+    expect(await screen.findByText(/Le premier démarrage peut prendre un moment/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Connexion…" })).toBeDisabled(); // no concurrent attempt
+    expect(action).not.toHaveBeenCalled(); // no credentials sent while the API sleeps
+    wake();
+    await vi.waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+    expect(wait).toHaveBeenCalledTimes(1);
+  });
+
+  it("API still down after the delay: says so, keeps the fields, offers to retry, sends nothing", async () => {
+    const action = vi.fn(async (): Promise<FormState> => ({}));
+    const user = userEvent.setup();
+    render(<LoginForm action={action} wait={async () => "timeout"} />);
+    await fillAndSubmit(user);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Le serveur ne répond pas actuellement");
+    expect(screen.getByLabelText("Identifiant")).toHaveValue("parent.demo@isbree.test");
+    expect(screen.getByLabelText("Mot de passe")).toHaveValue("un-mot-de-passe");
+    expect(screen.getByRole("button", { name: "Réessayer" })).toBeEnabled();
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it("a server error after waking is reported as such, not as a start-up", async () => {
+    const action = vi.fn(async (): Promise<FormState> => ({ error: "Le service est momentanément indisponible. Réessayez dans quelques instants." }));
+    const user = userEvent.setup();
+    render(<LoginForm action={action} wait={ready} />);
+    await fillAndSubmit(user);
+    expect(await screen.findByRole("alert")).toHaveTextContent("momentanément indisponible");
+    expect(screen.queryByText(/premier démarrage/)).not.toBeInTheDocument();
+  });
+
   it("shows Django's refusal without hinting whether the account exists", async () => {
     const action = vi.fn(async (): Promise<FormState> => ({ identifier: "x@y.test", error: "Identifiant ou mot de passe incorrect." }));
     const user = userEvent.setup();
-    render(<LoginForm action={action} />);
+    render(<LoginForm action={action} wait={ready} />);
     await user.type(screen.getByLabelText("Identifiant"), "x@y.test");
     await user.type(screen.getByLabelText("Mot de passe"), "wrong-password");
     await user.click(screen.getByRole("button", { name: "Se connecter" }));

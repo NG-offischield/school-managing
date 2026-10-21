@@ -1,21 +1,63 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { type FormEvent, startTransition, useActionState, useEffect, useRef, useState } from "react";
 
 import { type FormState, login } from "@/lib/auth-actions";
+import { waitForApi } from "@/lib/wait-for-api";
 
-export function LoginForm({ action = login }: { action?: typeof login }) {
+/** "checking": first readiness check; "waking": the API is starting; "timeout": it did not start in time. */
+type Phase = "idle" | "checking" | "waking" | "timeout";
+
+const NOT_RESPONDING =
+  "Le serveur ne répond pas actuellement. Vos informations sont conservées : réessayez dans un instant.";
+
+/**
+ * Sign-in in two steps: the form first waits for the API to be ready (free
+ * host asleep: about a minute), repeating only an anonymous readiness check,
+ * then sends the credentials ONCE. The fields are kept while waiting and
+ * after a timeout (the form is not reset); the password stays in the field,
+ * never stored elsewhere.
+ */
+export function LoginForm({ action = login, wait = waitForApi }: { action?: typeof login; wait?: typeof waitForApi }) {
   const [state, formAction, pending] = useActionState(action, {} as FormState);
+  const [phase, setPhase] = useState<Phase>("idle");
   const alertRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const busy = pending || phase === "checking" || phase === "waking";
+
   useEffect(() => {
     if (state.error) alertRef.current?.focus();
   }, [state]);
-  const errors = state.fieldErrors ?? {};
+  useEffect(() => {
+    if (phase === "timeout") alertRef.current?.focus();
+  }, [phase]);
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+    const data = new FormData(event.currentTarget);
+    // Missing fields are reported by the action at once: no need to wait for the API.
+    if (String(data.get("identifier") ?? "").trim() && String(data.get("password") ?? "")) {
+      abortRef.current = new AbortController();
+      setPhase("checking");
+      const readiness = await wait({ signal: abortRef.current.signal, onWaiting: () => setPhase("waking") });
+      if (readiness !== "ready") {
+        setPhase(readiness === "timeout" ? "timeout" : "idle");
+        return;
+      }
+    }
+    setPhase("idle");
+    startTransition(() => formAction(data));
+  }
+
+  const error = phase === "timeout" ? NOT_RESPONDING : busy ? undefined : state.error;
+  const errors = busy ? {} : (state.fieldErrors ?? {});
   return (
-    <form action={formAction} className="space-y-5" noValidate>
-      {state.error ? (
+    <form onSubmit={onSubmit} className="space-y-5" noValidate aria-busy={busy}>
+      {error ? (
         <div ref={alertRef} tabIndex={-1} role="alert" className="rounded-xl border border-danger bg-danger-soft p-4 font-semibold text-danger">
-          {state.error}
+          {error}
         </div>
       ) : null}
       <div>
@@ -64,11 +106,15 @@ export function LoginForm({ action = login }: { action?: typeof login }) {
           </p>
         ) : null}
       </div>
-      <button type="submit" className="btn btn-primary w-full" disabled={pending}>
-        {pending ? "Connexion…" : "Se connecter"}
+      <button type="submit" className="btn btn-primary w-full" disabled={busy}>
+        {busy ? "Connexion…" : phase === "timeout" ? "Réessayer" : "Se connecter"}
       </button>
-      <p className="text-sm text-muted" aria-live="polite">
-        {pending ? "Si le service était en veille, la connexion peut prendre jusqu'à une minute." : ""}
+      <p className="text-sm text-muted" role="status" aria-live="polite">
+        {phase === "waking"
+          ? "Connexion au serveur… Le premier démarrage peut prendre un moment (environ une minute) : la connexion continuera automatiquement."
+          : busy
+            ? "Connexion au serveur…"
+            : ""}
       </p>
     </form>
   );

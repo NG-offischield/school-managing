@@ -58,6 +58,19 @@ test.describe("without a session", () => {
 test.describe("role spaces (demo accounts)", () => {
   test.skip(!PASSWORD, "E2E_DEMO_PASSWORD (or .env.isbree.local) is required");
 
+  test("the API readiness is checked first, then the credentials are sent once", async ({ page }) => {
+    const calls: string[] = [];
+    page.on("request", (r) => {
+      const path = new URL(r.url()).pathname;
+      if (path === "/connexion/disponibilite") calls.push("ready-check");
+      else if (r.method() === "POST" && path === "/connexion") calls.push("login");
+    });
+    await signIn(page, ACCOUNTS.parent);
+    await expect(page).toHaveURL(/\/espace\/parent$/);
+    expect(calls.filter((c) => c === "login")).toHaveLength(1);
+    expect(calls.indexOf("ready-check")).toBeLessThan(calls.indexOf("login"));
+  });
+
   test("a parent sees a verified child and only the parent space", async ({ page, context }) => {
     await signIn(page, ACCOUNTS.parent);
     await expect(page).toHaveURL(/\/espace\/parent$/);

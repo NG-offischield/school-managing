@@ -25,6 +25,7 @@ import {
 const WAKING_UP =
   "Le service démarre (hébergement de démonstration en veille) : cela peut prendre jusqu'à une minute. Réessayez dans un instant.";
 const UNAVAILABLE = "Le service est momentanément indisponible. Réessayez dans quelques instants.";
+const NOT_RESPONDING = "Le serveur ne répond pas actuellement. Réessayez dans un instant.";
 
 function serviceError(status: number) {
   return status === NO_RESPONSE ? WAKING_UP : UNAVAILABLE;
@@ -69,7 +70,8 @@ export async function login(_previous: FormState, form: FormData): Promise<FormS
     if (result.status === 429) {
       return { identifier, error: "Trop de tentatives. Patientez une minute avant de réessayer." };
     }
-    return { identifier, error: serviceError(result.status) };
+    // The form waited for the API before posting: no answer now means it stopped responding.
+    return { identifier, error: result.status === NO_RESPONSE ? NOT_RESPONDING : UNAVAILABLE };
   }
   const session = sessionFromTokens(result.data);
   store.set(SESSION_COOKIE, await sealSession(session), sessionCookieOptions(session));
