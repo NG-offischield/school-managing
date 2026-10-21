@@ -1,6 +1,7 @@
 import { logApiFailure } from "./api-url";
 import { config } from "./config";
 import { type Session, sessionFromTokens, type TokenPayload } from "./session";
+import { fetchWhileWaking, WAKING_STATUSES } from "./waking-fetch";
 
 /**
  * Server-to-server calls to Django. Used by proxy.ts, server actions, route
@@ -31,18 +32,18 @@ export const NO_RESPONSE = 0;
 export async function postJson<T>(path: string, body: unknown, opts: { token?: string; clientIp?: string } = {}): Promise<ApiResult<T>> {
   const url = djangoUrl(path);
   try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: djangoHeaders({ ...opts, json: true }),
-      body: JSON.stringify(body),
-      cache: "no-store",
-      // A free API host can take up to about a minute to wake up.
-      signal: AbortSignal.timeout(75000),
-    });
+    // A free API host can take up to about a minute to wake up.
+    const response = await fetchWhileWaking(
+      url,
+      { method: "POST", headers: djangoHeaders({ ...opts, json: true }), body: JSON.stringify(body), cache: "no-store" },
+      { budgetMs: 75000 },
+    );
     const parsed = (await response.json().catch(() => null)) as { data?: T; error?: ApiError } | null;
     if (response.ok) return { ok: true, status: response.status, data: parsed?.data as T };
     // 400 / 401 / 403 / 429 are expected answers (wrong password, throttling): not logged.
     if (response.status === 404 || response.status >= 500) logApiFailure("POST", url, response.status);
+    // Still booting when the budget ran out: reported like no answer at all.
+    if (WAKING_STATUSES.has(response.status)) return { ok: false, status: NO_RESPONSE, error: null };
     return { ok: false, status: response.status, error: parsed?.error ?? null };
   } catch (error) {
     logApiFailure("POST", url, error);

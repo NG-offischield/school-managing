@@ -8,6 +8,7 @@ import { logApiFailure } from "./api-url";
 import { clientIp } from "./client-ip";
 import { djangoHeaders, djangoUrl } from "./django";
 import { type Session, SESSION_COOKIE, unsealSession } from "./session";
+import { fetchWhileWaking } from "./waking-fetch";
 
 /**
  * Data Access Layer: every read of personal data goes through here. The
@@ -39,11 +40,11 @@ export async function api<T>(path: string, query: Record<string, string | undefi
   for (const [name, value] of Object.entries(query)) if (value) url.searchParams.set(name, value);
   let response: Response;
   try {
-    response = await fetch(url, {
-      headers: djangoHeaders({ token: session.access, clientIp: await visitorIp() }),
-      cache: "no-store",
-      signal: AbortSignal.timeout(45000), // the API may be waking up (free host)
-    });
+    response = await fetchWhileWaking(
+      url,
+      { headers: djangoHeaders({ token: session.access, clientIp: await visitorIp() }), cache: "no-store" },
+      { budgetMs: 45000 }, // the API may be waking up (free host)
+    );
   } catch (error) {
     logApiFailure("GET", url.toString(), error);
     return { ok: false, status: 503 };
